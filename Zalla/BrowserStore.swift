@@ -20,10 +20,12 @@ final class BrowserStore: ObservableObject {
     @Published var selectedID: UUID?
     @Published private(set) var bookmarks: [SavedPage] = []
     @Published private(set) var history: [SavedPage] = []
+    @Published private(set) var downloads: [DownloadRecord] = []
     @Published var storageError: String?
     @Published var clearingData = false
     @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
+    private var activeDownloadDelegates: [UUID: TabDownloadSession] = [:]
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
 
@@ -42,8 +44,13 @@ final class BrowserStore: ObservableObject {
                 bookmarks = library.bookmarks
                 history = library.history
             }
+            downloads = DownloadsStore.load()
         } catch {
             storageError = "Your saved library could not be read. \(error.localizedDescription)"
+        }
+        // Seed home shortcuts on first launch if missing.
+        if UserDefaults.standard.data(forKey: HomeShortcuts.storageKey) == nil {
+            HomeShortcuts.save(HomeShortcuts.defaults)
         }
         addTab()
     }
@@ -60,16 +67,27 @@ final class BrowserStore: ObservableObject {
         tab.onImageExport = { [weak self] request in
             self?.imageExport = request
         }
+        tab.onDownloadDecision = { [weak self] tab, download, response, sourceURL in
+            self?.beginDownload(tab: tab, download: download, response: response, sourceURL: sourceURL)
+        }
         tabs.append(tab)
         selectedID = tab.id
         if let url { tab.load(url) }
     }
 
     func close(_ tab: BrowserTab) {
+        tab.capturePreview()
         tab.webView.stopLoading()
         tabs.removeAll { $0.id == tab.id }
         if tabs.isEmpty { addTab() }
         else if selectedID == tab.id { selectedID = tabs.last?.id }
+    }
+
+    func selectTab(_ tab: BrowserTab) {
+        if let current = selected, current.id != tab.id {
+            current.capturePreview()
+        }
+        selectedID = tab.id
     }
 
     func bookmark(_ tab: BrowserTab) {
@@ -92,6 +110,19 @@ final class BrowserStore: ObservableObject {
 
     func removeBookmarks(at offsets: IndexSet) {
         bookmarks.remove(atOffsets: offsets)
+        save()
+    }
+
+    func removeBookmark(id: UUID) {
+        bookmarks.removeAll { $0.id == id }
+        save()
+    }
+
+    func renameBookmark(id: UUID, title: String) {
+        guard let index = bookmarks.firstIndex(where: { $0.id == id }) else { return }
+        let cleaned = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        bookmarks[index].title = cleaned
         save()
     }
 
@@ -123,6 +154,7 @@ final class BrowserStore: ObservableObject {
         if !keepingBookmarks {
             bookmarks.removeAll()
         }
+        clearAllDownloads()
         save()
         await WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
@@ -132,7 +164,9 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: "searchEngine")
         defaults.removeObject(forKey: "themeID")
         defaults.removeObject(forKey: "appIconPreference")
+        defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
+        HomeShortcuts.resetToDefaults()
         if UIApplication.shared.supportsAlternateIcons {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 UIApplication.shared.setAlternateIconName(nil) { _ in
@@ -142,6 +176,70 @@ final class BrowserStore: ObservableObject {
         }
         addTab()
         clearingData = false
+    }
+
+    // MARK: - Downloads
+
+    private func beginDownload(tab: BrowserTab, download: WKDownload, response: URLResponse, sourceURL: URL) {
+        let filename = DownloadsStore.suggestedFilename(from: response, sourceURL: sourceURL)
+        let destination = DownloadsStore.uniqueDestination(for: filename)
+        let record = DownloadRecord(
+            filename: filename,
+            sourceURL: sourceURL,
+            localRelativePath: destination.relative,
+            byteCount: response.expectedContentLength > 0 ? response.expectedContentLength : nil,
+            state: .downloading,
+            isPrivate: tab.isPrivate
+        )
+        downloads.insert(record, at: 0)
+        persistDownloads()
+
+        let session = TabDownloadSession(
+            recordID: record.id,
+            destinationURL: destination.url,
+            onUpdate: { [weak self] id, state, bytes, errorMessage in
+                self?.updateDownload(id: id, state: state, byteCount: bytes, errorMessage: errorMessage)
+            },
+            onFinish: { [weak self] id in
+                self?.activeDownloadDelegates[id] = nil
+            }
+        )
+        activeDownloadDelegates[record.id] = session
+        download.delegate = session
+    }
+
+    private func updateDownload(id: UUID, state: DownloadState, byteCount: Int64?, errorMessage: String?) {
+        guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
+        downloads[index].state = state
+        if let byteCount { downloads[index].byteCount = byteCount }
+        downloads[index].errorMessage = errorMessage
+        persistDownloads()
+    }
+
+    func removeDownload(_ record: DownloadRecord) {
+        if let url = record.localFileURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        downloads.removeAll { $0.id == record.id }
+        persistDownloads()
+    }
+
+    func clearAllDownloads() {
+        for record in downloads {
+            if let url = record.localFileURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
+        downloads.removeAll()
+        persistDownloads()
+    }
+
+    private func persistDownloads() {
+        do {
+            try DownloadsStore.save(downloads)
+        } catch {
+            storageError = "Your downloads list could not be saved. \(error.localizedDescription)"
+        }
     }
 
     private func save() {
@@ -160,6 +258,58 @@ struct ImageExportRequest: Identifiable {
     let data: Data
 }
 
+/// Bridges WKDownloadDelegate callbacks into BrowserStore without retaining the tab forever.
+final class TabDownloadSession: NSObject, WKDownloadDelegate {
+    let recordID: UUID
+    let destinationURL: URL
+    let onUpdate: (UUID, DownloadState, Int64?, String?) -> Void
+    let onFinish: (UUID) -> Void
+
+    init(
+        recordID: UUID,
+        destinationURL: URL,
+        onUpdate: @escaping (UUID, DownloadState, Int64?, String?) -> Void,
+        onFinish: @escaping (UUID) -> Void
+    ) {
+        self.recordID = recordID
+        self.destinationURL = destinationURL
+        self.onUpdate = onUpdate
+        self.onFinish = onFinish
+    }
+
+    func download(_ download: WKDownload,
+                  decideDestinationUsing response: URLResponse,
+                  suggestedFilename: String,
+                  completionHandler: @escaping (URL?) -> Void) {
+        completionHandler(destinationURL)
+    }
+
+    func downloadDidFinish(_ download: WKDownload) {
+        var bytes: Int64?
+        if let values = try? destinationURL.resourceValues(forKeys: [.fileSizeKey]),
+           let size = values.fileSize {
+            bytes = Int64(size)
+        }
+        let id = recordID
+        let update = onUpdate
+        let finish = onFinish
+        Task { @MainActor in
+            update(id, .completed, bytes, nil)
+            finish(id)
+        }
+    }
+
+    func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        let message = error.localizedDescription
+        let id = recordID
+        let update = onUpdate
+        let finish = onFinish
+        Task { @MainActor in
+            update(id, .failed, nil, message)
+            finish(id)
+        }
+    }
+}
 
 private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
     weak var delegate: WKScriptMessageHandler?
@@ -188,10 +338,18 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var hasPage = false
     @Published var errorMessage: String?
     @Published var externalURL: URL?
+    @Published var previewImage: UIImage?
+    @Published var isReaderActive = false
+    @Published var readerAvailable = false
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
+    var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
     private var observations: [NSKeyValueObservation] = []
     private let scriptHandlerProxy = WeakScriptMessageHandler()
+    private var pendingDownloadResponse: URLResponse?
+    private var pendingDownloadURL: URL?
+    private var readerOriginalURL: URL?
+    private var lastSnapshotAt: Date?
 
     init(isPrivate: Bool) {
         self.isPrivate = isPrivate
@@ -248,8 +406,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     """
 
     private func refresh() {
-        title = webView.title ?? webView.url?.host ?? "New tab"
-        url = webView.url
+        if !isReaderActive {
+            title = webView.title ?? webView.url?.host ?? "New tab"
+            url = webView.url
+        }
         progress = webView.estimatedProgress
         isLoading = webView.isLoading
         canGoBack = webView.canGoBack
@@ -259,8 +419,105 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func load(_ url: URL) {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         errorMessage = nil
+        isReaderActive = false
+        readerOriginalURL = nil
         hasPage = true
         webView.load(URLRequest(url: url))
+    }
+
+    func backHistoryItems(limit: Int = 5) -> [HistoryListItem] {
+        let list = webView.backForwardList.backList.reversed().prefix(limit)
+        let mapped = list.map { item -> (title: String, url: URL) in
+            let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return (title, item.url)
+        }
+        return HistoryListHelper.limited(Array(mapped), limit: limit)
+    }
+
+    func forwardHistoryItems(limit: Int = 5) -> [HistoryListItem] {
+        let list = webView.backForwardList.forwardList.prefix(limit)
+        let mapped = list.map { item -> (title: String, url: URL) in
+            let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return (title, item.url)
+        }
+        return HistoryListHelper.limited(Array(mapped), limit: limit)
+    }
+
+    func goToBackForwardItem(_ item: WKBackForwardListItem) {
+        isReaderActive = false
+        readerOriginalURL = nil
+        webView.go(to: item)
+    }
+
+    func goToHistoryListItem(_ item: HistoryListItem, direction: HoldRevealKind) {
+        let source: [WKBackForwardListItem]
+        switch direction {
+        case .back:
+            source = Array(webView.backForwardList.backList.reversed().prefix(5))
+        case .forward:
+            source = Array(webView.backForwardList.forwardList.prefix(5))
+        }
+        let index = item.id - 1
+        guard source.indices.contains(index) else { return }
+        goToBackForwardItem(source[index])
+    }
+
+    func capturePreview() {
+        guard hasPage, !isLoading else { return }
+        if let lastSnapshotAt, Date().timeIntervalSince(lastSnapshotAt) < 1.5 { return }
+        lastSnapshotAt = Date()
+        let config = WKSnapshotConfiguration()
+        config.rect = webView.bounds
+        webView.takeSnapshot(with: config) { [weak self] image, _ in
+            Task { @MainActor in
+                self?.previewImage = image
+            }
+        }
+    }
+
+    func enterReaderMode(dark: Bool) {
+        guard hasPage, !isReaderActive else { return }
+        webView.evaluateJavaScript(ReaderMode.extractScript) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if error != nil || ReaderMode.parseExtractedJSON(result) == nil {
+                    self.errorMessage = "Reader mode could not extract an article from this page."
+                    return
+                }
+                guard let article = ReaderMode.parseExtractedJSON(result) else { return }
+                self.readerOriginalURL = self.webView.url
+                let html = ReaderMode.buildHTML(
+                    title: article.title,
+                    byline: article.byline,
+                    site: article.site,
+                    paragraphs: article.paragraphs,
+                    dark: dark
+                )
+                self.isReaderActive = true
+                self.title = article.title
+                self.webView.loadHTMLString(html, baseURL: self.readerOriginalURL)
+            }
+        }
+    }
+
+    func exitReaderMode() {
+        guard isReaderActive else { return }
+        isReaderActive = false
+        if let original = readerOriginalURL {
+            readerOriginalURL = nil
+            webView.load(URLRequest(url: original))
+        } else {
+            readerOriginalURL = nil
+            webView.goBack()
+        }
+    }
+
+    func toggleReaderMode(dark: Bool) {
+        if isReaderActive {
+            exitReaderMode()
+        } else {
+            enterReaderMode(dark: dark)
+        }
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -282,11 +539,18 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         errorMessage = nil
+        if !isReaderActive {
+            readerAvailable = false
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         refresh()
-        guard !isPrivate, let url, ["http", "https"].contains(url.scheme ?? "") else { return }
+        if !isReaderActive {
+            readerAvailable = hasPage
+            capturePreview()
+        }
+        guard !isPrivate, !isReaderActive, let url, ["http", "https"].contains(url.scheme ?? "") else { return }
         onVisit?(SavedPage(title: title, url: url))
     }
 
@@ -321,6 +585,26 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                ["mailto", "tel", "sms"].contains(scheme) { externalURL = url }
             decisionHandler(.cancel)
         }
+    }
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        let response = navigationResponse.response
+        if navigationResponse.canShowMIMEType == false || DownloadsStore.isLikelyDownload(response: response) {
+            pendingDownloadResponse = response
+            pendingDownloadURL = response.url ?? url
+            decisionHandler(.download)
+            return
+        }
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+        let response = pendingDownloadResponse ?? navigationResponse.response
+        let source = pendingDownloadURL ?? response.url ?? URL(string: "about:blank")!
+        pendingDownloadResponse = nil
+        pendingDownloadURL = nil
+        onDownloadDecision?(self, download, response, source)
     }
 
     func findOnPage() {
