@@ -6,8 +6,18 @@ struct ZallaApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
+    @AppStorage("customAccentGradient") private var customAccentGradient = true
 
-    private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(
+            themeID: themeID,
+            useCustom: useCustomAccent,
+            customHex: customAccentHex,
+            gradient: customAccentGradient
+        )
+    }
 
     var body: some Scene {
         WindowGroup {

@@ -8,6 +8,12 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(ToolbarStyle.storageKey, "toolbarStyle")
     }
 
+    func testAddressBarPlacement() {
+        XCTAssertEqual(AddressBarPlacement.bottom.rawValue, "Bottom")
+        XCTAssertEqual(AddressBarPlacement.top.rawValue, "Top")
+        XCTAssertEqual(AddressBarPlacement.storageKey, "addressBarPlacement")
+    }
+
     func testCompactPillTitleForNewTab() {
         XCTAssertEqual(
             CompactAddressChrome.pillTitle(hasPage: false, pageTitle: "", isReaderActive: false),
@@ -27,7 +33,7 @@ final class ToolbarStyleTests: XCTestCase {
     }
 
     func testCompactHostSubtitle() {
-        let url = URL(string: "https://example.com/path")
+        let url = URL(string: "https://www.example.com/path")
         XCTAssertEqual(CompactAddressChrome.hostSubtitle(url: url, hasPage: true), "example.com")
         XCTAssertNil(CompactAddressChrome.hostSubtitle(url: url, hasPage: false))
         XCTAssertNil(CompactAddressChrome.hostSubtitle(url: nil, hasPage: true))
@@ -37,5 +43,11 @@ final class ToolbarStyleTests: XCTestCase {
         let url = URL(string: "https://example.com/path?q=1")
         XCTAssertEqual(CompactAddressChrome.editingPrefill(url: url), "https://example.com/path?q=1")
         XCTAssertEqual(CompactAddressChrome.editingPrefill(url: nil), "")
+    }
+
+    func testAddressDisplayCollapsedLabel() {
+        let url = URL(string: "https://www.apple.com/iphone")
+        XCTAssertEqual(AddressDisplay.collapsedLabel(url: url, hasPage: true), "apple.com")
+        XCTAssertEqual(AddressDisplay.collapsedLabel(url: nil, hasPage: false), "Search or enter a website")
     }
 }

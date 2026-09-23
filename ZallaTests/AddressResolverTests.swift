@@ -32,4 +32,11 @@ final class AddressResolverTests: XCTestCase {
     func testUnsupportedSchemeBecomesSearch() {
         XCTAssertEqual(AddressResolver.resolve("file:///etc/passwd", engine: .bing)?.host, "www.bing.com")
     }
+
+    func testSearchURLStaysHTTPSInApp() {
+        let url = AddressResolver.searchURL(for: "privacy browser", engine: .duckDuckGo)!
+        XCTAssertEqual(url.scheme, "https")
+        XCTAssertEqual(url.host, "duckduckgo.com")
+        XCTAssertTrue(url.absoluteString.contains("privacy"))
+    }
 }

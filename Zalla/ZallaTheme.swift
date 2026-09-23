@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
     case zallaRed
@@ -28,6 +29,26 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .space: return "Space"
         }
     }
+
+    /// Featured accents shown first in Settings (refined, not a wall of chips).
+    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space] }
+
+    /// Secondary rainbow accents, presented more quietly.
+    static var secondary: [ZallaThemeID] {
+        [.orange, .yellow, .green, .blue, .indigo, .violet]
+    }
+
+    /// Best-fit alternate icon among shipped assets.
+    var suggestedAppIcon: AppIconPreference {
+        switch self {
+        case .zallaRed, .orange, .yellow:
+            return .default
+        case .space, .indigo, .violet, .blue:
+            return .dark
+        case .ocean, .forest, .green:
+            return .tinted
+        }
+    }
 }
 
 struct ZallaTheme: Equatable {
@@ -37,9 +58,13 @@ struct ZallaTheme: Equatable {
     let deep: Color
     let highlight: Color
     let gradientEnd: Color
+    var usesGradientAccent: Bool = true
 
     var gradient: LinearGradient {
-        LinearGradient(colors: [primary, gradientEnd], startPoint: .topLeading, endPoint: .bottomTrailing)
+        if usesGradientAccent {
+            return LinearGradient(colors: [primary, gradientEnd], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+        return LinearGradient(colors: [primary, primary], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     static func hex(_ value: String) -> Color {
@@ -85,6 +110,71 @@ struct ZallaTheme: Equatable {
     static func theme(forRaw raw: String) -> ZallaTheme {
         theme(for: ZallaThemeID(rawValue: raw) ?? .zallaRed)
     }
+
+    /// Resolves preset or custom accent for chrome tinting.
+    static func resolved(themeID: String, useCustom: Bool, customHex: String, gradient: Bool = true) -> ZallaTheme {
+        if useCustom {
+            return custom(hexString: customHex, gradient: gradient)
+        }
+        return theme(forRaw: themeID)
+    }
+
+    static func custom(hexString: String, gradient: Bool) -> ZallaTheme {
+        let primary = hex(normalizeHex(hexString) ?? "E33B4F")
+        let bright = primary.opacity(0.92)
+        let deep = primary.opacity(0.75)
+        let end: Color
+        if gradient {
+            end = shifted(hexString: normalizeHex(hexString) ?? "E33B4F", towardHue: 0.08)
+        } else {
+            end = primary
+        }
+        return ZallaTheme(
+            id: .zallaRed,
+            primary: primary,
+            bright: bright,
+            deep: deep,
+            highlight: bright,
+            gradientEnd: end,
+            usesGradientAccent: gradient
+        )
+    }
+
+    static func normalizeHex(_ value: String) -> String? {
+        var cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.hasPrefix("#") { cleaned.removeFirst() }
+        guard cleaned.count == 6,
+              cleaned.unicodeScalars.allSatisfy({ CharacterSet(charactersIn: "0123456789abcdefABCDEF").contains($0) }) else {
+            return nil
+        }
+        return cleaned.uppercased()
+    }
+
+    static func rgbComponents(from hexString: String) -> (Double, Double, Double) {
+        let cleaned = normalizeHex(hexString) ?? "E33B4F"
+        var int: UInt64 = 0
+        Scanner(string: cleaned).scanHexInt64(&int)
+        let r = Double((int >> 16) & 0xFF) / 255
+        let g = Double((int >> 8) & 0xFF) / 255
+        let b = Double(int & 0xFF) / 255
+        return (r, g, b)
+    }
+
+    static func hexString(r: Double, g: Double, b: Double) -> String {
+        let ri = Int(max(0, min(1, r)) * 255)
+        let gi = Int(max(0, min(1, g)) * 255)
+        let bi = Int(max(0, min(1, b)) * 255)
+        return String(format: "%02X%02X%02X", ri, gi, bi)
+    }
+
+    private static func shifted(hexString: String, towardHue: Double) -> Color {
+        let (r, g, b) = rgbComponents(from: hexString)
+        // Mild shift toward a neighboring hue for gradient end without UIKit dependency in pure math.
+        let nr = min(1, max(0, r * (1 - towardHue) + towardHue * 0.85))
+        let ng = min(1, max(0, g * (1 - towardHue * 0.4)))
+        let nb = min(1, max(0, b * (1 - towardHue) + towardHue * 0.55))
+        return Color(red: nr, green: ng, blue: nb)
+    }
 }
 
 enum AppIconPreference: String, CaseIterable, Identifiable {
@@ -101,5 +191,55 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
         case .dark: return "AppIconDark"
         case .tinted: return "AppIconTinted"
         }
+    }
+
+    static func apply(_ preference: AppIconPreference, completion: ((String?) -> Void)? = nil) {
+        guard UIApplication.shared.supportsAlternateIcons else {
+            completion?("Alternate icons need a TestFlight or App Store build with CFBundleAlternateIcons configured.")
+            return
+        }
+        let name = preference.alternateIconName
+        if UIApplication.shared.alternateIconName == name {
+            completion?(nil)
+            return
+        }
+        UIApplication.shared.setAlternateIconName(name) { error in
+            DispatchQueue.main.async {
+                if let error {
+                    completion?(error.localizedDescription)
+                } else {
+                    completion?(nil)
+                }
+            }
+        }
+    }
+}
+
+enum HomeWelcomeMode: String, CaseIterable, Identifiable, Codable {
+    case none = "None"
+    case name = "Named welcome"
+    case quotes = "Rotating quotes"
+
+    var id: String { rawValue }
+
+    static let storageKey = "homeWelcomeMode"
+    static let userNameKey = "homeUserName"
+}
+
+enum HomeQuotes {
+    static let lines: [String] = [
+        "Built around you.",
+        "Browse at your own pace.",
+        "Your tabs, your rhythm.",
+        "Keep what matters close.",
+        "A quieter place on the web.",
+        "Start where you left off.",
+        "Simple tools, ready when you are."
+    ]
+
+    static func quote(for date: Date = Date()) -> String {
+        let calendar = Calendar.current
+        let day = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
+        return lines[day % lines.count]
     }
 }

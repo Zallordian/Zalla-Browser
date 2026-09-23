@@ -12,6 +12,19 @@ final class ReaderModeTests: XCTestCase {
         XCTAssertEqual(article?.paragraphs.count, 1)
     }
 
+    func testParseResultEmpty() {
+        let raw = """
+        {"title":"Hello","byline":"","site":"","paragraphs":[]}
+        """
+        switch ReaderMode.parseResult(raw) {
+        case .failure(let failure):
+            XCTAssertEqual(failure, .empty)
+            XCTAssertFalse(failure.userMessage.isEmpty)
+        case .success:
+            XCTFail("Expected empty failure")
+        }
+    }
+
     func testBuildHTMLContainsTitleAndNoScript() {
         let html = ReaderMode.buildHTML(
             title: "Title <x>",

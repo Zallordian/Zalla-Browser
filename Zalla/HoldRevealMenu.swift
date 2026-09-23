@@ -16,6 +16,9 @@ struct HoldRevealMenu: View {
     let highlightedID: Int?
     var onTapItem: ((HoldRevealItem) -> Void)? = nil
 
+    static let rowHeight: CGFloat = 58
+    static let bottomPadding: CGFloat = 110
+
     var body: some View {
         VStack(spacing: 0) {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -45,6 +48,7 @@ struct HoldRevealMenu: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .frame(minHeight: Self.rowHeight)
                     .background(highlighted ? Color.accentColor : Color.clear)
                     .contentShape(Rectangle())
                 }
@@ -63,15 +67,40 @@ struct HoldRevealMenu: View {
         .shadow(color: .black.opacity(0.22), radius: 18, y: 8)
     }
 
-    static func highlightedID(at point: CGPoint, items: [HoldRevealItem], in bounds: CGRect) -> Int? {
+    /// Hit-test using the menu's own global frame when available; falls back to screen geometry.
+    static func highlightedID(
+        at point: CGPoint,
+        items: [HoldRevealItem],
+        in bounds: CGRect,
+        menuFrame: CGRect? = nil
+    ) -> Int? {
         guard !items.isEmpty else { return nil }
-        let rowHeight: CGFloat = 56
+        let rowHeight = Self.rowHeight
         let sheetHeight = CGFloat(items.count) * rowHeight
-        let bottomPadding: CGFloat = 110
-        let sheetTop = bounds.height - bottomPadding - sheetHeight
-        let sheetBottom = bounds.height - bottomPadding
-        guard point.y >= sheetTop - 48, point.y <= sheetBottom + 24 else { return nil }
-        let index = min(max(Int((point.y - sheetTop) / rowHeight), 0), items.count - 1)
+
+        let sheetTop: CGFloat
+        let sheetBottom: CGFloat
+        let sheetLeading: CGFloat
+        let sheetTrailing: CGFloat
+
+        if let menuFrame, menuFrame.width > 8, menuFrame.height > 8 {
+            sheetTop = menuFrame.minY
+            sheetBottom = menuFrame.maxY
+            sheetLeading = menuFrame.minX - 24
+            sheetTrailing = menuFrame.maxX + 24
+        } else {
+            sheetTop = bounds.height - Self.bottomPadding - sheetHeight
+            sheetBottom = bounds.height - Self.bottomPadding
+            sheetLeading = bounds.minX + 12
+            sheetTrailing = bounds.maxX - 12
+        }
+
+        // Generous vertical slack so finger drag stays on the intended control.
+        guard point.y >= sheetTop - 56, point.y <= sheetBottom + 40 else { return nil }
+        guard point.x >= sheetLeading, point.x <= sheetTrailing else { return nil }
+
+        let relativeY = min(max(point.y - sheetTop, 0), sheetHeight - 1)
+        let index = min(max(Int(relativeY / rowHeight), 0), items.count - 1)
         return items[index].id
     }
 }

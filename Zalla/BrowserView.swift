@@ -7,9 +7,13 @@ struct BrowserView: View {
     @ObservedObject var browser: BrowserStore
     @AppStorage("appearance") private var appearance = "System"
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @State private var sheet: BrowserSheet?
 
-    private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
+    }
 
     var body: some View {
         Group {
@@ -60,21 +64,31 @@ private struct TabContent: View {
     @Binding var sheet: BrowserSheet?
     @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
+    @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @State private var address = ""
     @State private var showShare = false
     @State private var isEditingCompactAddress = false
+    @State private var isEditingClassicAddress = false
     @FocusState private var addressFocused: Bool
 
     @State private var holdKind: HoldRevealKind?
     @State private var holdItems: [HoldRevealItem] = []
     @State private var holdHighlightedID: Int?
     @State private var suppressNextNavTap = false
+    @State private var holdMenuFrame: CGRect = .zero
 
-    private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
+    }
     private var toolbarStyle: ToolbarStyle {
         ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic
+    }
+    private var addressBarPlacement: AddressBarPlacement {
+        AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
     }
 
     var body: some View {
@@ -97,11 +111,16 @@ private struct TabContent: View {
                     .background(.regularMaterial)
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if addressBarPlacement == .top {
+                    topChrome
+                }
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if toolbarStyle == .classic {
-                    classicToolbar
-                } else {
-                    compactToolbar
+                if addressBarPlacement == .bottom {
+                    bottomChrome
+                } else if toolbarStyle == .classic {
+                    classicNavOnly
                 }
             }
 
@@ -110,17 +129,33 @@ private struct TabContent: View {
             }
         }
         .onChange(of: tab.url) { _, url in
-            if !addressFocused { address = url?.absoluteString ?? "" }
+            if !addressFocused {
+                address = url?.absoluteString ?? ""
+                isEditingClassicAddress = false
+            }
         }
         .onChange(of: addressFocused) { _, focused in
             if focused {
+                if toolbarStyle == .classic {
+                    isEditingClassicAddress = true
+                    address = AddressDisplay.editingText(url: tab.url).isEmpty ? address : AddressDisplay.editingText(url: tab.url)
+                    if address.isEmpty {
+                        address = tab.url?.absoluteString ?? ""
+                    }
+                }
                 DispatchQueue.main.async {
                     UIResponder.currentFirstResponder()?.selectAll(nil)
                 }
-            } else if isEditingCompactAddress {
-                // Collapse Compact chrome when the field resigns (submit, cancel, or blur).
-                isEditingCompactAddress = false
-                address = tab.url?.absoluteString ?? ""
+            } else {
+                if isEditingCompactAddress {
+                    // Collapse Compact chrome when the field resigns (submit, cancel, or blur).
+                    isEditingCompactAddress = false
+                    address = tab.url?.absoluteString ?? ""
+                }
+                if isEditingClassicAddress {
+                    isEditingClassicAddress = false
+                    address = tab.url?.absoluteString ?? ""
+                }
             }
         }
         .onAppear { address = tab.url?.absoluteString ?? "" }
@@ -151,21 +186,29 @@ private struct TabContent: View {
                     commitHoldReveal(id: item.id)
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 110)
+                .padding(.bottom, addressBarPlacement == .top ? 36 : 110)
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: HoldMenuFrameKey.self, value: geo.frame(in: .global))
+                    }
+                )
+                .onPreferenceChange(HoldMenuFrameKey.self) { holdMenuFrame = $0 }
                 .gesture(
                     DragGesture(minimumDistance: 0, coordinateSpace: .global)
                         .onChanged { value in
                             holdHighlightedID = HoldRevealMenu.highlightedID(
                                 at: value.location,
                                 items: holdItems,
-                                in: UIScreen.main.bounds
+                                in: UIScreen.main.bounds,
+                                menuFrame: holdMenuFrame
                             ) ?? holdHighlightedID
                         }
                         .onEnded { value in
                             let id = HoldRevealMenu.highlightedID(
                                 at: value.location,
                                 items: holdItems,
-                                in: UIScreen.main.bounds
+                                in: UIScreen.main.bounds,
+                                menuFrame: holdMenuFrame
                             ) ?? holdHighlightedID
                             if let id {
                                 commitHoldReveal(id: id)
@@ -210,61 +253,141 @@ private struct TabContent: View {
         holdHighlightedID = nil
     }
 
+    @ViewBuilder
+    private var topChrome: some View {
+        if toolbarStyle == .classic {
+            classicAddressBlock(includeNav: false)
+                .padding(.horizontal, 18)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+                .background { chromeMaterial(edges: .top) }
+        } else {
+            compactToolbar
+                .background { chromeMaterial(edges: .top) }
+        }
+    }
+
+    @ViewBuilder
+    private var bottomChrome: some View {
+        if toolbarStyle == .classic {
+            classicToolbar
+        } else {
+            compactToolbar
+        }
+    }
+
     private var classicToolbar: some View {
         VStack(spacing: 10) {
-            if tab.isLoading { ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading") }
-            if tab.hasPage {
-                HStack(spacing: 10) {
-                    Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField("Search or enter a website", text: $address)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
-                        .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
-                        .onSubmit { submitAddress() }
-                        .accessibilityLabel("Search or website address")
-                    Button {
-                        if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
-                    } label: { Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise") }
-                    .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
-                    .frame(minWidth: 44, minHeight: 44)
-                }
-                .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
-            }
-
-            HStack {
-                holdNavButton(
-                    label: "Back",
-                    icon: "chevron.left",
-                    enabled: tab.canGoBack,
-                    kind: .back
-                ) { tab.webView.goBack() }
-                Spacer()
-                holdNavButton(
-                    label: "Forward",
-                    icon: "chevron.right",
-                    enabled: tab.canGoForward,
-                    kind: .forward
-                ) { tab.webView.goForward() }
-                Spacer()
-                control("Share page", icon: "square.and.arrow.up") { showShare = true }.disabled(tab.url == nil)
-                Spacer()
-                tabsButton
-                Spacer()
-                Button { sheet = .menu } label: {
-                    Image(systemName: "ellipsis.circle").font(.title3)
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .accessibilityLabel("Browser menu")
-            }
+            classicAddressBlock(includeNav: true)
         }
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 6)
-        .background {
-            Color(uiColor: .systemBackground).opacity(0.92)
-                .background(.ultraThinMaterial)
-                .ignoresSafeArea(edges: .bottom)
+        .background { chromeMaterial(edges: .bottom) }
+    }
+
+    private var classicNavOnly: some View {
+        VStack(spacing: 0) {
+            classicNavRow
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
+        .background { chromeMaterial(edges: .bottom) }
+    }
+
+    private func chromeMaterial(edges: Edge.Set) -> some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .overlay(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.28 : 0.55))
+            .ignoresSafeArea(edges: edges)
+    }
+
+    @ViewBuilder
+    private func classicAddressBlock(includeNav: Bool) -> some View {
+        VStack(spacing: 10) {
+            if tab.isLoading {
+                ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading")
+            }
+            if tab.hasPage || isEditingClassicAddress || addressFocused {
+                classicAddressField
+            }
+            if includeNav {
+                classicNavRow
+            }
+        }
+    }
+
+    private var classicAddressField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                .foregroundStyle(.secondary)
+            if addressFocused || isEditingClassicAddress {
+                TextField("Search or enter a website", text: $address)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
+                    .onSubmit { submitAddress() }
+                    .accessibilityLabel("Search or website address")
+            } else {
+                Text(AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { beginClassicAddressEditing() }
+                    .accessibilityLabel("Address, \(AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage))")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Shows the full URL for editing")
+            }
+            Button {
+                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+            } label: { Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise") }
+            .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
+            .frame(minWidth: 44, minHeight: 44)
+        }
+        .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
+        .contentShape(Capsule())
+        .onTapGesture {
+            if !(addressFocused || isEditingClassicAddress) {
+                beginClassicAddressEditing()
+            }
+        }
+    }
+
+    private var classicNavRow: some View {
+        HStack {
+            holdNavButton(
+                label: "Back",
+                icon: "chevron.left",
+                enabled: tab.canGoBack,
+                kind: .back
+            ) { tab.webView.goBack() }
+            Spacer()
+            holdNavButton(
+                label: "Forward",
+                icon: "chevron.right",
+                enabled: tab.canGoForward,
+                kind: .forward
+            ) { tab.webView.goForward() }
+            Spacer()
+            control("Share page", icon: "square.and.arrow.up") { showShare = true }.disabled(tab.url == nil)
+            Spacer()
+            tabsButton
+            Spacer()
+            Button { sheet = .menu } label: {
+                Image(systemName: "ellipsis.circle").font(.title3)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Browser menu")
+        }
+    }
+
+    private func beginClassicAddressEditing() {
+        address = AddressDisplay.editingText(url: tab.url)
+        isEditingClassicAddress = true
+        DispatchQueue.main.async {
+            addressFocused = true
         }
     }
 
@@ -378,6 +501,9 @@ private struct TabContent: View {
         // Focus after the TextField is in the hierarchy.
         DispatchQueue.main.async {
             addressFocused = true
+            DispatchQueue.main.async {
+                UIResponder.currentFirstResponder()?.selectAll(nil)
+            }
         }
     }
 
@@ -389,10 +515,13 @@ private struct TabContent: View {
 
     private func submitAddress() {
         let engine = SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+        // Always resolve through AddressResolver so search stays inside Zalla's webview.
         guard let url = AddressResolver.resolve(address, engine: engine) else { return }
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         tab.load(url)
         addressFocused = false
         isEditingCompactAddress = false
+        isEditingClassicAddress = false
     }
 
     private func compactCircle(icon: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
@@ -485,7 +614,10 @@ private struct TabContent: View {
                 }
                 if enabled { action() }
             }
-            .simultaneousGesture(holdRevealGesture(kind: kind, enabled: enabled))
+            .simultaneousGesture(holdRevealGesture(
+                kind: kind,
+                enabled: enabled && !(kind == .back ? tab.backHistoryItems() : tab.forwardHistoryItems()).isEmpty
+            ))
     }
 
     private func holdRevealGesture(kind: HoldRevealKind, enabled: Bool) -> some Gesture {
@@ -502,7 +634,8 @@ private struct TabContent: View {
                         holdHighlightedID = HoldRevealMenu.highlightedID(
                             at: drag.location,
                             items: holdItems,
-                            in: UIScreen.main.bounds
+                            in: UIScreen.main.bounds,
+                            menuFrame: holdMenuFrame
                         ) ?? holdHighlightedID
                     }
                 default:
@@ -517,7 +650,8 @@ private struct TabContent: View {
                         holdHighlightedID = HoldRevealMenu.highlightedID(
                             at: drag.location,
                             items: holdItems,
-                            in: UIScreen.main.bounds
+                            in: UIScreen.main.bounds,
+                            menuFrame: holdMenuFrame
                         ) ?? holdHighlightedID
                     }
                     if holdKind != nil, let id = holdHighlightedID {
@@ -534,6 +668,13 @@ private struct TabContent: View {
     private func control(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Image(systemName: icon).frame(minWidth: 44, minHeight: 44) }
             .accessibilityLabel(label)
+    }
+}
+
+private struct HoldMenuFrameKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
     }
 }
 
@@ -645,6 +786,7 @@ private struct BrowserMenuSheet: View {
 private struct TabsView: View {
     @ObservedObject var browser: BrowserStore
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmCloseAll = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
 
@@ -661,9 +803,11 @@ private struct TabsView: View {
                         },
                         close: { browser.close(tab) }
                     )
+                    .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .trailing).combined(with: .opacity)))
                 }
             }
             .padding(16)
+            .animation(.easeInOut(duration: 0.2), value: browser.tabs.map(\.id))
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Your tabs")
@@ -674,7 +818,21 @@ private struct TabsView: View {
                     Button("Private tab") { browser.addTab(isPrivate: true); dismiss() }
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                if browser.tabs.count > 1 {
+                    Button("Close All", role: .destructive) { confirmCloseAll = true }
+                }
+            }
             ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        }
+        .confirmationDialog("Close all tabs?", isPresented: $confirmCloseAll, titleVisibility: .visible) {
+            Button("Close All", role: .destructive) {
+                browser.closeAllTabs()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Opens a fresh tab afterward.")
         }
     }
 }
@@ -702,6 +860,7 @@ private struct TabPreviewCard: View {
                             }
                     }
                 }
+                .frame(maxWidth: .infinity)
                 .frame(height: 120)
                 .clipped()
 
@@ -732,13 +891,27 @@ private struct TabPreviewCard: View {
             }
             .padding(10)
         }
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(selected ? Color.accentColor : Color.clear, lineWidth: 2)
         }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onTapGesture(perform: select)
+        .gesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    if value.translation.width < -80 || value.translation.height < -80 {
+                        close()
+                    }
+                }
+        )
+        .contextMenu {
+            Button(role: .destructive, action: close) {
+                Label("Close Tab", systemImage: "xmark")
+            }
+        }
     }
 }
 
@@ -993,15 +1166,24 @@ private struct DownloadsView: View {
 }
 
 private struct HomePersonalizationView: View {
-    @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
     @AppStorage(HomeShortcuts.washIntensityKey) private var washIntensity = 0.35
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
+    @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
+    @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
 
     var body: some View {
         Form {
             Section("New tab") {
                 Toggle("Show Zalla logo", isOn: $showLogo)
-                Toggle("Show recent history chips", isOn: $showRecentHistory)
+                Picker("Welcome", selection: $welcomeModeRaw) {
+                    ForEach(HomeWelcomeMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode.rawValue)
+                    }
+                }
+                if welcomeModeRaw == HomeWelcomeMode.name.rawValue {
+                    TextField("Your name", text: $userName)
+                        .textInputAutocapitalization(.words)
+                }
                 VStack(alignment: .leading) {
                     Text("Background wash")
                     Slider(value: $washIntensity, in: 0...0.6, step: 0.05)
@@ -1010,6 +1192,8 @@ private struct HomePersonalizationView: View {
             Section {
                 Button("Reset shortcuts to defaults") {
                     HomeShortcuts.resetToDefaults()
+                    welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
+                    userName = ""
                 }
             } footer: {
                 Text("Shortcuts themselves are edited from the new tab Edit button. Reset restores the default shortcut set and these toggles.")
@@ -1025,9 +1209,13 @@ private struct SettingsView: View {
     @AppStorage("appearance") private var appearance = "System"
     @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
+    @AppStorage("customAccentGradient") private var customAccentGradient = true
     @AppStorage("appIconPreference") private var appIconPreference = AppIconPreference.default.rawValue
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
+    @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -1035,11 +1223,24 @@ private struct SettingsView: View {
     @State private var exportURL: URL?
     @State private var showExporter = false
     @State private var bookmarkMessage: String?
+    @State private var customColor = Color(red: 0.89, green: 0.23, blue: 0.31)
+    @State private var hexDraft = "E33B4F"
+    @State private var redSlider = 0.89
+    @State private var greenSlider = 0.23
+    @State private var blueSlider = 0.31
+    @State private var suggestIconForTheme: ZallaThemeID?
 
-    private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(
+            themeID: themeID,
+            useCustom: useCustomAccent,
+            customHex: customAccentHex,
+            gradient: customAccentGradient
+        )
+    }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "3"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "5"
         return "\(marketing) (\(build))"
     }
 
@@ -1057,6 +1258,11 @@ private struct SettingsView: View {
                         Text(style.rawValue).tag(style.rawValue)
                     }
                 }
+                Picker("Address bar", selection: $addressBarPlacementRaw) {
+                    ForEach(AddressBarPlacement.allCases) { placement in
+                        Text(placement.rawValue).tag(placement.rawValue)
+                    }
+                }
             }
 
             Section("New tab page") {
@@ -1065,29 +1271,39 @@ private struct SettingsView: View {
                 }
             }
 
-            Section("Accent theme") {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 12)], spacing: 12) {
-                    ForEach(ZallaThemeID.allCases) { id in
-                        let swatch = ZallaTheme.theme(for: id)
-                        Button {
-                            themeID = id.rawValue
-                        } label: {
-                            Circle()
-                                .fill(swatch.gradient)
-                                .frame(width: 36, height: 36)
-                                .overlay {
-                                    if themeID == id.rawValue {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption.bold())
-                                            .foregroundStyle(.white)
-                                    }
-                                }
-                                .accessibilityLabel(id.displayName)
-                        }
-                        .buttonStyle(.plain)
-                    }
+            Section {
+                themeRow(title: "Signature", ids: ZallaThemeID.featured)
+                DisclosureGroup("More accents") {
+                    themeRow(title: nil, ids: ZallaThemeID.secondary)
                 }
-                .padding(.vertical, 4)
+                Toggle("Custom accent", isOn: $useCustomAccent)
+                if useCustomAccent {
+                    ColorPicker("Color", selection: $customColor, supportsOpacity: false)
+                        .onChange(of: customColor) { _, newValue in
+                            syncFromColor(newValue)
+                        }
+                    VStack(alignment: .leading, spacing: 8) {
+                        labeledSlider("Red", value: $redSlider)
+                        labeledSlider("Green", value: $greenSlider)
+                        labeledSlider("Blue", value: $blueSlider)
+                    }
+                    .onChange(of: redSlider) { _, _ in syncFromSliders() }
+                    .onChange(of: greenSlider) { _, _ in syncFromSliders() }
+                    .onChange(of: blueSlider) { _, _ in syncFromSliders() }
+                    HStack {
+                        Text("#")
+                        TextField("Hex", text: $hexDraft)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .onSubmit(applyHexDraft)
+                        Button("Apply", action: applyHexDraft)
+                    }
+                    Toggle("Gradient accent", isOn: $customAccentGradient)
+                }
+            } header: {
+                Text("Accent")
+            } footer: {
+                Text("Accents are optional. Zalla Red remains the default. Matching app icons are suggested when a preset is available.")
             }
 
             Section("App icon") {
@@ -1101,6 +1317,17 @@ private struct SettingsView: View {
                 }
                 if let iconMessage {
                     Text(iconMessage).font(.footnote).foregroundStyle(.secondary)
+                }
+                Text("Per-accent icon artwork beyond Default, Dark, and Tinted can be added later. Preference mapping is ready.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Tools") {
+                NavigationLink {
+                    NetworkSpeedView()
+                } label: {
+                    Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
                 }
             }
 
@@ -1120,7 +1347,7 @@ private struct SettingsView: View {
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("Clear browsing data closes all tabs and removes history, cookies, and website caches. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("Clear browsing data closes all tabs and removes history, cookies, and website caches. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {
@@ -1153,6 +1380,28 @@ private struct SettingsView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Use a matching app icon?",
+            isPresented: Binding(
+                get: { suggestIconForTheme != nil },
+                set: { if !$0 { suggestIconForTheme = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let id = suggestIconForTheme {
+                let suggested = id.suggestedAppIcon
+                Button("Use \(suggested.rawValue) icon") {
+                    appIconPreference = suggested.rawValue
+                    applyIcon(suggested)
+                    suggestIconForTheme = nil
+                }
+                Button("Keep current icon", role: .cancel) { suggestIconForTheme = nil }
+            }
+        } message: {
+            if let id = suggestIconForTheme {
+                Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
+            }
+        }
         .fileImporter(
             isPresented: $showImporter,
             allowedContentTypes: [.html, .text],
@@ -1172,27 +1421,107 @@ private struct SettingsView: View {
             Button("OK") { bookmarkMessage = nil }
         } message: { Text(bookmarkMessage ?? "") }
         .tint(theme.primary)
+        .onAppear { loadCustomControls() }
+    }
+
+    @ViewBuilder
+    private func themeRow(title: String?, ids: [ZallaThemeID]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let title {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 12) {
+                ForEach(ids) { id in
+                    let swatch = ZallaTheme.theme(for: id)
+                    Button {
+                        useCustomAccent = false
+                        themeID = id.rawValue
+                        suggestIconForTheme = id
+                    } label: {
+                        VStack(spacing: 6) {
+                            Circle()
+                                .fill(swatch.gradient)
+                                .frame(width: 34, height: 34)
+                                .overlay {
+                                    if !useCustomAccent && themeID == id.rawValue {
+                                        Image(systemName: "checkmark")
+                                            .font(.caption.bold())
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                            Text(id.displayName)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(id.displayName)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func labeledSlider(_ title: String, value: Binding<Double>) -> some View {
+        HStack {
+            Text(title).frame(width: 52, alignment: .leading)
+            Slider(value: value, in: 0...1)
+        }
+    }
+
+    private func loadCustomControls() {
+        hexDraft = ZallaTheme.normalizeHex(customAccentHex) ?? "E33B4F"
+        let rgb = ZallaTheme.rgbComponents(from: hexDraft)
+        redSlider = rgb.0
+        greenSlider = rgb.1
+        blueSlider = rgb.2
+        customColor = Color(red: rgb.0, green: rgb.1, blue: rgb.2)
+    }
+
+    private func syncFromColor(_ color: Color) {
+        #if canImport(UIKit)
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        ui.getRed(&r, green: &g, blue: &b, alpha: &a)
+        redSlider = Double(r)
+        greenSlider = Double(g)
+        blueSlider = Double(b)
+        syncFromSliders()
+        #endif
+    }
+
+    private func syncFromSliders() {
+        let hex = ZallaTheme.hexString(r: redSlider, g: greenSlider, b: blueSlider)
+        customAccentHex = hex
+        hexDraft = hex
+        customColor = Color(red: redSlider, green: greenSlider, blue: blueSlider)
+        useCustomAccent = true
+    }
+
+    private func applyHexDraft() {
+        guard let normalized = ZallaTheme.normalizeHex(hexDraft) else { return }
+        customAccentHex = normalized
+        hexDraft = normalized
+        let rgb = ZallaTheme.rgbComponents(from: normalized)
+        redSlider = rgb.0
+        greenSlider = rgb.1
+        blueSlider = rgb.2
+        customColor = Color(red: rgb.0, green: rgb.1, blue: rgb.2)
+        useCustomAccent = true
     }
 
     private func applyIcon(_ preference: AppIconPreference) {
-        guard UIApplication.shared.supportsAlternateIcons else {
-            iconMessage = "Alternate icons need a TestFlight or App Store build with CFBundleAlternateIcons configured."
-            return
-        }
-        let name = preference.alternateIconName
-        if UIApplication.shared.alternateIconName == name {
-            iconMessage = nil
-            return
-        }
-        UIApplication.shared.setAlternateIconName(name) { error in
-            DispatchQueue.main.async {
-                if let error {
-                    iconMessage = error.localizedDescription
-                } else {
-                    iconMessage = preference == .default
-                        ? "Using the default icon."
-                        : "Icon updated to \(preference.rawValue)."
-                }
+        AppIconPreference.apply(preference) { message in
+            if let message {
+                iconMessage = message
+            } else {
+                iconMessage = preference == .default
+                    ? "Using the default icon."
+                    : "Icon updated to \(preference.rawValue)."
             }
         }
     }

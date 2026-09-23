@@ -7,9 +7,12 @@ struct NewTabView: View {
 
     @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
-    @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage(HomeShortcuts.washIntensityKey) private var washIntensity = 0.35
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
+    @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
+    @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
 
     @State private var shortcuts: [HomeShortcut] = HomeShortcuts.load()
     @State private var address = ""
@@ -17,11 +20,12 @@ struct NewTabView: View {
     @State private var editingShortcut: HomeShortcut?
     @FocusState private var searchFocused: Bool
 
-    private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
+    }
 
-    private var recentChips: [SavedPage] {
-        guard showRecentHistory else { return [] }
-        return Array(browser.history.prefix(8))
+    private var welcomeMode: HomeWelcomeMode {
+        HomeWelcomeMode(rawValue: welcomeModeRaw) ?? .quotes
     }
 
     var body: some View {
@@ -75,43 +79,31 @@ struct NewTabView: View {
                         .frame(width: 72, height: 72)
                         .accessibilityLabel("Zalla")
                 }
+                welcomeBlock
                 searchField
-                if !recentChips.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(recentChips) { page in
-                                Button { tab.load(page.url) } label: {
-                                    Text(page.title)
+                if shortcuts.isEmpty {
+                    emptyShortcutsNudge
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 14)], spacing: 16) {
+                        ForEach(shortcuts) { shortcut in
+                            Button {
+                                if let url = shortcut.url { tab.load(url) }
+                            } label: {
+                                VStack(spacing: 10) {
+                                    Image(systemName: shortcut.symbolName)
+                                        .font(.title2)
+                                        .foregroundStyle(theme.primary)
+                                        .frame(width: 52, height: 52)
+                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                    Text(shortcut.title)
                                         .font(.caption.weight(.semibold))
                                         .lineLimit(1)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 8)
-                                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
+                                        .foregroundStyle(.primary)
                                 }
-                                .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity)
                             }
+                            .buttonStyle(.plain)
                         }
-                    }
-                }
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 14)], spacing: 16) {
-                    ForEach(shortcuts) { shortcut in
-                        Button {
-                            if let url = shortcut.url { tab.load(url) }
-                        } label: {
-                            VStack(spacing: 10) {
-                                Image(systemName: shortcut.symbolName)
-                                    .font(.title2)
-                                    .foregroundStyle(theme.primary)
-                                    .frame(width: 52, height: 52)
-                                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                Text(shortcut.title)
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .foregroundStyle(.primary)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 Button("View library") { onOpenLibrary() }
@@ -120,6 +112,52 @@ struct NewTabView: View {
             }
             .padding(24)
         }
+    }
+
+    @ViewBuilder
+    private var welcomeBlock: some View {
+        switch welcomeMode {
+        case .none:
+            EmptyView()
+        case .name:
+            let trimmed = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                Text("Welcome back")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+            } else {
+                Text("Welcome, \(trimmed)")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+        case .quotes:
+            Text(HomeQuotes.quote())
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 8)
+        }
+    }
+
+    private var emptyShortcutsNudge: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "link.badge.plus")
+                .font(.title2)
+                .foregroundStyle(theme.primary.opacity(0.85))
+            Text("Add a few links you use often.")
+                .font(.subheadline.weight(.medium))
+            Text("Tap Edit to personalize this page.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal, 16)
+        .background(
+            Color(uiColor: .secondarySystemGroupedBackground).opacity(0.65),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private var editModeBody: some View {
@@ -208,6 +246,8 @@ struct NewTabView: View {
             .padding(.horizontal, 18)
             .frame(minHeight: 52)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
+            .contentShape(Capsule())
+            .onTapGesture { searchFocused = true }
             .onSubmit(submitAddress)
             .padding(.horizontal, 8)
     }
@@ -223,7 +263,8 @@ struct NewTabView: View {
     }
 
     private func submitAddress() {
-        if let url = AddressResolver.resolve(address, engine: SearchEngine(rawValue: searchEngine) ?? .duckDuckGo) {
+        let engine = SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+        if let url = AddressResolver.resolve(address, engine: engine) {
             tab.load(url)
             searchFocused = false
         }
@@ -258,24 +299,23 @@ private struct ShortcutEditor: View {
             }
             Section("Icon") {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
-                    ForEach(symbols, id: \.self) { symbol in
+                    ForEach(symbols, id: \.self) { name in
                         Button {
-                            shortcut.symbolName = symbol
+                            shortcut.symbolName = name
                         } label: {
-                            Image(systemName: symbol)
-                                .frame(width: 44, height: 44)
+                            Image(systemName: name)
+                                .frame(width: 40, height: 40)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(shortcut.symbolName == symbol
-                                              ? Color.accentColor.opacity(0.2)
-                                              : Color(uiColor: .secondarySystemFill))
+                                    shortcut.symbolName == name
+                                        ? Color.accentColor.opacity(0.18)
+                                        : Color(uiColor: .tertiarySystemFill),
+                                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(symbol)
+                        .accessibilityLabel(name)
                     }
                 }
-                .padding(.vertical, 4)
             }
         }
         .navigationTitle(shortcut.title.isEmpty ? "Add shortcut" : "Edit shortcut")
@@ -286,16 +326,20 @@ private struct ShortcutEditor: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
-                    var cleaned = shortcut
-                    cleaned.title = cleaned.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    cleaned.urlString = cleaned.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if cleaned.title.isEmpty { cleaned.title = cleaned.url?.host ?? "Shortcut" }
-                    if !cleaned.urlString.lowercased().hasPrefix("http") {
-                        cleaned.urlString = "https://" + cleaned.urlString
+                    let title = shortcut.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    var urlString = shortcut.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !urlString.lowercased().hasPrefix("http://"), !urlString.lowercased().hasPrefix("https://") {
+                        urlString = "https://" + urlString
                     }
-                    onSave(cleaned)
+                    guard !title.isEmpty, URL(string: urlString) != nil else { return }
+                    shortcut.title = title
+                    shortcut.urlString = urlString
+                    onSave(shortcut)
                 }
-                .disabled(shortcut.urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(
+                    shortcut.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || shortcut.urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
             }
         }
     }

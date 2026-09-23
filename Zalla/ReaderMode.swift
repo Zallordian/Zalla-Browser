@@ -3,42 +3,78 @@ import WebKit
 
 enum ReaderMode {
     /// JavaScript that extracts article-like content and returns JSON via completion.
+    /// Broader selectors and fallbacks so more pages yield readable text.
     static let extractScript = """
     (function() {
       function textOf(el) {
         if (!el) return '';
         return (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
       }
-      var title = document.title || '';
+      function metaContent(sel) {
+        var node = document.querySelector(sel);
+        if (!node) return '';
+        return (node.getAttribute('content') || '').trim();
+      }
+      var title = metaContent('meta[property="og:title"]') ||
+                  metaContent('meta[name="twitter:title"]') ||
+                  document.title || '';
       var h1 = document.querySelector('h1');
       if (h1) {
         var h1Text = textOf(h1);
         if (h1Text.length > 0) title = h1Text;
       }
-      var byline = '';
-      var author = document.querySelector('[rel="author"], .author, .byline, meta[name="author"]');
-      if (author) {
-        if (author.tagName === 'META') byline = author.getAttribute('content') || '';
-        else byline = textOf(author);
+      var byline = metaContent('meta[name="author"]') ||
+                   metaContent('meta[property="article:author"]') || '';
+      if (!byline) {
+        var author = document.querySelector('[rel="author"], .author, .byline, .by-line, [itemprop="author"]');
+        if (author) {
+          if (author.tagName === 'META') byline = author.getAttribute('content') || '';
+          else byline = textOf(author);
+        }
       }
-      var article = document.querySelector('article') ||
-                    document.querySelector('[role="main"]') ||
-                    document.querySelector('main') ||
-                    document.body;
+      var candidates = [
+        document.querySelector('article'),
+        document.querySelector('[itemprop="articleBody"]'),
+        document.querySelector('.post-content, .entry-content, .article-content, .article-body, .story-body'),
+        document.querySelector('[role="main"]'),
+        document.querySelector('main'),
+        document.body
+      ];
+      var article = null;
+      var bestScore = 0;
+      candidates.forEach(function(node) {
+        if (!node) return;
+        var sample = textOf(node);
+        var score = sample.length;
+        if (node.querySelectorAll) {
+          score += node.querySelectorAll('p').length * 40;
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          article = node;
+        }
+      });
+      if (!article) article = document.body;
       var clone = article.cloneNode(true);
       var removeSelectors = [
         'script', 'style', 'noscript', 'iframe', 'nav', 'footer', 'header',
-        'aside', 'form', '.ad', '.ads', '.advertisement', '.social',
-        '.share', '.comments', '.comment', '[aria-hidden="true"]'
+        'aside', 'form', 'button', 'svg', 'canvas',
+        '.ad', '.ads', '.advertisement', '.social', '.share', '.related',
+        '.comments', '.comment', '.newsletter', '.promo', '.paywall',
+        '[aria-hidden="true"]', '[role="navigation"]', '[role="complementary"]'
       ];
       removeSelectors.forEach(function(sel) {
-        clone.querySelectorAll(sel).forEach(function(n) { n.remove(); });
+        try {
+          clone.querySelectorAll(sel).forEach(function(n) { n.remove(); });
+        } catch (e) {}
       });
       var paragraphs = [];
-      clone.querySelectorAll('p, h2, h3, h4, li, blockquote, pre').forEach(function(node) {
+      clone.querySelectorAll('p, h2, h3, h4, li, blockquote, pre, figcaption').forEach(function(node) {
         var t = textOf(node);
         if (t.length < 2) return;
+        if (t.length < 24 && node.tagName.toLowerCase() === 'p') return;
         var tag = node.tagName.toLowerCase();
+        if (tag === 'figcaption') tag = 'p';
         paragraphs.push({ tag: tag, text: t });
       });
       if (paragraphs.length < 2) {
@@ -46,16 +82,25 @@ enum ReaderMode {
         if (raw.length > 80) {
           paragraphs = raw.split(/(?<=\\.)\\s+/).filter(function(s) {
             return s.trim().length > 40;
-          }).slice(0, 40).map(function(s) {
+          }).slice(0, 60).map(function(s) {
             return { tag: 'p', text: s.trim() };
           });
         }
       }
+      if (paragraphs.length === 0 && textOf(document.body).length > 120) {
+        var bodyText = textOf(document.body);
+        paragraphs = bodyText.split(/(?<=\\.)\\s+/).filter(function(s) {
+          return s.trim().length > 50;
+        }).slice(0, 40).map(function(s) {
+          return { tag: 'p', text: s.trim() };
+        });
+      }
       return JSON.stringify({
-        title: title,
+        title: title || 'Article',
         byline: byline,
         site: location.hostname || '',
-        paragraphs: paragraphs
+        paragraphs: paragraphs,
+        ok: paragraphs.length > 0
       });
     })();
     """
@@ -166,11 +211,37 @@ enum ReaderMode {
         var paragraphs: [[String: String]]
     }
 
+    enum ExtractFailure: Equatable {
+        case empty
+        case invalidPayload
+        case scriptError
+
+        var userMessage: String {
+            switch self {
+            case .empty:
+                return "Reader could not find enough article text on this page."
+            case .invalidPayload:
+                return "Reader could not understand this page's content."
+            case .scriptError:
+                return "Reader could not run on this page. Try reloading, then open Reader again."
+            }
+        }
+    }
+
     static func parseExtractedJSON(_ raw: Any?) -> ExtractedArticle? {
+        switch parseResult(raw) {
+        case .success(let article):
+            return article
+        case .failure:
+            return nil
+        }
+    }
+
+    static func parseResult(_ raw: Any?) -> Result<ExtractedArticle, ExtractFailure> {
         guard let string = raw as? String,
               let data = string.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
+            return .failure(.invalidPayload)
         }
         let title = object["title"] as? String ?? "Article"
         let byline = object["byline"] as? String ?? ""
@@ -181,8 +252,8 @@ enum ReaderMode {
             let tag = item["tag"] as? String ?? "p"
             return ["tag": tag, "text": text]
         }
-        guard !paragraphs.isEmpty else { return nil }
-        return ExtractedArticle(title: title, byline: byline, site: site, paragraphs: paragraphs)
+        guard !paragraphs.isEmpty else { return .failure(.empty) }
+        return .success(ExtractedArticle(title: title, byline: byline, site: site, paragraphs: paragraphs))
     }
 }
 

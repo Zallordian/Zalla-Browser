@@ -83,6 +83,17 @@ final class BrowserStore: ObservableObject {
         else if selectedID == tab.id { selectedID = tabs.last?.id }
     }
 
+    func closeAllTabs() {
+        let snapshot = tabs
+        for tab in snapshot {
+            tab.capturePreview()
+            tab.webView.stopLoading()
+        }
+        tabs.removeAll()
+        selectedID = nil
+        addTab()
+    }
+
     func selectTab(_ tab: BrowserTab) {
         if let current = selected, current.id != tab.id {
             current.capturePreview()
@@ -165,6 +176,12 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: "themeID")
         defaults.removeObject(forKey: "appIconPreference")
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
+        defaults.removeObject(forKey: AddressBarPlacement.storageKey)
+        defaults.removeObject(forKey: "useCustomAccent")
+        defaults.removeObject(forKey: "customAccentHex")
+        defaults.removeObject(forKey: "customAccentGradient")
+        defaults.removeObject(forKey: HomeWelcomeMode.storageKey)
+        defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
         HomeShortcuts.resetToDefaults()
         if UIApplication.shared.supportsAlternateIcons {
@@ -480,22 +497,26 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.evaluateJavaScript(ReaderMode.extractScript) { [weak self] result, error in
             Task { @MainActor in
                 guard let self else { return }
-                if error != nil || ReaderMode.parseExtractedJSON(result) == nil {
-                    self.errorMessage = "Reader mode could not extract an article from this page."
+                if error != nil {
+                    self.errorMessage = ReaderMode.ExtractFailure.scriptError.userMessage
                     return
                 }
-                guard let article = ReaderMode.parseExtractedJSON(result) else { return }
-                self.readerOriginalURL = self.webView.url
-                let html = ReaderMode.buildHTML(
-                    title: article.title,
-                    byline: article.byline,
-                    site: article.site,
-                    paragraphs: article.paragraphs,
-                    dark: dark
-                )
-                self.isReaderActive = true
-                self.title = article.title
-                self.webView.loadHTMLString(html, baseURL: self.readerOriginalURL)
+                switch ReaderMode.parseResult(result) {
+                case .failure(let failure):
+                    self.errorMessage = failure.userMessage
+                case .success(let article):
+                    self.readerOriginalURL = self.webView.url
+                    let html = ReaderMode.buildHTML(
+                        title: article.title,
+                        byline: article.byline,
+                        site: article.site,
+                        paragraphs: article.paragraphs,
+                        dark: dark
+                    )
+                    self.isReaderActive = true
+                    self.title = article.title
+                    self.webView.loadHTMLString(html, baseURL: self.readerOriginalURL)
+                }
             }
         }
     }
@@ -602,6 +623,18 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
         let response = pendingDownloadResponse ?? navigationResponse.response
         let source = pendingDownloadURL ?? response.url ?? URL(string: "about:blank")!
+        pendingDownloadResponse = nil
+        pendingDownloadURL = nil
+        onDownloadDecision?(self, download, response, source)
+    }
+
+    func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+        // Covers blob: and JS-triggered downloads that become WKDownload via the action path.
+        let source = navigationAction.request.url
+            ?? pendingDownloadURL
+            ?? URL(string: "blob:download")!
+        let response = pendingDownloadResponse
+            ?? URLResponse(url: source, mimeType: "application/octet-stream", expectedContentLength: -1, textEncodingName: nil)
         pendingDownloadResponse = nil
         pendingDownloadURL = nil
         onDownloadDecision?(self, download, response, source)

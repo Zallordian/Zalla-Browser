@@ -117,11 +117,42 @@ enum DownloadsStore {
         if let suggested = response.suggestedFilename, !suggested.isEmpty {
             return sanitizeFilename(suggested)
         }
+        if sourceURL.scheme?.lowercased() == "blob" {
+            if let mime = response.mimeType?.lowercased() {
+                return sanitizeFilename("download.\(fileExtension(forMIME: mime))")
+            }
+            return "download"
+        }
         let last = sourceURL.lastPathComponent
         if !last.isEmpty, last != "/" { return sanitizeFilename(last) }
+        if let mime = response.mimeType?.lowercased() {
+            return sanitizeFilename("download.\(fileExtension(forMIME: mime))")
+        }
         return "download"
     }
 
+    static func fileExtension(forMIME mime: String) -> String {
+        switch mime {
+        case "application/pdf": return "pdf"
+        case "application/zip", "application/x-zip-compressed": return "zip"
+        case "application/json": return "json"
+        case "text/csv": return "csv"
+        case "image/png": return "png"
+        case "image/jpeg": return "jpg"
+        case "image/webp": return "webp"
+        case "application/msword": return "doc"
+        case let value where value.hasPrefix("application/vnd.openxmlformats-officedocument.wordprocessingml"):
+            return "docx"
+        case let value where value.hasPrefix("application/vnd.openxmlformats-officedocument.spreadsheetml"):
+            return "xlsx"
+        case let value where value.hasPrefix("application/vnd.openxmlformats-officedocument.presentationml"):
+            return "pptx"
+        default:
+            return "bin"
+        }
+    }
+
+    /// Heuristic for responses that should become downloads rather than inline navigation.
     static func isLikelyDownload(response: URLResponse) -> Bool {
         if let http = response as? HTTPURLResponse {
             if let disposition = http.value(forHTTPHeaderField: "Content-Disposition")?.lowercased(),
@@ -129,14 +160,26 @@ enum DownloadsStore {
                 return true
             }
         }
-        guard let mime = response.mimeType?.lowercased() else { return false }
+        let url = response.url
+        if url?.scheme?.lowercased() == "blob" {
+            return true
+        }
+        guard let mime = response.mimeType?.lowercased() else {
+            // Missing MIME with a file-like path often indicates a download.
+            if let path = url?.path.lowercased(), pathContainsDownloadExtension(path) {
+                return true
+            }
+            return false
+        }
         let inlineTypes = [
             "text/html", "text/plain", "text/css", "text/javascript",
             "application/javascript", "application/xhtml+xml",
             "application/json", "image/png", "image/jpeg", "image/gif",
-            "image/webp", "image/svg+xml", "audio/", "video/"
+            "image/webp", "image/svg+xml", "audio/", "video/",
+            "application/xhtml", "multipart/x-mixed-replace"
         ]
         if inlineTypes.contains(where: { mime.hasPrefix($0) || mime == $0 }) {
+            // JSON/plain can still be attachments when Content-Disposition said so above.
             return false
         }
         let downloadTypes = [
@@ -147,8 +190,28 @@ enum DownloadsStore {
             "application/msword",
             "application/vnd.",
             "application/x-msdownload",
-            "application/x-apple-diskimage"
+            "application/x-apple-diskimage",
+            "application/x-7z-compressed",
+            "application/gzip",
+            "application/x-tar",
+            "application/x-rar-compressed",
+            "binary/"
         ]
-        return downloadTypes.contains(where: { mime.hasPrefix($0) || mime == $0 })
+        if downloadTypes.contains(where: { mime.hasPrefix($0) || mime == $0 }) {
+            return true
+        }
+        if let path = url?.path.lowercased(), pathContainsDownloadExtension(path) {
+            return true
+        }
+        return false
+    }
+
+    private static func pathContainsDownloadExtension(_ path: String) -> Bool {
+        let extensions = [
+            ".pdf", ".zip", ".dmg", ".pkg", ".exe", ".msi", ".7z", ".rar",
+            ".tar", ".gz", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".csv", ".ical", ".ics", ".apk", ".ipa"
+        ]
+        return extensions.contains(where: { path.hasSuffix($0) })
     }
 }

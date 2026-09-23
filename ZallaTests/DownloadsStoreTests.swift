@@ -38,4 +38,14 @@ final class DownloadsStoreTests: XCTestCase {
         )
         XCTAssertFalse(DownloadsStore.isLikelyDownload(response: html))
     }
+
+    func testBlobURLIsLikelyDownload() {
+        let blob = URLResponse(
+            url: URL(string: "blob:https://example.com/uuid")!,
+            mimeType: "application/octet-stream",
+            expectedContentLength: -1,
+            textEncodingName: nil
+        )
+        XCTAssertTrue(DownloadsStore.isLikelyDownload(response: blob))
+    }
 }

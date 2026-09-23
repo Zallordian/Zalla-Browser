@@ -86,6 +86,8 @@ enum HomeShortcuts {
         defaults.set(true, forKey: showRecentHistoryKey)
         defaults.set(0.35, forKey: washIntensityKey)
         defaults.set(true, forKey: showLogoKey)
+        defaults.set(HomeWelcomeMode.quotes.rawValue, forKey: HomeWelcomeMode.storageKey)
+        defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)
     }
 
     /// Pure helper for tests: seed defaults when the stored list is empty or missing.
