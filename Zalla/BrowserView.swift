@@ -208,29 +208,29 @@ private struct TabContent: View {
     private var classicToolbar: some View {
         VStack(spacing: 10) {
             if tab.isLoading { ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading") }
-            HStack(spacing: 10) {
-                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search or enter a website", text: $address)
-                    .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
-                    .onSubmit {
-                        if let url = AddressResolver.resolve(address, engine: SearchEngine(rawValue: searchEngine) ?? .duckDuckGo) {
-                            tab.load(url)
-                            addressFocused = false
+            if tab.hasPage {
+                HStack(spacing: 10) {
+                    Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search or enter a website", text: $address)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
+                        .onSubmit {
+                            if let url = AddressResolver.resolve(address, engine: SearchEngine(rawValue: searchEngine) ?? .duckDuckGo) {
+                                tab.load(url)
+                                addressFocused = false
+                            }
                         }
-                    }
-                    .accessibilityLabel("Search or website address")
-                if tab.hasPage {
+                        .accessibilityLabel("Search or website address")
                     Button {
                         if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
                     } label: { Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise") }
                     .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
                     .frame(minWidth: 44, minHeight: 44)
                 }
+                .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
             }
-            .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
 
             HStack {
                 holdNavButton(
