@@ -1,0 +1,25 @@
+{
+  "tool": "Built-in image_gen",
+  "prompts": [
+    {
+      "name": "default",
+      "prompt": "Use case: logo-brand. Edit this approved Zalla ribbon Z into a production iOS app icon. Preserve the exact recognizable Z silhouette, ribbon folds and coral-crimson identity. Enlarge symbol to occupy about 68% of square width, optically centered. Clean all speckles around edges. Rich coral red ribbon with restrained crimson folded sections on perfectly solid deep charcoal #15151B background extending to all four square corners. Crisp controlled edges, luxurious minimal polish. No rounded outer corners, no border, no text, no mockup, no extra objects, no cast shadow or glow. Output one square icon."
+    },
+    {
+      "name": "transparent",
+      "prompt": "Use case: background-extraction. From this Zalla app icon extract ONLY the red ribbon Z onto a genuinely transparent background with alpha. Preserve its exact shape, color gradients, folds, scale, position and square canvas. Remove only charcoal background, including within negative spaces. No shadow, speckles, halo, border, text or added elements. Clean antialiased edges. This is the reusable in-app brand mark and foreground layer for Icon Composer."
+    },
+    {
+      "name": "tinted",
+      "prompt": "Use case: logo-brand. Edit the provided Zalla app icon to its monochrome tinted appearance. Preserve EXACT Z geometry, position, scale, margins and square canvas. Change red ribbon only to neutral silver-white with subtle medium gray at folds. Background uniform pure black extending fully to square corners. Strictly grayscale, no colored pixels. Crisp smooth edges. No text, no border, no rounded outer corners, no shadow or glow. One finished icon."
+    },
+    {
+      "name": "dark",
+      "prompt": "Use case: logo-brand. Create dark appearance of this exact Zalla iOS app icon. Preserve exact silhouette, ribbon geometry, scale and position. Keep the ribbon vivid coral red, subtly lighten deepest crimson folds for legibility at small sizes. Change background to perfectly uniform opaque #08080C. Full square canvas, no transparent regions, no rounded outer corners. Smooth impeccably clean edges; no speckles, halo, noise, texture or glow. No text. One finished square app icon."
+    },
+    {
+      "name": "tinted-final",
+      "prompt": "Use case: logo-brand. Recolor this exact opaque square Zalla icon into a strictly grayscale tinted iOS icon. Preserve all geometry, proportions, position and background coverage EXACTLY. Replace coral with white and pale silver, replace crimson folds with medium gray. KEEP background fully OPAQUE charcoal #101010 across entire square, including negative spaces. Absolutely NO transparency, NO cutout, NO alpha extraction. Keep edges smooth and clean. No text, speckles, glow, or border."
+    }
+  ]
+}

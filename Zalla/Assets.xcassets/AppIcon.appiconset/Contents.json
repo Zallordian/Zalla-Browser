@@ -1,0 +1,38 @@
+{
+  "info": {
+    "version": 1,
+    "author": "xcode"
+  },
+  "images": [
+    {
+      "platform": "ios",
+      "idiom": "universal",
+      "size": "1024x1024",
+      "filename": "zalla-default-1024.png"
+    },
+    {
+      "platform": "ios",
+      "idiom": "universal",
+      "size": "1024x1024",
+      "filename": "zalla-dark-1024.png",
+      "appearances": [
+        {
+          "value": "dark",
+          "appearance": "luminosity"
+        }
+      ]
+    },
+    {
+      "platform": "ios",
+      "idiom": "universal",
+      "size": "1024x1024",
+      "filename": "zalla-tinted-1024.png",
+      "appearances": [
+        {
+          "value": "tinted",
+          "appearance": "luminosity"
+        }
+      ]
+    }
+  ]
+}
