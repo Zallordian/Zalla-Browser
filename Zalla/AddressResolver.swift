@@ -30,7 +30,9 @@ enum AddressResolver {
         var components = URLComponents(string: engine.endpoint)
         components?.queryItems = [URLQueryItem(name: "q", value: text)]
         // Search providers commonly decode '+' as a space in query strings.
-        components?.percentEncodedQuery = components?.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        if let encodedQuery = components?.percentEncodedQuery {
+            components?.percentEncodedQuery = encodedQuery.replacingOccurrences(of: "+", with: "%2B")
+        }
         return components?.url
     }
 }
