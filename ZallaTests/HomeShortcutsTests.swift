@@ -39,4 +39,11 @@ final class HomeShortcutsTests: XCTestCase {
         XCTAssertEqual(HomeShortcuts.load(from: defaults), HomeShortcuts.defaults)
         XCTAssertTrue(defaults.bool(forKey: HomeShortcuts.showLogoKey))
     }
+
+    func testEmptyListPersists() {
+        let defaults = UserDefaults(suiteName: "zalla.homeShortcuts.empty")!
+        defaults.removePersistentDomain(forName: "zalla.homeShortcuts.empty")
+        HomeShortcuts.save([], to: defaults)
+        XCTAssertEqual(HomeShortcuts.load(from: defaults), [])
+    }
 }

@@ -65,8 +65,8 @@ enum HomeShortcuts {
             return Self.defaults
         }
         do {
-            let decoded = try JSONDecoder().decode([HomeShortcut].self, from: data)
-            return decoded.isEmpty ? Self.defaults : decoded
+            // Preserve an intentionally empty list so the new-tab empty state can appear.
+            return try JSONDecoder().decode([HomeShortcut].self, from: data)
         } catch {
             return Self.defaults
         }
