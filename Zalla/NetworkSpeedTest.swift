@@ -6,7 +6,7 @@ import UIKit
 /// No third-party speed-test trademarks or partner branding.
 enum NetworkSpeedEndpoints {
     /// Lightweight trace endpoint for latency samples.
-    static let latencyURL = URL(string: "https://speed.cloudflare.com/cdn-cgi/trace")!
+    static let latencyURL = URL(string: "https://www.cloudflare.com/cdn-cgi/trace")!
     /// Download payload endpoint. `bytes` controls transfer size.
     static func downloadURL(bytes: Int) -> URL {
         URL(string: "https://speed.cloudflare.com/__down?bytes=\(bytes)")!
