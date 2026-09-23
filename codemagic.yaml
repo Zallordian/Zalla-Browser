@@ -14,25 +14,10 @@ workflows:
       - name: Generate Xcode project
         script: xcodegen generate
       - name: Build for iOS Simulator
-        script: >
-          xcodebuild
-          -project ""
-          -scheme ""
-          -sdk iphonesimulator
-          -destination "generic/platform=iOS Simulator"
-          -configuration Debug
-          CODE_SIGNING_ALLOWED=NO
-          build
+        script: xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -configuration Debug CODE_SIGNING_ALLOWED=NO build
       - name: Run unit tests
-        script: >
-          xcodebuild
-          -project ""
-          -scheme ""
-          -sdk iphonesimulator
-          -destination "generic/platform=iOS Simulator"
-          -configuration Debug
-          CODE_SIGNING_ALLOWED=NO
-          test
+        script: xcodebuild -project "$XCODE_PROJECT" -scheme "$XCODE_SCHEME" -sdk iphonesimulator -destination "generic/platform=iOS Simulator" -configuration Debug CODE_SIGNING_ALLOWED=NO test
     artifacts:
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+
