@@ -64,6 +64,7 @@ private struct TabContent: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var address = ""
     @State private var showShare = false
+    @State private var isEditingCompactAddress = false
     @FocusState private var addressFocused: Bool
 
     @State private var holdKind: HoldRevealKind?
@@ -116,6 +117,10 @@ private struct TabContent: View {
                 DispatchQueue.main.async {
                     UIResponder.currentFirstResponder()?.selectAll(nil)
                 }
+            } else if isEditingCompactAddress {
+                // Collapse Compact chrome when the field resigns (submit, cancel, or blur).
+                isEditingCompactAddress = false
+                address = tab.url?.absoluteString ?? ""
             }
         }
         .onAppear { address = tab.url?.absoluteString ?? "" }
@@ -215,12 +220,7 @@ private struct TabContent: View {
                     TextField("Search or enter a website", text: $address)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
                         .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
-                        .onSubmit {
-                            if let url = AddressResolver.resolve(address, engine: SearchEngine(rawValue: searchEngine) ?? .duckDuckGo) {
-                                tab.load(url)
-                                addressFocused = false
-                            }
-                        }
+                        .onSubmit { submitAddress() }
                         .accessibilityLabel("Search or website address")
                     Button {
                         if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
@@ -304,28 +304,50 @@ private struct TabContent: View {
 
     private var compactPill: some View {
         HStack(spacing: 10) {
-            tabsButtonCompact
-            VStack(alignment: .leading, spacing: 1) {
-                Text(compactTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-                if let host = tab.url?.host, tab.hasPage {
-                    Text(host)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            Spacer(minLength: 0)
-            if tab.hasPage {
+            if isEditingCompactAddress {
+                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search or enter a website", text: $address)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.webSearch)
+                    .submitLabel(.go)
+                    .focused($addressFocused)
+                    .onSubmit { submitAddress() }
+                    .accessibilityLabel("Search or website address")
                 Button {
-                    if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                    cancelCompactAddressEditing()
                 } label: {
-                    Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
-                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
                 }
-                .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
+                .accessibilityLabel("Cancel address editing")
+                .frame(minWidth: 44, minHeight: 44)
+            } else {
+                tabsButtonCompact
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(compactTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    if let host = CompactAddressChrome.hostSubtitle(url: tab.url, hasPage: tab.hasPage) {
+                        Text(host)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+                if tab.hasPage {
+                    Button {
+                        if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                    } label: {
+                        Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
+                }
             }
         }
         .padding(.horizontal, 14)
@@ -333,17 +355,44 @@ private struct TabContent: View {
         .background(.ultraThinMaterial, in: Capsule(style: .continuous))
         .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
-        .onTapGesture {
-            if !tab.hasPage {
-                addressFocused = true
-            }
-        }
+        .contentShape(Capsule())
+        // Attach tap-to-edit only while collapsed so the TextField keeps pointer events.
+        .modifier(CompactPillInteractionModifier(
+            isEditing: isEditingCompactAddress,
+            onBeginEditing: beginCompactAddressEditing,
+            onCancelEditing: cancelCompactAddressEditing
+        ))
     }
 
     private var compactTitle: String {
-        if tab.isReaderActive { return tab.title }
-        if tab.hasPage { return tab.title }
-        return "Search or enter a website"
+        CompactAddressChrome.pillTitle(
+            hasPage: tab.hasPage,
+            pageTitle: tab.title,
+            isReaderActive: tab.isReaderActive
+        )
+    }
+
+    private func beginCompactAddressEditing() {
+        address = CompactAddressChrome.editingPrefill(url: tab.url)
+        isEditingCompactAddress = true
+        // Focus after the TextField is in the hierarchy.
+        DispatchQueue.main.async {
+            addressFocused = true
+        }
+    }
+
+    private func cancelCompactAddressEditing() {
+        addressFocused = false
+        isEditingCompactAddress = false
+        address = tab.url?.absoluteString ?? ""
+    }
+
+    private func submitAddress() {
+        let engine = SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+        guard let url = AddressResolver.resolve(address, engine: engine) else { return }
+        tab.load(url)
+        addressFocused = false
+        isEditingCompactAddress = false
     }
 
     private func compactCircle(icon: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
@@ -488,7 +537,30 @@ private struct TabContent: View {
     }
 }
 
+private struct CompactPillInteractionModifier: ViewModifier {
+    let isEditing: Bool
+    let onBeginEditing: () -> Void
+    let onCancelEditing: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isEditing {
+            content
+                .onKeyPress(.escape) {
+                    onCancelEditing()
+                    return .handled
+                }
+        } else {
+            content
+                .onTapGesture(perform: onBeginEditing)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to edit address or search")
+        }
+    }
+}
+
 private extension UIResponder {
+
     private static weak var _currentFirstResponder: UIResponder?
 
     static func currentFirstResponder() -> UIResponder? {
