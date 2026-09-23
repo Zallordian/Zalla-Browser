@@ -10,31 +10,29 @@ workflows:
         XCODE_SCHEME: Zalla
     scripts:
       - name: Install XcodeGen
-        script: |
-          brew install xcodegen
+        script: brew install xcodegen
       - name: Generate Xcode project
-        script: |
-          xcodegen generate
+        script: xcodegen generate
       - name: Build for iOS Simulator
-        script: |
-          xcodebuild `
-            -project "$XCODE_PROJECT" `
-            -scheme "$XCODE_SCHEME" `
-            -sdk iphonesimulator `
-            -destination "generic/platform=iOS Simulator" `
-            -configuration Debug `
-            CODE_SIGNING_ALLOWED=NO `
-            build
+        script: >
+          xcodebuild
+          -project ""
+          -scheme ""
+          -sdk iphonesimulator
+          -destination "generic/platform=iOS Simulator"
+          -configuration Debug
+          CODE_SIGNING_ALLOWED=NO
+          build
       - name: Run unit tests
-        script: |
-          xcodebuild `
-            -project "$XCODE_PROJECT" `
-            -scheme "$XCODE_SCHEME" `
-            -sdk iphonesimulator `
-            -destination "generic/platform=iOS Simulator" `
-            -configuration Debug `
-            CODE_SIGNING_ALLOWED=NO `
-            test
+        script: >
+          xcodebuild
+          -project ""
+          -scheme ""
+          -sdk iphonesimulator
+          -destination "generic/platform=iOS Simulator"
+          -configuration Debug
+          CODE_SIGNING_ALLOWED=NO
+          test
     artifacts:
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
