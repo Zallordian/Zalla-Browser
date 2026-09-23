@@ -30,3 +30,54 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
 
+  zalla-ios-testflight:
+    name: Zalla TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.zalla.browser
+      vars:
+        XCODE_PROJECT: Zalla.xcodeproj
+        XCODE_SCHEME: Zalla
+        BUNDLE_ID: com.zalla.browser
+        APP_STORE_APPLE_ID: 6814680880
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Set up code signing
+        script: xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          set -euo pipefail
+          cd "$CM_BUILD_DIR"
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          if [ -z "${LATEST:-}" ] || [ "$LATEST" = "None" ]; then
+            LATEST=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || true)
+          fi
+          if [ -z "${LATEST:-}" ] || [ "$LATEST" = "None" ]; then
+            LATEST=0
+          fi
+          NEW_BUILD=$((LATEST + 1))
+          echo "Setting CFBundleVersion to $NEW_BUILD"
+          agvtool new-version -all "$NEW_BUILD"
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false
