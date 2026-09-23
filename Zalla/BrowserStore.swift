@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import WebKit
 
-struct SavedPage: Identifiable, Codable {
+struct SavedPage: Identifiable, Codable, Equatable {
     var id = UUID()
     var title: String
     var url: URL
@@ -22,6 +22,7 @@ final class BrowserStore: ObservableObject {
     @Published private(set) var history: [SavedPage] = []
     @Published var storageError: String?
     @Published var clearingData = false
+    @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
@@ -56,6 +57,9 @@ final class BrowserStore: ObservableObject {
             self.history = Array(self.history.prefix(500))
             self.save()
         }
+        tab.onImageExport = { [weak self] request in
+            self?.imageExport = request
+        }
         tabs.append(tab)
         selectedID = tab.id
         if let url { tab.load(url) }
@@ -74,6 +78,18 @@ final class BrowserStore: ObservableObject {
         save()
     }
 
+    @discardableResult
+    func importBookmarks(_ pages: [SavedPage]) -> Int {
+        var added = 0
+        for page in pages {
+            if bookmarks.contains(where: { $0.url == page.url }) { continue }
+            bookmarks.append(page)
+            added += 1
+        }
+        if added > 0 { save() }
+        return added
+    }
+
     func removeBookmarks(at offsets: IndexSet) {
         bookmarks.remove(atOffsets: offsets)
         save()
@@ -86,7 +102,6 @@ final class BrowserStore: ObservableObject {
 
     func clearBrowsingData() async {
         clearingData = true
-        // Release pages before deletion so active pages cannot immediately recreate cookies.
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -94,6 +109,37 @@ final class BrowserStore: ObservableObject {
         await WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
         )
+        addTab()
+        clearingData = false
+    }
+
+    /// Destructive reset used by Settings. Bookmarks are kept by default.
+    func resetApp(keepingBookmarks: Bool = true) async {
+        clearingData = true
+        tabs.forEach { $0.webView.stopLoading() }
+        tabs.removeAll()
+        selectedID = nil
+        history.removeAll()
+        if !keepingBookmarks {
+            bookmarks.removeAll()
+        }
+        save()
+        await WKWebsiteDataStore.default().removeData(
+            ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
+        )
+        let defaults = UserDefaults.standard
+        defaults.removeObject(forKey: "appearance")
+        defaults.removeObject(forKey: "searchEngine")
+        defaults.removeObject(forKey: "themeID")
+        defaults.removeObject(forKey: "appIconPreference")
+        defaults.set(false, forKey: "hasCompletedOnboarding")
+        if UIApplication.shared.supportsAlternateIcons {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                UIApplication.shared.setAlternateIconName(nil) { _ in
+                    continuation.resume()
+                }
+            }
+        }
         addTab()
         clearingData = false
     }
@@ -108,8 +154,28 @@ final class BrowserStore: ObservableObject {
     }
 }
 
+struct ImageExportRequest: Identifiable {
+    let id = UUID()
+    let sourceURL: URL
+    let data: Data
+}
+
+
+private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    weak var delegate: WKScriptMessageHandler?
+
+    init(delegate: WKScriptMessageHandler? = nil) {
+        self.delegate = delegate
+        super.init()
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        delegate?.userContentController(userContentController, didReceive: message)
+    }
+}
+
 @MainActor
-final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDelegate, WKUIDelegate {
+final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     let id = UUID()
     let isPrivate: Bool
     let webView: WKWebView
@@ -123,14 +189,22 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var errorMessage: String?
     @Published var externalURL: URL?
     var onVisit: ((SavedPage) -> Void)?
+    var onImageExport: ((ImageExportRequest) -> Void)?
     private var observations: [NSKeyValueObservation] = []
+    private let scriptHandlerProxy = WeakScriptMessageHandler()
 
     init(isPrivate: Bool) {
         self.isPrivate = isPrivate
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = isPrivate ? .nonPersistent() : .default()
+        let controller = WKUserContentController()
+        let script = WKUserScript(source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        controller.addUserScript(script)
+        configuration.userContentController = controller
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
+        scriptHandlerProxy.delegate = self
+        controller.add(scriptHandlerProxy, name: "zallaImage")
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
@@ -144,6 +218,34 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in self?.refresh() }
         ]
     }
+
+    private static let imageLongPressScript = """
+    (function() {
+      if (window.__zallaImageHook) return;
+      window.__zallaImageHook = true;
+      var timer = null;
+      function send(src) {
+        try {
+          if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zallaImage) {
+            window.webkit.messageHandlers.zallaImage.postMessage({ src: src });
+          }
+        } catch (e) {}
+      }
+      document.addEventListener('touchstart', function(e) {
+        var t = e.target;
+        if (!t || t.tagName !== 'IMG' || !t.src) return;
+        timer = setTimeout(function() { send(t.src); }, 480);
+      }, { passive: true });
+      document.addEventListener('touchend', function() { if (timer) clearTimeout(timer); }, { passive: true });
+      document.addEventListener('touchmove', function() { if (timer) clearTimeout(timer); }, { passive: true });
+      document.addEventListener('contextmenu', function(e) {
+        var t = e.target;
+        if (t && t.tagName === 'IMG' && t.src) {
+          send(t.src);
+        }
+      });
+    })();
+    """
 
     private func refresh() {
         title = webView.title ?? webView.url?.host ?? "New tab"
@@ -159,6 +261,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         errorMessage = nil
         hasPage = true
         webView.load(URLRequest(url: url))
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "zallaImage",
+              let body = message.body as? [String: Any],
+              let src = body["src"] as? String,
+              let imageURL = URL(string: src) else { return }
+        Task { await prepareImageExport(from: imageURL) }
+    }
+
+    private func prepareImageExport(from imageURL: URL) async {
+        do {
+            let (data, _) = try await URLSession.shared.data(from: imageURL)
+            onImageExport?(ImageExportRequest(sourceURL: imageURL, data: data))
+        } catch {
+            errorMessage = "Could not load that image for export."
+        }
     }
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
@@ -198,12 +317,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 webView.load(navigationAction.request)
             } else { decisionHandler(.allow) }
         } else {
-            // App handoffs require a visible user action and explicit confirmation.
             if navigationAction.navigationType == .linkActivated,
                ["mailto", "tel", "sms"].contains(scheme) { externalURL = url }
             decisionHandler(.cancel)
         }
     }
+
     func findOnPage() {
         webView.findInteraction?.presentFindNavigator(showingReplace: false)
     }
@@ -245,5 +364,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             completionHandler(alert.textFields?.first?.text)
         })
         host.present(alert, animated: true)
+    }
+
+    func webView(_ webView: WKWebView,
+                 contextMenuConfigurationForElement elementInfo: WKContextMenuElementInfo,
+                 completionHandler: @escaping (UIContextMenuConfiguration?) -> Void) {
+        if let link = elementInfo.linkURL {
+            let ext = link.pathExtension.lowercased()
+            if ["png", "jpg", "jpeg", "gif", "webp", "heic", "tif", "tiff", "bmp"].contains(ext) {
+                completionHandler(UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
+                    let export = UIAction(title: "Export image as...", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+                        Task { await self?.prepareImageExport(from: link) }
+                    }
+                    return UIMenu(title: "", children: [export])
+                })
+                return
+            }
+        }
+        completionHandler(nil)
     }
 }
