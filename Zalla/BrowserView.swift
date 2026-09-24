@@ -86,6 +86,9 @@ private struct TabContent: View {
     @AppStorage(ChromeModeTips.compactSeenKey) private var hasSeenCompactTip = false
     @AppStorage(ChromeModeTips.topBarSeenKey) private var hasSeenTopBarTip = false
     @AppStorage(ChromeModeTips.holdRevealSeenKey) private var hasSeenHoldRevealTip = false
+    @AppStorage(ChromeModeTips.quickActionSeenKey) private var hasSeenQuickActionTip = false
+    @State private var quickActionOpen = false
+    @State private var quickActionFrame: CGRect = .zero
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -103,9 +106,12 @@ private struct TabContent: View {
                 if tab.hasPage {
                     WebSurface(webView: tab.webView)
                 } else {
-                    NewTabView(browser: browser, tab: tab) {
-                        sheet = .library
-                    }
+                    NewTabView(
+                        browser: browser,
+                        tab: tab,
+                        onOpenLibrary: { sheet = .library },
+                        onOpenTabs: { sheet = .tabs }
+                    )
                 }
                 if let error = tab.errorMessage {
                     VStack(alignment: .leading, spacing: 10) {
@@ -146,6 +152,18 @@ private struct TabContent: View {
             if holdKind != nil, !holdItems.isEmpty {
                 holdRevealOverlay
             }
+
+            if quickActionOpen, toolbarStyle == .quickAction {
+                QuickActionFan(
+                    anchor: quickActionFrame,
+                    placement: addressBarPlacement,
+                    theme: theme,
+                    entries: quickActionEntries,
+                    onDismiss: { quickActionOpen = false }
+                )
+                .transition(.opacity)
+                .zIndex(15)
+            }
         }
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .onChange(of: tab.url) { _, url in
@@ -182,6 +200,8 @@ private struct TabContent: View {
             address = tab.url?.absoluteString ?? ""
             if toolbarStyle == .compact, !hasSeenCompactTip {
                 chromeTipMessage = ChromeModeTips.compactMessage
+            } else if toolbarStyle == .quickAction, !hasSeenQuickActionTip {
+                chromeTipMessage = ChromeModeTips.quickActionMessage
             } else if addressBarPlacement == .top, !hasSeenTopBarTip {
                 chromeTipMessage = ChromeModeTips.topBarMessage
             }
@@ -209,6 +229,14 @@ private struct TabContent: View {
         } message: {
             Text(ChromeModeTips.compactMessage)
         }
+        .alert("Quick Action", isPresented: Binding(
+            get: { chromeTipMessage == ChromeModeTips.quickActionMessage },
+            set: { if !$0 { chromeTipMessage = nil; hasSeenQuickActionTip = true } }
+        )) {
+            Button("Got it") { chromeTipMessage = nil; hasSeenQuickActionTip = true }
+        } message: {
+            Text(ChromeModeTips.quickActionMessage)
+        }
         .alert("Address bar on top", isPresented: Binding(
             get: { chromeTipMessage == ChromeModeTips.topBarMessage },
             set: { if !$0 { chromeTipMessage = nil; hasSeenTopBarTip = true } }
@@ -226,11 +254,15 @@ private struct TabContent: View {
             Text(holdRevealTipMessage ?? ChromeModeTips.holdRevealMessage)
         }
         .onChange(of: toolbarStyleRaw) { _, newValue in
+            quickActionOpen = false
             if newValue == ToolbarStyle.compact.rawValue, !hasSeenCompactTip {
                 chromeTipMessage = ChromeModeTips.compactMessage
+            } else if newValue == ToolbarStyle.quickAction.rawValue, !hasSeenQuickActionTip {
+                chromeTipMessage = ChromeModeTips.quickActionMessage
             }
         }
         .onChange(of: addressBarPlacementRaw) { _, newValue in
+            quickActionOpen = false
             if newValue == AddressBarPlacement.top.rawValue, !hasSeenTopBarTip {
                 chromeTipMessage = ChromeModeTips.topBarMessage
             }
@@ -328,24 +360,32 @@ private struct TabContent: View {
 
     @ViewBuilder
     private var topChrome: some View {
-        if toolbarStyle == .classic {
+        switch toolbarStyle {
+        case .classic:
             classicAddressBlock(includeNav: false)
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
                 .background { chromeMaterial(edges: .top) }
-        } else {
+        case .compact:
             compactToolbar
+                .background { chromeMaterial(edges: .top) }
+        case .quickAction:
+            quickActionToolbar
                 .background { chromeMaterial(edges: .top) }
         }
     }
 
     @ViewBuilder
     private var bottomChrome: some View {
-        if toolbarStyle == .classic {
+        switch toolbarStyle {
+        case .classic:
             classicToolbar
-        } else {
+        case .compact:
             compactToolbar
+                .background { chromeMaterial(edges: .bottom) }
+        case .quickAction:
+            quickActionToolbar
                 .background { chromeMaterial(edges: .bottom) }
         }
     }
@@ -519,6 +559,136 @@ private struct TabContent: View {
                 }
             }
         }
+    }
+
+    // MARK: - Quick Action chrome
+
+    /// Quick Action: address chip on the left, crimson center control, tabs and reload on the right.
+    /// Tapping the center control fans out Back, Forward, Tabs, New Tab, Share, and Menu.
+    /// Tapping the address chip, or pressing and holding the center control, opens address editing.
+    private var quickActionToolbar: some View {
+        VStack(spacing: 8) {
+            if tab.isLoading {
+                ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
+            }
+            if isEditingCompactAddress {
+                // Reuse the Compact editing pill so focus, submit, and cancel behave the same.
+                compactPill
+                    .padding(.horizontal, 16)
+            } else {
+                HStack(spacing: 12) {
+                    quickActionAddressChip
+                        .frame(maxWidth: .infinity)
+                    quickActionButton
+                    HStack(spacing: 2) {
+                        Spacer(minLength: 0)
+                        tabsButton
+                        if tab.hasPage {
+                            Button {
+                                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                            } label: {
+                                Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(minWidth: 44, minHeight: 44)
+                            }
+                            .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+    }
+
+    private var quickActionAddressLabel: String {
+        if tab.hasPage {
+            return AddressDisplay.friendlyHost(from: tab.url) ?? compactTitle
+        }
+        return "Search"
+    }
+
+    private var quickActionAddressChip: some View {
+        HStack(spacing: 6) {
+            if tab.hasPage {
+                connectionSecurityAffordance(font: .caption2, textFont: .caption2.weight(.semibold))
+            } else {
+                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Text(quickActionAddressLabel)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
+        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        .contentShape(Capsule())
+        .onTapGesture { beginQuickActionAddressEditing() }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Address, \(tab.hasPage ? quickActionAddressLabel : "Search or enter a website")")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to edit address or search")
+    }
+
+    private var quickActionButton: some View {
+        QuickActionGlyph(theme: theme, isOpen: false)
+            .opacity(quickActionOpen ? 0 : 1)
+            .background(
+                GeometryReader { geo in
+                    Color.clear.preference(key: QuickActionFrameKey.self, value: geo.frame(in: .global))
+                }
+            )
+            .onPreferenceChange(QuickActionFrameKey.self) { quickActionFrame = $0 }
+            .onTapGesture { openQuickAction() }
+            .onLongPressGesture(minimumDuration: 0.4) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                beginQuickActionAddressEditing()
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Quick actions")
+            .accessibilityHint("Shows Back, Forward, Tabs, New Tab, Share, and Menu")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { openQuickAction() }
+            .accessibilityAction(named: "Search or enter address") { beginQuickActionAddressEditing() }
+    }
+
+    private var quickActionEntries: [QuickActionEntry] {
+        QuickActionItem.allCases.map { item -> QuickActionEntry in
+            switch item {
+            case .back:
+                return QuickActionEntry(item: item, enabled: tab.canGoBack) { tab.webView.goBack() }
+            case .forward:
+                return QuickActionEntry(item: item, enabled: tab.canGoForward) { tab.webView.goForward() }
+            case .tabs:
+                return QuickActionEntry(item: item, badge: "\(browser.tabs.count)") { sheet = .tabs }
+            case .newTab:
+                return QuickActionEntry(item: item) { browser.addTab() }
+            case .share:
+                return QuickActionEntry(item: item, enabled: tab.url != nil) { showShare = true }
+            case .menu:
+                return QuickActionEntry(item: item) { sheet = .menu }
+            }
+        }
+    }
+
+    private func openQuickAction() {
+        guard !quickActionOpen else { return }
+        if addressFocused { addressFocused = false }
+        withAnimation(.easeOut(duration: 0.18)) {
+            quickActionOpen = true
+        }
+    }
+
+    private func beginQuickActionAddressEditing() {
+        quickActionOpen = false
+        beginCompactAddressEditing()
     }
 
     private var compactToolbar: some View {
@@ -1359,9 +1529,20 @@ private struct HomePersonalizationView: View {
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
     @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
+    @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
+    @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Home slider", isOn: $showSlider)
+                Toggle("Recently visited", isOn: $showRecentHistory)
+                    .disabled(!showSlider)
+            } header: {
+                Text("Widgets")
+            } footer: {
+                Text("Swipe the top of a new tab to see your open tabs and recent pages. Widgets only use what is already saved on this device. Recent pages never appear in private tabs.")
+            }
             Section("New tab") {
                 Toggle("Show Zalla logo", isOn: $showLogo)
                 Picker("Welcome", selection: $welcomeModeRaw) {
@@ -1383,6 +1564,8 @@ private struct HomePersonalizationView: View {
                     HomeShortcuts.resetToDefaults()
                     welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
                     userName = ""
+                    showSlider = true
+                    showRecentHistory = true
                 }
             } footer: {
                 Text("Shortcuts themselves are edited from the new tab Edit button. Reset restores the default shortcut set and these toggles.")
@@ -1455,7 +1638,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact and Top bar are optional.")
+                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control.")
             }
 
             Section {

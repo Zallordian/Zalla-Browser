@@ -185,6 +185,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ChromeModeTips.compactSeenKey)
         defaults.removeObject(forKey: ChromeModeTips.topBarSeenKey)
         defaults.removeObject(forKey: ChromeModeTips.holdRevealSeenKey)
+        defaults.removeObject(forKey: ChromeModeTips.quickActionSeenKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
         HomeShortcuts.resetToDefaults()
         if UIApplication.shared.supportsAlternateIcons {

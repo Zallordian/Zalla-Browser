@@ -20,6 +20,9 @@ struct OnboardingView: View {
 
     private var theme: ZallaTheme { ZallaTheme.theme(forRaw: themeID) }
 
+    static let privacyPolicyURL = URL(string: "https://zalla.gg/privacy/")!
+    static let supportURL = URL(string: "https://zalla.gg/support/")!
+
     private var preferredScheme: ColorScheme? {
         appearance == "Dark" ? .dark : appearance == "Light" ? .light : nil
     }
@@ -52,9 +55,9 @@ struct OnboardingView: View {
 
                 TabView(selection: $step) {
                     welcome.tag(0)
-                    lookAndFeel.tag(1)
-                    passwords.tag(2)
-                    bookmarks.tag(3)
+                    quickSetupLook.tag(1)
+                    quickSetupNavigation.tag(2)
+                    bringYourStuff.tag(3)
                     farewell.tag(4)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
@@ -193,6 +196,11 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
+                Link(destination: Self.privacyPolicyURL) {
+                    Label("Privacy Policy", systemImage: "hand.raised")
+                        .font(.footnote.weight(.semibold))
+                }
+                .padding(.top, 4)
             }
             .opacity(contentVisible || step != 0 ? 1 : 0)
             .offset(y: contentVisible || step != 0 ? 0 : 16)
@@ -213,168 +221,238 @@ struct OnboardingView: View {
         }
     }
 
-    private var lookAndFeel: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header(
-                    title: "Look and feel",
-                    subtitle: "Zalla starts with a bottom address bar and Classic toolbar. Compact stays off unless you turn it on later in Settings."
-                )
+    private var quickSetupLook: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            header(
+                title: "Quick Setup",
+                subtitle: "Make Zalla yours. Everything here can be changed later in Settings."
+            )
+            .padding(.horizontal, 24)
 
-                miniBrowserPreview
-                    .padding(.vertical, 4)
+            livePreview
+                .padding(.horizontal, 24)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Appearance").font(.headline)
-                    Picker("Appearance", selection: appearanceBinding) {
-                        ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                .padding(20)
-                .background(cardBackground)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Search engine").font(.headline)
-                    Picker("Search engine", selection: $searchEngine) {
-                        ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
-                    }
-                    .pickerStyle(.menu)
-                }
-                .padding(20)
-                .background(cardBackground)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Browser chrome").font(.headline)
-                    Text("Defaults match daily browsing. You can try Compact later without changing anything now.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Picker("Toolbar", selection: $toolbarStyleRaw) {
-                        ForEach(ToolbarStyle.allCases) { style in
-                            Text(style.rawValue).tag(style.rawValue)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Appearance").font(.headline)
+                        Picker("Appearance", selection: appearanceBinding) {
+                            ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
-                    Picker("Address bar", selection: $addressBarPlacementRaw) {
-                        ForEach(AddressBarPlacement.allCases) { placement in
-                            Text(placement.rawValue).tag(placement.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-                .padding(20)
-                .background(cardBackground)
+                    .padding(20)
+                    .background(cardBackground)
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Accent theme").font(.headline)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 14)], spacing: 14) {
-                        ForEach(ZallaThemeID.allCases) { id in
-                            let swatch = ZallaTheme.theme(for: id)
-                            let selected = themeID == id.rawValue
-                            Button {
-                                withAnimation(.spring(response: 0.38, dampingFraction: 0.7)) {
-                                    themeID = id.rawValue
-                                }
-                            } label: {
-                                Circle()
-                                    .fill(swatch.gradient)
-                                    .frame(width: 52, height: 52)
-                                    .overlay {
-                                        if selected {
-                                            Image(systemName: "checkmark")
-                                                .font(.headline.bold())
-                                                .foregroundStyle(.white)
-                                                .transition(.scale.combined(with: .opacity))
-                                        }
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Accent").font(.headline)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 56), spacing: 12)], spacing: 12) {
+                            ForEach(ZallaThemeID.allCases) { id in
+                                let swatch = ZallaTheme.theme(for: id)
+                                let selected = themeID == id.rawValue
+                                Button {
+                                    withAnimation(.spring(response: 0.38, dampingFraction: 0.7)) {
+                                        themeID = id.rawValue
                                     }
-                                    .scaleEffect(selected ? 1.12 : 1.0)
-                                    .shadow(color: selected ? swatch.primary.opacity(0.45) : .clear, radius: 10, y: 4)
-                                    .accessibilityLabel(id.displayName)
+                                } label: {
+                                    Circle()
+                                        .fill(swatch.gradient)
+                                        .frame(width: 44, height: 44)
+                                        .overlay {
+                                            if selected {
+                                                Image(systemName: "checkmark")
+                                                    .font(.subheadline.bold())
+                                                    .foregroundStyle(.white)
+                                                    .transition(.scale.combined(with: .opacity))
+                                            }
+                                        }
+                                        .scaleEffect(selected ? 1.12 : 1.0)
+                                        .shadow(color: selected ? swatch.primary.opacity(0.45) : .clear, radius: 10, y: 4)
+                                        .accessibilityLabel(id.displayName)
+                                        .accessibilityAddTraits(selected ? .isSelected : [])
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                }
-                .padding(20)
-                .background(cardBackground)
+                    .padding(20)
+                    .background(cardBackground)
 
-                nextButton("Continue") { goTo(2) }
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Search engine").font(.headline)
+                            Spacer()
+                            Picker("Search engine", selection: $searchEngine) {
+                                ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                        Text("Searches open inside Zalla. Your chosen engine receives what you search for.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(20)
+                    .background(cardBackground)
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
             }
-            .padding(24)
-            .opacity(step == 1 && !contentVisible ? 0 : 1)
-            .offset(y: step == 1 && !contentVisible ? 18 : 0)
+
+            nextButton("Continue") { goTo(2) }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 36)
         }
+        .padding(.top, 12)
+        .opacity(step == 1 && !contentVisible ? 0 : 1)
+        .offset(y: step == 1 && !contentVisible ? 18 : 0)
     }
 
-    private var passwords: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            stepHero(systemName: "key.fill")
+    private var quickSetupNavigation: some View {
+        VStack(alignment: .leading, spacing: 16) {
             header(
-                title: "Passwords",
-                subtitle: "Zalla uses Apple Passwords and iCloud Keychain AutoFill. There is no separate Zalla vault."
+                title: "Navigation",
+                subtitle: "Pick how your controls sit on screen. The preview updates as you choose."
             )
-            VStack(alignment: .leading, spacing: 14) {
-                Label("Turn on AutoFill in Settings", systemImage: "key.fill")
-                    .font(.headline)
-                Text("Safari and Zalla can share the same saved passwords through Apple Passwords when AutoFill is enabled.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Button {
-                    openPasswordSettings()
-                } label: {
-                    Text("Open password settings")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+            .padding(.horizontal, 24)
+
+            livePreview
+                .padding(.horizontal, 24)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Toolbar").font(.headline)
+                        ForEach(ToolbarStyle.allCases) { style in
+                            toolbarStyleOption(style)
+                        }
+                    }
+                    .padding(20)
+                    .background(cardBackground)
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Address bar").font(.headline)
+                        Picker("Address bar", selection: placementBinding) {
+                            ForEach(AddressBarPlacement.allCases) { placement in
+                                Text(placement.rawValue).tag(placement.rawValue)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(20)
+                    .background(cardBackground)
                 }
-                .buttonStyle(.borderedProminent)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 12)
             }
-            .padding(20)
-            .background(cardBackground)
-            Spacer()
+
             nextButton("Continue") { goTo(3) }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 36)
         }
-        .padding(.horizontal, 24)
         .padding(.top, 12)
         .opacity(step == 2 && !contentVisible ? 0 : 1)
         .offset(y: step == 2 && !contentVisible ? 18 : 0)
     }
 
-    private var bookmarks: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            stepHero(systemName: "bookmark.fill")
-            header(
-                title: "Bring your bookmarks",
-                subtitle: "Import an HTML bookmark file from Safari, Chrome, or Firefox. You can also skip and import later."
-            )
-            VStack(spacing: 12) {
-                Button {
-                    showImporter = true
-                } label: {
-                    Label("Import HTML bookmarks", systemImage: "square.and.arrow.down")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Skip for now") {
-                    goTo(4)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+    private func toolbarStyleOption(_ style: ToolbarStyle) -> some View {
+        let selected = (ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic) == style
+        return Button {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                toolbarStyleRaw = style.rawValue
             }
-            .padding(20)
-            .background(cardBackground)
-            Spacer()
-            nextButton("Continue") { goTo(4) }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 36)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: style.symbolName)
+                    .font(.title3)
+                    .foregroundStyle(selected ? .white : theme.primary)
+                    .frame(width: 42, height: 42)
+                    .background(
+                        selected ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(theme.primary.opacity(0.12)),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(style.rawValue)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text(style.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? theme.primary : Color.secondary.opacity(0.5))
+            }
+            .padding(12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(selected ? theme.primary.opacity(0.08) : Color.clear)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(selected ? theme.primary.opacity(0.35) : Color.primary.opacity(0.08), lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var bringYourStuff: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                stepHero(systemName: "tray.and.arrow.down.fill")
+                header(
+                    title: "Bring your stuff",
+                    subtitle: "Passwords stay with Apple. Bookmarks come in from a file. Both are optional."
+                )
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Passwords", systemImage: "key.fill")
+                        .font(.headline)
+                    Text("Zalla uses Apple Passwords and iCloud Keychain AutoFill. There is no separate Zalla vault. Turn on AutoFill so Safari and Zalla share the same saved passwords.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        openPasswordSettings()
+                    } label: {
+                        Text("Open password settings")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(20)
+                .background(cardBackground)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Bookmarks", systemImage: "bookmark.fill")
+                        .font(.headline)
+                    Text("Import an HTML bookmark file exported from Safari, Chrome, or Firefox. You can also do this later in Settings.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        showImporter = true
+                    } label: {
+                        Label("Import HTML bookmarks", systemImage: "square.and.arrow.down")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(20)
+                .background(cardBackground)
+
+                nextButton("Continue") { goTo(4) }
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 12)
+        }
         .opacity(step == 3 && !contentVisible ? 0 : 1)
         .offset(y: step == 3 && !contentVisible ? 18 : 0)
     }
@@ -418,6 +496,17 @@ struct OnboardingView: View {
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
+                if (ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic) == .quickAction {
+                    Text("Tip: tap the center button for your controls.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 18) {
+                    Link("Privacy Policy", destination: Self.privacyPolicyURL)
+                    Link("Support", destination: Self.supportURL)
+                }
+                .font(.footnote.weight(.semibold))
+                .padding(.top, 4)
             }
             Spacer()
             Button(action: finish) {
@@ -438,83 +527,13 @@ struct OnboardingView: View {
 
     // MARK: - Preview chrome
 
-    private var miniBrowserPreview: some View {
-        let chromeBG = previewIsDark ? Color(white: 0.12) : Color(white: 0.96)
-        let barBG = previewIsDark ? Color(white: 0.18) : Color.white
-        let pageBG = previewIsDark ? Color(white: 0.08) : Color(uiColor: .systemBackground)
-        let muted = previewIsDark ? Color.white.opacity(0.45) : Color.black.opacity(0.35)
-
-        return VStack(spacing: 0) {
-            // Top status strip only; address bar stays at the bottom to match app defaults.
-            HStack {
-                Text("Zalla")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(muted)
-                Spacer()
-                Circle()
-                    .fill(theme.primary.opacity(0.85))
-                    .frame(width: 8, height: 8)
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 6)
-            .background(chromeBG)
-
-            VStack(alignment: .leading, spacing: 10) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(theme.gradient.opacity(0.85))
-                    .frame(height: 10)
-                    .frame(maxWidth: 140)
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(muted.opacity(0.45))
-                    .frame(height: 6)
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(muted.opacity(0.28))
-                    .frame(height: 6)
-                    .frame(maxWidth: 180)
-                Spacer(minLength: 0)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
-            .background(pageBG)
-
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
-                        .foregroundStyle(theme.primary)
-                    Text("zalla.app")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(previewIsDark ? .white.opacity(0.85) : .primary)
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(barBG, in: Capsule())
-                .padding(.horizontal, 16)
-
-                HStack {
-                    ForEach(["chevron.backward", "chevron.forward", "square.on.square", "book", "ellipsis"], id: \.self) { name in
-                        Image(systemName: name)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(name == "ellipsis" ? theme.primary : muted)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(.vertical, 10)
-            }
-            .background(chromeBG)
-        }
-        .background(chromeBG, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(theme.primary.opacity(0.22), lineWidth: 1)
-        }
-        .shadow(color: theme.primary.opacity(0.18), radius: 18, y: 8)
-        .animation(.easeInOut(duration: 0.28), value: appearance)
-        .animation(.easeInOut(duration: 0.28), value: themeID)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Live browser preview")
+    private var livePreview: some View {
+        ChromeStylePreview(
+            style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+            placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom,
+            isDark: previewIsDark,
+            theme: theme
+        )
     }
 
     // MARK: - Shared pieces
@@ -523,6 +542,17 @@ struct OnboardingView: View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .fill(Color(uiColor: .secondarySystemGroupedBackground))
             .shadow(color: theme.primary.opacity(0.06), radius: 12, y: 4)
+    }
+
+    private var placementBinding: Binding<String> {
+        Binding(
+            get: { addressBarPlacementRaw },
+            set: { newValue in
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    addressBarPlacementRaw = newValue
+                }
+            }
+        )
     }
 
     private var appearanceBinding: Binding<String> {

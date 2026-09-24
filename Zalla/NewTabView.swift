@@ -4,6 +4,7 @@ struct NewTabView: View {
     @ObservedObject var browser: BrowserStore
     @ObservedObject var tab: BrowserTab
     var onOpenLibrary: () -> Void
+    var onOpenTabs: () -> Void = {}
 
     @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
@@ -13,7 +14,10 @@ struct NewTabView: View {
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
     @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
+    @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
+    @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
 
+    @State private var homePage = 0
     @State private var shortcuts: [HomeShortcut] = HomeShortcuts.load()
     @State private var address = ""
     @State private var isEditing = false
@@ -72,14 +76,7 @@ struct NewTabView: View {
             VStack(spacing: 22) {
                 header
                 Spacer(minLength: 12)
-                if showLogo {
-                    Image("ZallaMark")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 72, height: 72)
-                        .accessibilityLabel("Zalla")
-                }
-                welcomeBlock
+                homeHero
                 searchField
                 if shortcuts.isEmpty {
                     emptyShortcutsNudge
@@ -112,6 +109,78 @@ struct NewTabView: View {
             }
             .padding(24)
         }
+    }
+
+    // MARK: - Home slider
+
+    private var sliderPages: [HomeWidgets.Page] {
+        HomeWidgets.pages(
+            sliderEnabled: showSlider,
+            showRecentHistory: showRecentHistory,
+            isPrivate: tab.isPrivate,
+            hasHistory: !browser.history.isEmpty
+        )
+    }
+
+    @ViewBuilder
+    private var homeHero: some View {
+        let pages = sliderPages
+        if pages.count <= 1 {
+            welcomePage
+        } else {
+            VStack(spacing: 10) {
+                TabView(selection: $homePage) {
+                    ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
+                        sliderPage(page)
+                            .padding(.horizontal, 4)
+                            .tag(index)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 184)
+                HomePageDots(count: pages.count, selection: homePage, tint: theme.primary)
+            }
+            .onChange(of: pages.count) { _, newCount in
+                if homePage >= newCount { homePage = 0 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sliderPage(_ page: HomeWidgets.Page) -> some View {
+        switch page {
+        case .welcome:
+            welcomePage
+        case .tabs:
+            HomeTabsWidget(
+                totalCount: browser.tabs.count,
+                privateCount: browser.tabs.filter(\.isPrivate).count,
+                tint: theme.primary,
+                onOpenTabs: onOpenTabs,
+                onNewTab: { browser.addTab() }
+            )
+        case .recent:
+            HomeRecentWidget(
+                pages: HomeWidgets.recentPages(browser.history),
+                tint: theme.primary,
+                onOpen: { url in tab.load(url) },
+                onOpenLibrary: onOpenLibrary
+            )
+        }
+    }
+
+    private var welcomePage: some View {
+        VStack(spacing: 18) {
+            if showLogo {
+                Image("ZallaMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 72, height: 72)
+                    .accessibilityLabel("Zalla")
+            }
+            welcomeBlock
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -264,19 +333,31 @@ struct NewTabView: View {
     }
 
     private var searchField: some View {
-        TextField("Search or enter a website", text: $address)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(.webSearch)
-            .submitLabel(.go)
-            .focused($searchFocused)
-            .padding(.horizontal, 18)
-            .frame(minHeight: 52)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
-            .contentShape(Capsule())
-            .onTapGesture { searchFocused = true }
-            .onSubmit(submitAddress)
-            .padding(.horizontal, 8)
+        HStack(spacing: 10) {
+            Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            TextField("Search or enter a website", text: $address)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.webSearch)
+                .submitLabel(.go)
+                .focused($searchFocused)
+            Text(currentEngine.rawValue)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(theme.primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(theme.primary.opacity(0.12), in: Capsule())
+                .accessibilityLabel("Searching with \(currentEngine.rawValue)")
+        }
+        .padding(.horizontal, 18)
+        .frame(minHeight: 52)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
+        .contentShape(Capsule())
+        .onTapGesture { searchFocused = true }
+        .onSubmit(submitAddress)
+        .padding(.horizontal, 8)
     }
 
     private func moveShortcuts(from source: IndexSet, to destination: Int) {
@@ -289,9 +370,12 @@ struct NewTabView: View {
         persist()
     }
 
+    private var currentEngine: SearchEngine {
+        SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+    }
+
     private func submitAddress() {
-        let engine = SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
-        if let url = AddressResolver.resolve(address, engine: engine) {
+        if let url = AddressResolver.resolve(address, engine: currentEngine) {
             tab.load(url)
             searchFocused = false
         }

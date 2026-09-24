@@ -1,12 +1,34 @@
+import CoreGraphics
 import Foundation
 
 enum ToolbarStyle: String, CaseIterable, Identifiable, Codable {
     case classic = "Classic"
     case compact = "Compact"
+    case quickAction = "Quick Action"
 
     var id: String { rawValue }
 
     static let storageKey = "toolbarStyle"
+
+    /// Short description used by onboarding and Settings pickers.
+    var summary: String {
+        switch self {
+        case .classic:
+            return "Address bar with Back, Forward, Share, Tabs, and Menu in a full row."
+        case .compact:
+            return "One floating row with a tap-to-search pill."
+        case .quickAction:
+            return "A single crimson button that fans out every control when you need it."
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .classic: return "dock.rectangle"
+        case .compact: return "capsule"
+        case .quickAction: return "smallcircle.filled.circle"
+        }
+    }
 }
 
 enum AddressBarPlacement: String, CaseIterable, Identifiable, Codable {
@@ -23,6 +45,7 @@ enum ChromeModeTips {
     static let compactSeenKey = "hasSeenCompactModeTip"
     static let topBarSeenKey = "hasSeenTopBarPlacementTip"
     static let holdRevealSeenKey = "hasSeenHoldRevealTip"
+    static let quickActionSeenKey = "hasSeenQuickActionTip"
 
     static let compactMessage =
         "Compact puts your address and controls in one floating row. Tap the center pill to search or edit the address."
@@ -30,8 +53,110 @@ enum ChromeModeTips {
     static let topBarMessage =
         "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
 
+    static let quickActionMessage =
+        "Quick Action keeps one button at the center of your chrome. Tap it to reveal Back, Forward, Tabs, New Tab, Share, and Menu. Tap the address, or press and hold the button, to search."
+
     static let holdRevealMessage =
         "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
+}
+
+/// Controls revealed by the Quick Action button, in left-to-right fan order.
+enum QuickActionItem: String, CaseIterable, Identifiable {
+    case back
+    case forward
+    case tabs
+    case newTab
+    case share
+    case menu
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .back: return "Back"
+        case .forward: return "Forward"
+        case .tabs: return "Tabs"
+        case .newTab: return "New Tab"
+        case .share: return "Share"
+        case .menu: return "Menu"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .back: return "chevron.left"
+        case .forward: return "chevron.right"
+        case .tabs: return "square.on.square"
+        case .newTab: return "plus"
+        case .share: return "square.and.arrow.up"
+        case .menu: return "ellipsis"
+        }
+    }
+}
+
+/// Pure layout math for the Quick Action fan.
+enum QuickActionLayout {
+    static let radius: Double = 128
+    static let startAngle: Double = 165
+    static let endAngle: Double = 15
+
+    /// Fan angles in degrees, evenly spread from left (startAngle) to right (endAngle).
+    static func angles(count: Int) -> [Double] {
+        guard count > 0 else { return [] }
+        guard count > 1 else { return [90] }
+        let step = (startAngle - endAngle) / Double(count - 1)
+        return (0..<count).map { startAngle - Double($0) * step }
+    }
+
+    /// Offset from the Quick Action button center for the item at `index`.
+    /// Opens upward when the chrome sits at the bottom, downward when it sits at the top.
+    static func offset(index: Int, count: Int, placement: AddressBarPlacement, radius: Double = radius) -> CGSize {
+        let all = angles(count: count)
+        guard all.indices.contains(index) else { return .zero }
+        let radians = all[index] * .pi / 180
+        let dx = cos(radians) * radius
+        let dy = sin(radians) * radius
+        return CGSize(width: dx, height: placement == .bottom ? -dy : dy)
+    }
+}
+
+/// Pure description of what the onboarding mini preview should draw for a chrome combination.
+struct ChromePreviewLayout: Equatable {
+    var addressAtTop: Bool
+    var showsNavRow: Bool
+    var navRowAtBottom: Bool
+    var showsFloatingRow: Bool
+    var showsQuickActionButton: Bool
+
+    static func make(style: ToolbarStyle, placement: AddressBarPlacement) -> ChromePreviewLayout {
+        let top = placement == .top
+        switch style {
+        case .classic:
+            return ChromePreviewLayout(
+                addressAtTop: top,
+                showsNavRow: true,
+                navRowAtBottom: true,
+                showsFloatingRow: false,
+                showsQuickActionButton: false
+            )
+        case .compact:
+            return ChromePreviewLayout(
+                addressAtTop: top,
+                showsNavRow: false,
+                navRowAtBottom: false,
+                showsFloatingRow: true,
+                showsQuickActionButton: false
+            )
+        case .quickAction:
+            return ChromePreviewLayout(
+                addressAtTop: top,
+                showsNavRow: false,
+                navRowAtBottom: false,
+                showsFloatingRow: false,
+                showsQuickActionButton: true
+            )
+        }
+    }
 }
 
 /// Pure helpers for address chrome title/host display and tap-to-edit prefill.

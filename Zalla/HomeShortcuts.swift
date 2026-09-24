@@ -22,6 +22,7 @@ enum HomeShortcuts {
     static let showRecentHistoryKey = "homeShowRecentHistory"
     static let washIntensityKey = "homeWashIntensity"
     static let showLogoKey = "homeShowLogo"
+    static let showSliderKey = "homeShowSlider"
 
     /// Curated SF Symbols for shortcut icons.
     static let curatedSymbols: [String] = [
@@ -86,6 +87,7 @@ enum HomeShortcuts {
         defaults.set(true, forKey: showRecentHistoryKey)
         defaults.set(0.35, forKey: washIntensityKey)
         defaults.set(true, forKey: showLogoKey)
+        defaults.set(true, forKey: showSliderKey)
         defaults.set(HomeWelcomeMode.quotes.rawValue, forKey: HomeWelcomeMode.storageKey)
         defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)
     }
@@ -94,5 +96,60 @@ enum HomeShortcuts {
     static func seededIfEmpty(_ existing: [HomeShortcut]?) -> [HomeShortcut] {
         guard let existing, !existing.isEmpty else { return Self.defaults }
         return existing
+    }
+}
+
+/// Pure helpers for the new tab home slider. Widgets only use data already on this device.
+enum HomeWidgets {
+    static let recentHistoryLimit = 3
+
+    enum Page: String, Equatable {
+        case welcome
+        case tabs
+        case recent
+    }
+
+    /// Pages shown in the home slider. Welcome is always first. Recent history is hidden
+    /// in private tabs, when turned off, or when there is nothing to show.
+    static func pages(
+        sliderEnabled: Bool,
+        showRecentHistory: Bool,
+        isPrivate: Bool,
+        hasHistory: Bool
+    ) -> [Page] {
+        guard sliderEnabled else { return [.welcome] }
+        var pages: [Page] = [.welcome, .tabs]
+        if showRecentHistory, !isPrivate, hasHistory {
+            pages.append(.recent)
+        }
+        return pages
+    }
+
+    /// Most recent unique pages by URL, newest first.
+    static func recentPages(_ history: [SavedPage], limit: Int = recentHistoryLimit) -> [SavedPage] {
+        var seen = Set<URL>()
+        var result: [SavedPage] = []
+        for page in history where !seen.contains(page.url) {
+            seen.insert(page.url)
+            result.append(page)
+            if result.count >= limit { break }
+        }
+        return result
+    }
+
+    static func tabCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 tab open" : "\(count) tabs open"
+    }
+
+    static func privateTabLabel(_ count: Int) -> String? {
+        guard count > 0 else { return nil }
+        return count == 1 ? "1 private" : "\(count) private"
+    }
+
+    /// Title for a recent page row, falling back to its host.
+    static func displayTitle(for page: SavedPage) -> String {
+        let trimmed = page.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty { return trimmed }
+        return AddressDisplay.friendlyHost(from: page.url) ?? page.url.absoluteString
     }
 }
