@@ -361,6 +361,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var previewImage: UIImage?
     @Published var isReaderActive = false
     @Published var readerAvailable = false
+    @Published var hasOnlySecureContent = true
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
@@ -397,7 +398,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             webView.observe(\.url, options: [.new]) { [weak self] _, _ in self?.refresh() },
             webView.observe(\.title, options: [.new]) { [weak self] _, _ in self?.refresh() },
             webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.refresh() },
-            webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in self?.refresh() }
+            webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in self?.refresh() },
+            webView.observe(\.hasOnlySecureContent, options: [.new]) { [weak self] _, _ in self?.refresh() }
         ]
     }
 
@@ -438,6 +440,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         isLoading = webView.isLoading
         canGoBack = webView.canGoBack
         canGoForward = webView.canGoForward
+        hasOnlySecureContent = webView.hasOnlySecureContent
     }
 
     func load(_ url: URL) {
@@ -601,6 +604,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         errorMessage = "This page stopped responding. Reload to continue."
+        let restoreURL = url ?? webView.url ?? webView.backForwardList.currentItem?.url
+        if let restoreURL, ["http", "https"].contains(restoreURL.scheme?.lowercased() ?? "") {
+            webView.load(URLRequest(url: restoreURL))
+        } else {
+            webView.reload()
+        }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,

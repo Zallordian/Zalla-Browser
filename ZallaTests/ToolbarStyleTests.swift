@@ -59,4 +59,32 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertFalse(ChromeModeTips.topBarMessage.isEmpty)
         XCTAssertFalse(ChromeModeTips.holdRevealMessage.isEmpty)
     }
+
+    func testConnectionSecurityEvaluate() {
+        let https = URL(string: "https://example.com")
+        let http = URL(string: "http://example.com")
+        XCTAssertEqual(
+            ConnectionSecurity.evaluate(url: https, hasPage: true, hasOnlySecureContent: true),
+            .secure
+        )
+        XCTAssertEqual(
+            ConnectionSecurity.evaluate(url: https, hasPage: true, hasOnlySecureContent: false),
+            .notSecure
+        )
+        XCTAssertEqual(
+            ConnectionSecurity.evaluate(url: http, hasPage: true, hasOnlySecureContent: true),
+            .notSecure
+        )
+        XCTAssertEqual(
+            ConnectionSecurity.evaluate(url: https, hasPage: false, hasOnlySecureContent: true),
+            .none
+        )
+        XCTAssertEqual(
+            ConnectionSecurity.evaluate(url: nil, hasPage: true, hasOnlySecureContent: true),
+            .none
+        )
+        XCTAssertEqual(ConnectionSecurity.secure.accessibilityLabel, "Secure connection")
+        XCTAssertEqual(ConnectionSecurity.notSecure.accessibilityLabel, "Not Secure")
+        XCTAssertNil(ConnectionSecurity.none.accessibilityLabel)
+    }
 }

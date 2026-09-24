@@ -399,8 +399,7 @@ private struct TabContent: View {
 
     private var classicAddressField: some View {
         HStack(spacing: 10) {
-            Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
-                .foregroundStyle(.secondary)
+            classicAddressLeading
             if addressFocused || isEditingClassicAddress {
                 TextField("Search or enter a website", text: $address)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -470,6 +469,39 @@ private struct TabContent: View {
         }
     }
 
+    @ViewBuilder
+    private var classicAddressLeading: some View {
+        if addressFocused || isEditingClassicAddress || !tab.hasPage {
+            Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                .foregroundStyle(.secondary)
+        } else {
+            connectionSecurityAffordance(font: .footnote, textFont: .caption.weight(.semibold))
+        }
+    }
+
+    @ViewBuilder
+    private func connectionSecurityAffordance(font: Font, textFont: Font) -> some View {
+        let security = ConnectionSecurity.evaluate(
+            url: tab.url,
+            hasPage: tab.hasPage,
+            hasOnlySecureContent: tab.hasOnlySecureContent
+        )
+        switch security {
+        case .secure:
+            Image(systemName: "lock.fill")
+                .font(font)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("Secure connection")
+        case .notSecure:
+            Text("Not Secure")
+                .font(textFont)
+                .foregroundStyle(.orange)
+                .accessibilityLabel("Not Secure")
+        case .none:
+            EmptyView()
+        }
+    }
+
     private func beginClassicAddressEditing() {
         address = AddressDisplay.editingText(url: tab.url)
         isEditingClassicAddress = true
@@ -512,6 +544,10 @@ private struct TabContent: View {
                 }
 
                 compactPill
+
+                compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page") {
+                    showShare = true
+                }
 
                 compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu") {
                     sheet = .menu
@@ -558,11 +594,19 @@ private struct TabContent: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .foregroundStyle(.primary)
-                    if let host = CompactAddressChrome.hostSubtitle(url: tab.url, hasPage: tab.hasPage) {
-                        Text(host)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    if tab.hasPage {
+                        HStack(spacing: 4) {
+                            connectionSecurityAffordance(
+                                font: .caption2,
+                                textFont: .caption2.weight(.semibold)
+                            )
+                            if let host = CompactAddressChrome.hostSubtitle(url: tab.url, hasPage: tab.hasPage) {
+                                Text(host)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
                 }
                 Spacer(minLength: 0)
@@ -826,6 +870,7 @@ private struct BrowserMenuSheet: View {
     @Binding var sheet: BrowserSheet?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showShare = false
 
     var body: some View {
         List {
@@ -860,6 +905,10 @@ private struct BrowserMenuSheet: View {
                     dismiss()
                 } label: { Label("Bookmark page", systemImage: "bookmark") }
                 .disabled(browser.selected?.url == nil)
+                Button {
+                    showShare = true
+                } label: { Label("Share", systemImage: "square.and.arrow.up") }
+                .disabled(browser.selected?.url == nil)
             }
             Section("Library") {
                 Button {
@@ -879,6 +928,11 @@ private struct BrowserMenuSheet: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        }
+        .sheet(isPresented: $showShare) {
+            if let url = browser.selected?.url {
+                ActivityShareSheet(items: [url])
+            }
         }
     }
 }
@@ -1505,6 +1559,19 @@ private struct SettingsView: View {
                 Label("Bookmarks and history saved on this device", systemImage: "iphone")
                 Text("Websites and your chosen search engine receive the requests you send them. Zalla does not provide a VPN or anonymity service.")
                     .font(.footnote).foregroundStyle(.secondary)
+            }
+
+            Section {
+                Link(destination: URL(string: "https://zalla.gg/privacy/")!) {
+                    Label("Privacy Policy", systemImage: "doc.text")
+                }
+                Link(destination: URL(string: "https://zalla.gg/support/")!) {
+                    Label("Support", systemImage: "questionmark.circle")
+                }
+            } header: {
+                Text("Privacy and support")
+            } footer: {
+                Text("Opens zalla.gg in Safari.")
             }
 
             Section("Version") {

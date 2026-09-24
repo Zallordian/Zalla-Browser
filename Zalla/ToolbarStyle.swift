@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 
 enum ToolbarStyle: String, CaseIterable, Identifiable, Codable {
     case classic = "Classic"
@@ -78,5 +78,33 @@ enum AddressDisplay {
     /// Full URL string used while editing.
     static func editingText(url: URL?) -> String {
         url?.absoluteString ?? ""
+    }
+}
+
+/// Safari-like connection security for collapsed address chrome.
+enum ConnectionSecurity: Equatable {
+    case none
+    case secure
+    case notSecure
+
+    /// Prefer URL scheme; treat HTTPS with mixed content as not secure.
+    static func evaluate(url: URL?, hasPage: Bool, hasOnlySecureContent: Bool) -> ConnectionSecurity {
+        guard hasPage, let url else { return .none }
+        switch url.scheme?.lowercased() {
+        case "https":
+            return hasOnlySecureContent ? .secure : .notSecure
+        case "http":
+            return .notSecure
+        default:
+            return .none
+        }
+    }
+
+    var accessibilityLabel: String? {
+        switch self {
+        case .none: return nil
+        case .secure: return "Secure connection"
+        case .notSecure: return "Not Secure"
+        }
     }
 }
