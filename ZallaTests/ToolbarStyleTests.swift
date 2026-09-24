@@ -50,4 +50,13 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(AddressDisplay.collapsedLabel(url: url, hasPage: true), "apple.com")
         XCTAssertEqual(AddressDisplay.collapsedLabel(url: nil, hasPage: false), "Search or enter a website")
     }
+
+    func testChromeModeTipKeysAndCopy() {
+        XCTAssertEqual(ChromeModeTips.compactSeenKey, "hasSeenCompactModeTip")
+        XCTAssertEqual(ChromeModeTips.topBarSeenKey, "hasSeenTopBarPlacementTip")
+        XCTAssertEqual(ChromeModeTips.holdRevealSeenKey, "hasSeenHoldRevealTip")
+        XCTAssertFalse(ChromeModeTips.compactMessage.contains(String(UnicodeScalar(0x2014)!)))
+        XCTAssertFalse(ChromeModeTips.topBarMessage.isEmpty)
+        XCTAssertFalse(ChromeModeTips.holdRevealMessage.isEmpty)
+    }
 }

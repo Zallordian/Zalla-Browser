@@ -1,4 +1,4 @@
-import Foundation
+﻿import Foundation
 
 enum ToolbarStyle: String, CaseIterable, Identifiable, Codable {
     case classic = "Classic"
@@ -16,6 +16,22 @@ enum AddressBarPlacement: String, CaseIterable, Identifiable, Codable {
     var id: String { rawValue }
 
     static let storageKey = "addressBarPlacement"
+}
+
+/// One-time lightweight tips for chrome mode changes and hold-to-reveal.
+enum ChromeModeTips {
+    static let compactSeenKey = "hasSeenCompactModeTip"
+    static let topBarSeenKey = "hasSeenTopBarPlacementTip"
+    static let holdRevealSeenKey = "hasSeenHoldRevealTip"
+
+    static let compactMessage =
+        "Compact puts your address and controls in one floating row. Tap the center pill to search or edit the address."
+
+    static let topBarMessage =
+        "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
+
+    static let holdRevealMessage =
+        "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
 }
 
 /// Pure helpers for address chrome title/host display and tap-to-edit prefill.

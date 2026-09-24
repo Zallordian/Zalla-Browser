@@ -182,6 +182,9 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: "customAccentGradient")
         defaults.removeObject(forKey: HomeWelcomeMode.storageKey)
         defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)
+        defaults.removeObject(forKey: ChromeModeTips.compactSeenKey)
+        defaults.removeObject(forKey: ChromeModeTips.topBarSeenKey)
+        defaults.removeObject(forKey: ChromeModeTips.holdRevealSeenKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
         HomeShortcuts.resetToDefaults()
         if UIApplication.shared.supportsAlternateIcons {
@@ -588,6 +591,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         errorMessage = error.localizedDescription
     }
 
+    func dismissError() {
+        errorMessage = nil
+    }
+
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         errorMessage = "This page stopped responding. Reload to continue."
     }
@@ -596,6 +603,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == "blob" || scheme == "data" {
+            // JS-triggered blob/data downloads become WKDownload via the action path.
+            pendingDownloadURL = url
+            decisionHandler(.download)
+            return
+        }
         if ["http", "https", "about"].contains(scheme) {
             if navigationAction.targetFrame == nil {
                 decisionHandler(.cancel)

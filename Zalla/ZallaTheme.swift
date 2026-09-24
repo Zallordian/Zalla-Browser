@@ -38,7 +38,7 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         [.orange, .yellow, .green, .blue, .indigo, .violet]
     }
 
-    /// Best-fit alternate icon among shipped assets.
+    /// Best-fit alternate icon among shipped assets (Default / Dark / Tinted only).
     var suggestedAppIcon: AppIconPreference {
         switch self {
         case .zallaRed, .orange, .yellow:
@@ -48,6 +48,35 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .ocean, .forest, .green:
             return .tinted
         }
+    }
+}
+
+extension ZallaTheme {
+    /// Maps a custom accent hex to the closest shipped alternate icon.
+    /// True per-accent PNG icons are not bundled; this keeps runtime selection consistent.
+    static func closestAppIcon(forCustomHex hex: String) -> AppIconPreference {
+        let (r, g, b) = rgbComponents(from: hex)
+        let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if luminance < 0.28 {
+            return .dark
+        }
+        // Cool / teal / green accents pair with the tinted mark.
+        if g >= r && (g + b) > (r * 1.55) {
+            return .tinted
+        }
+        // Blue / indigo / violet leaning accents pair with Dark.
+        if b > r && b >= g {
+            return .dark
+        }
+        return .default
+    }
+
+    /// Resolves the recommended icon for the current accent settings.
+    static func recommendedAppIcon(themeID: String, useCustom: Bool, customHex: String) -> AppIconPreference {
+        if useCustom {
+            return closestAppIcon(forCustomHex: customHex)
+        }
+        return (ZallaThemeID(rawValue: themeID) ?? .zallaRed).suggestedAppIcon
     }
 }
 

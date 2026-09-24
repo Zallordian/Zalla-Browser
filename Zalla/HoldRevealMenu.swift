@@ -16,8 +16,8 @@ struct HoldRevealMenu: View {
     let highlightedID: Int?
     var onTapItem: ((HoldRevealItem) -> Void)? = nil
 
-    static let rowHeight: CGFloat = 58
-    static let bottomPadding: CGFloat = 110
+    static let rowHeight: CGFloat = 64
+    static let bottomPadding: CGFloat = 118
 
     var body: some View {
         VStack(spacing: 0) {
@@ -47,7 +47,7 @@ struct HoldRevealMenu: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 14)
                     .frame(minHeight: Self.rowHeight)
                     .background(highlighted ? Color.accentColor : Color.clear)
                     .contentShape(Rectangle())
@@ -86,8 +86,8 @@ struct HoldRevealMenu: View {
         if let menuFrame, menuFrame.width > 8, menuFrame.height > 8 {
             sheetTop = menuFrame.minY
             sheetBottom = menuFrame.maxY
-            sheetLeading = menuFrame.minX - 24
-            sheetTrailing = menuFrame.maxX + 24
+            sheetLeading = menuFrame.minX - 36
+            sheetTrailing = menuFrame.maxX + 36
         } else {
             sheetTop = bounds.height - Self.bottomPadding - sheetHeight
             sheetBottom = bounds.height - Self.bottomPadding
@@ -95,9 +95,9 @@ struct HoldRevealMenu: View {
             sheetTrailing = bounds.maxX - 12
         }
 
-        // Generous vertical slack so finger drag stays on the intended control.
-        guard point.y >= sheetTop - 56, point.y <= sheetBottom + 40 else { return nil }
-        guard point.x >= sheetLeading, point.x <= sheetTrailing else { return nil }
+        // Extra-forgiving hit targets so finger drag stays on the intended control.
+        guard point.y >= sheetTop - 72, point.y <= sheetBottom + 56 else { return nil }
+        guard point.x >= sheetLeading - 12, point.x <= sheetTrailing + 12 else { return nil }
 
         let relativeY = min(max(point.y - sheetTop, 0), sheetHeight - 1)
         let index = min(max(Int(relativeY / rowHeight), 0), items.count - 1)

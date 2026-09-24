@@ -140,24 +140,39 @@ struct NewTabView: View {
     }
 
     private var emptyShortcutsNudge: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 14) {
             Image(systemName: "link.badge.plus")
-                .font(.title2)
-                .foregroundStyle(theme.primary.opacity(0.85))
-            Text("Add a few links you use often.")
-                .font(.subheadline.weight(.medium))
-            Text("Tap Edit to personalize this page.")
-                .font(.caption)
+                .font(.title)
+                .foregroundStyle(theme.primary)
+            Text("Pin your daily sites")
+                .font(.headline)
+            Text("Add the websites you open every day so they are one tap away. Search above still works anytime.")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button {
+                editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
+            } label: {
+                Text("Add shortcut")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(theme.primary)
+            Button("Manage shortcuts") {
+                withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
+            }
+            .font(.subheadline.weight(.semibold))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 28)
-        .padding(.horizontal, 16)
+        .padding(.vertical, 24)
+        .padding(.horizontal, 18)
         .background(
             Color(uiColor: .secondarySystemGroupedBackground).opacity(0.65),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     private var editModeBody: some View {
@@ -228,10 +243,22 @@ struct NewTabView: View {
                     .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
             }
             Spacer()
-            Button("Edit") {
-                withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
+            Menu {
+                Button {
+                    editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
+                } label: {
+                    Label("Add shortcut", systemImage: "plus")
+                }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
+                } label: {
+                    Label("Edit shortcuts", systemImage: "pencil")
+                }
+            } label: {
+                Text("Shortcuts")
+                    .font(.subheadline.weight(.semibold))
             }
-            .font(.subheadline.weight(.semibold))
+            .accessibilityLabel("Shortcuts menu")
         }
         .padding(.top, 12)
     }

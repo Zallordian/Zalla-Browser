@@ -48,4 +48,24 @@ final class DownloadsStoreTests: XCTestCase {
         )
         XCTAssertTrue(DownloadsStore.isLikelyDownload(response: blob))
     }
+
+    func testDataURLIsLikelyDownload() {
+        let data = URLResponse(
+            url: URL(string: "data:application/octet-stream;base64,AAA")!,
+            mimeType: "application/octet-stream",
+            expectedContentLength: -1,
+            textEncodingName: nil
+        )
+        XCTAssertTrue(DownloadsStore.isLikelyDownload(response: data))
+    }
+
+    func testDownloadQueryHint() {
+        let response = URLResponse(
+            url: URL(string: "https://cdn.example/file?download=1")!,
+            mimeType: "application/octet-stream",
+            expectedContentLength: 10,
+            textEncodingName: nil
+        )
+        XCTAssertTrue(DownloadsStore.isLikelyDownload(response: response))
+    }
 }

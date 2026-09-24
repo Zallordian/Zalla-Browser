@@ -36,4 +36,18 @@ final class ThemeTests: XCTestCase {
         XCTAssertEqual(ZallaThemeID.featured.first, .zallaRed)
         XCTAssertFalse(ZallaThemeID.secondary.contains(.zallaRed))
     }
+
+    func testClosestAppIconForCustomHex() {
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "E33B4F"), .default)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "1A1A2E"), .dark)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "1F8A9E"), .tinted)
+        XCTAssertEqual(
+            ZallaTheme.recommendedAppIcon(themeID: ZallaThemeID.space.rawValue, useCustom: false, customHex: "E33B4F"),
+            .dark
+        )
+        XCTAssertEqual(
+            ZallaTheme.recommendedAppIcon(themeID: ZallaThemeID.zallaRed.rawValue, useCustom: true, customHex: "1A1A2E"),
+            .dark
+        )
+    }
 }

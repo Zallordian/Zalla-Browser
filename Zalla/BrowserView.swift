@@ -80,6 +80,12 @@ private struct TabContent: View {
     @State private var holdHighlightedID: Int?
     @State private var suppressNextNavTap = false
     @State private var holdMenuFrame: CGRect = .zero
+    @State private var chromeTipMessage: String?
+    @State private var holdRevealTipMessage: String?
+    @State private var pendingHoldRevealTip = false
+    @AppStorage(ChromeModeTips.compactSeenKey) private var hasSeenCompactTip = false
+    @AppStorage(ChromeModeTips.topBarSeenKey) private var hasSeenTopBarTip = false
+    @AppStorage(ChromeModeTips.holdRevealSeenKey) private var hasSeenHoldRevealTip = false
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -102,12 +108,25 @@ private struct TabContent: View {
                     }
                 }
                 if let error = tab.errorMessage {
-                    HStack {
-                        Text(error).font(.caption)
-                        Spacer()
-                        Button("Reload") { tab.webView.reload() }
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(error)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 12) {
+                            Button("Reload") {
+                                tab.dismissError()
+                                tab.webView.reload()
+                            }
+                            .font(.caption.weight(.semibold))
+                            Button("Stay on page") {
+                                tab.dismissError()
+                            }
+                            .font(.caption.weight(.semibold))
+                            Spacer(minLength: 0)
+                        }
                     }
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.regularMaterial)
                 }
             }
@@ -158,7 +177,14 @@ private struct TabContent: View {
                 }
             }
         }
-        .onAppear { address = tab.url?.absoluteString ?? "" }
+        .onAppear {
+            address = tab.url?.absoluteString ?? ""
+            if toolbarStyle == .compact, !hasSeenCompactTip {
+                chromeTipMessage = ChromeModeTips.compactMessage
+            } else if addressBarPlacement == .top, !hasSeenTopBarTip {
+                chromeTipMessage = ChromeModeTips.topBarMessage
+            }
+        }
         .sheet(isPresented: $showShare) {
             if let url = tab.url { ActivityShareSheet(items: [url]) }
         }
@@ -174,6 +200,40 @@ private struct TabContent: View {
             }
             Button("Cancel", role: .cancel) { tab.externalURL = nil }
         } message: { Text(tab.externalURL?.absoluteString ?? "") }
+        .alert("Compact toolbar", isPresented: Binding(
+            get: { chromeTipMessage == ChromeModeTips.compactMessage },
+            set: { if !$0 { chromeTipMessage = nil; hasSeenCompactTip = true } }
+        )) {
+            Button("Got it") { chromeTipMessage = nil; hasSeenCompactTip = true }
+        } message: {
+            Text(ChromeModeTips.compactMessage)
+        }
+        .alert("Address bar on top", isPresented: Binding(
+            get: { chromeTipMessage == ChromeModeTips.topBarMessage },
+            set: { if !$0 { chromeTipMessage = nil; hasSeenTopBarTip = true } }
+        )) {
+            Button("Got it") { chromeTipMessage = nil; hasSeenTopBarTip = true }
+        } message: {
+            Text(ChromeModeTips.topBarMessage)
+        }
+        .alert("History peek", isPresented: Binding(
+            get: { holdRevealTipMessage != nil },
+            set: { if !$0 { holdRevealTipMessage = nil; hasSeenHoldRevealTip = true } }
+        )) {
+            Button("Got it") { holdRevealTipMessage = nil; hasSeenHoldRevealTip = true }
+        } message: {
+            Text(holdRevealTipMessage ?? ChromeModeTips.holdRevealMessage)
+        }
+        .onChange(of: toolbarStyleRaw) { _, newValue in
+            if newValue == ToolbarStyle.compact.rawValue, !hasSeenCompactTip {
+                chromeTipMessage = ChromeModeTips.compactMessage
+            }
+        }
+        .onChange(of: addressBarPlacementRaw) { _, newValue in
+            if newValue == AddressBarPlacement.top.rawValue, !hasSeenTopBarTip {
+                chromeTipMessage = ChromeModeTips.topBarMessage
+            }
+        }
     }
 
     private var holdRevealOverlay: some View {
@@ -234,6 +294,9 @@ private struct TabContent: View {
         holdItems = history.map { HoldRevealItem(id: $0.id, title: $0.title, subtitle: $0.host) }
         holdHighlightedID = holdItems.first?.id
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if !hasSeenHoldRevealTip {
+            pendingHoldRevealTip = true
+        }
     }
 
     private func commitHoldReveal(id: Int) {
@@ -251,6 +314,15 @@ private struct TabContent: View {
         holdKind = nil
         holdItems = []
         holdHighlightedID = nil
+        holdMenuFrame = .zero
+        if pendingHoldRevealTip, !hasSeenHoldRevealTip {
+            pendingHoldRevealTip = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                holdRevealTipMessage = ChromeModeTips.holdRevealMessage
+            }
+        } else {
+            pendingHoldRevealTip = false
+        }
     }
 
     @ViewBuilder
@@ -328,6 +400,14 @@ private struct TabContent: View {
                     .keyboardType(.webSearch).submitLabel(.go).focused($addressFocused)
                     .onSubmit { submitAddress() }
                     .accessibilityLabel("Search or website address")
+                    .onAppear {
+                        if isEditingClassicAddress || isEditingCompactAddress {
+                            addressFocused = true
+                            DispatchQueue.main.async {
+                                UIResponder.currentFirstResponder()?.selectAll(nil)
+                            }
+                        }
+                    }
             } else {
                 Text(AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage))
                     .foregroundStyle(.primary)
@@ -386,8 +466,19 @@ private struct TabContent: View {
     private func beginClassicAddressEditing() {
         address = AddressDisplay.editingText(url: tab.url)
         isEditingClassicAddress = true
+        focusAddressFieldSelectingAll()
+    }
+
+    /// Focuses the address field after the TextField enters the hierarchy, then selects all.
+    private func focusAddressFieldSelectingAll() {
         DispatchQueue.main.async {
             addressFocused = true
+            DispatchQueue.main.async {
+                UIResponder.currentFirstResponder()?.selectAll(nil)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    UIResponder.currentFirstResponder()?.selectAll(nil)
+                }
+            }
         }
     }
 
@@ -438,6 +529,12 @@ private struct TabContent: View {
                     .focused($addressFocused)
                     .onSubmit { submitAddress() }
                     .accessibilityLabel("Search or website address")
+                    .onAppear {
+                        addressFocused = true
+                        DispatchQueue.main.async {
+                            UIResponder.currentFirstResponder()?.selectAll(nil)
+                        }
+                    }
                 Button {
                     cancelCompactAddressEditing()
                 } label: {
@@ -499,12 +596,7 @@ private struct TabContent: View {
         address = CompactAddressChrome.editingPrefill(url: tab.url)
         isEditingCompactAddress = true
         // Focus after the TextField is in the hierarchy.
-        DispatchQueue.main.async {
-            addressFocused = true
-            DispatchQueue.main.async {
-                UIResponder.currentFirstResponder()?.selectAll(nil)
-            }
-        }
+        focusAddressFieldSelectingAll()
     }
 
     private func cancelCompactAddressEditing() {
@@ -541,13 +633,13 @@ private struct TabContent: View {
     private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .font(.body.weight(.semibold))
-            .frame(width: 44, height: 44)
+            .frame(width: 48, height: 48)
             .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
             .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
             .opacity(enabled ? 1 : 0.35)
             .accessibilityLabel(label)
-            .contentShape(Circle())
+            .contentShape(Circle().scale(1.25))
             .onTapGesture {
                 if suppressNextNavTap {
                     suppressNextNavTap = false
@@ -598,14 +690,15 @@ private struct TabContent: View {
         } label: { Label("New Private Tab", systemImage: "eye.slash") }
         Divider()
         Button { sheet = .library } label: { Label("Bookmarks", systemImage: "book") }
+        Button { sheet = .downloads } label: { Label("Downloads", systemImage: "arrow.down.circle") }
         Button { sheet = .tabs } label: { Label("All Tabs", systemImage: "square.on.square") }
     }
 
     private func holdNavButton(label: String, icon: String, enabled: Bool, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
-            .frame(minWidth: 44, minHeight: 44)
-            .opacity(enabled ? 1 : 0.35)
+            .frame(minWidth: 52, minHeight: 52)
             .contentShape(Rectangle())
+            .opacity(enabled ? 1 : 0.35)
             .accessibilityLabel(label)
             .onTapGesture {
                 if suppressNextNavTap {
@@ -621,7 +714,7 @@ private struct TabContent: View {
     }
 
     private func holdRevealGesture(kind: HoldRevealKind, enabled: Bool) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.35)
+        LongPressGesture(minimumDuration: 0.28)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
             .onChanged { value in
                 guard enabled else { return }
@@ -787,12 +880,14 @@ private struct TabsView: View {
     @ObservedObject var browser: BrowserStore
     @Environment(\.dismiss) private var dismiss
     @State private var confirmCloseAll = false
+    @State private var undoClose: (title: String, url: URL?, isPrivate: Bool)?
+    @State private var showUndoClose = false
 
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
+    private let columns = [GridItem(.adaptive(minimum: 156), spacing: 16)]
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
+            LazyVGrid(columns: columns, spacing: 18) {
                 ForEach(browser.tabs) { tab in
                     TabPreviewCard(
                         tab: tab,
@@ -801,16 +896,44 @@ private struct TabsView: View {
                             browser.selectTab(tab)
                             dismiss()
                         },
-                        close: { browser.close(tab) }
+                        close: {
+                            undoClose = (tab.title, tab.url, tab.isPrivate)
+                            browser.close(tab)
+                            showUndoClose = true
+                        }
                     )
                     .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .trailing).combined(with: .opacity)))
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
             .animation(.easeInOut(duration: 0.2), value: browser.tabs.map(\.id))
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Your tabs")
+        .safeAreaInset(edge: .bottom) {
+            if showUndoClose, let undoClose {
+                HStack {
+                    Text("Tab closed")
+                        .font(.subheadline)
+                    Spacer()
+                    Button("Undo") {
+                        browser.addTab(isPrivate: undoClose.isPrivate, url: undoClose.url)
+                        showUndoClose = false
+                        self.undoClose = nil
+                    }
+                    .font(.subheadline.weight(.semibold))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(.ultraThinMaterial)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                        showUndoClose = false
+                    }
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Menu("New tab", systemImage: "plus") {
@@ -827,6 +950,8 @@ private struct TabsView: View {
         }
         .confirmationDialog("Close all tabs?", isPresented: $confirmCloseAll, titleVisibility: .visible) {
             Button("Close All", role: .destructive) {
+                showUndoClose = false
+                undoClose = nil
                 browser.closeAllTabs()
                 dismiss()
             }
@@ -861,14 +986,16 @@ private struct TabPreviewCard: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 120)
+                .frame(height: 128)
                 .clipped()
 
                 Button(action: close) {
                     Image(systemName: "xmark.circle.fill")
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(.white, .black.opacity(0.55))
-                        .padding(8)
+                        .padding(10)
+                        .contentShape(Rectangle())
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .accessibilityLabel("Close \(tab.title)")
             }
@@ -889,7 +1016,8 @@ private struct TabPreviewCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
         }
         .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -1240,18 +1368,15 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "5"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "6"
         return "\(marketing) (\(build))"
     }
 
     var body: some View {
         Form {
-            Section("Built around you") {
+            Section {
                 Picker("Appearance", selection: $appearance) {
                     ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
-                }
-                Picker("Search engine", selection: $searchEngine) {
-                    ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
                 }
                 Picker("Toolbar", selection: $toolbarStyleRaw) {
                     ForEach(ToolbarStyle.allCases) { style in
@@ -1263,12 +1388,13 @@ private struct SettingsView: View {
                         Text(placement.rawValue).tag(placement.rawValue)
                     }
                 }
-            }
-
-            Section("New tab page") {
                 NavigationLink("Home personalization") {
                     HomePersonalizationView()
                 }
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("Classic toolbar with a bottom address bar is the default. Compact and Top bar are optional.")
             }
 
             Section {
@@ -1299,14 +1425,19 @@ private struct SettingsView: View {
                         Button("Apply", action: applyHexDraft)
                     }
                     Toggle("Gradient accent", isOn: $customAccentGradient)
+                    Button("Use closest matching icon") {
+                        let suggested = ZallaTheme.closestAppIcon(forCustomHex: customAccentHex)
+                        appIconPreference = suggested.rawValue
+                        applyIcon(suggested)
+                    }
                 }
             } header: {
                 Text("Accent")
             } footer: {
-                Text("Accents are optional. Zalla Red remains the default. Matching app icons are suggested when a preset is available.")
+                Text("Accents are optional. Zalla Red remains the default. Custom colors map to the closest Default, Dark, or Tinted icon.")
             }
 
-            Section("App icon") {
+            Section {
                 Picker("Icon", selection: $appIconPreference) {
                     ForEach(AppIconPreference.allCases) { option in
                         Text(option.rawValue).tag(option.rawValue)
@@ -1318,9 +1449,25 @@ private struct SettingsView: View {
                 if let iconMessage {
                     Text(iconMessage).font(.footnote).foregroundStyle(.secondary)
                 }
-                Text("Per-accent icon artwork beyond Default, Dark, and Tinted can be added later. Preference mapping is ready.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            } header: {
+                Text("App icon")
+            } footer: {
+                Text("Shipped alternate icons are Default, Dark, and Tinted. Per-accent PNG icons are not included in this build.")
+            }
+
+            Section {
+                Picker("Search engine", selection: $searchEngine) {
+                    ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
+                }
+                Button {
+                    showImporter = true
+                } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
+                Button {
+                    exportBookmarks()
+                } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
+                .disabled(browser.bookmarks.isEmpty)
+            } header: {
+                Text("Browsing")
             }
 
             Section("Tools") {
@@ -1329,16 +1476,11 @@ private struct SettingsView: View {
                 } label: {
                     Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
                 }
-            }
-
-            Section("Bookmarks") {
-                Button {
-                    showImporter = true
-                } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
-                Button {
-                    exportBookmarks()
-                } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
-                .disabled(browser.bookmarks.isEmpty)
+                NavigationLink {
+                    DownloadsView(browser: browser)
+                } label: {
+                    Label("Downloads", systemImage: "arrow.down.circle")
+                }
             }
 
             Section {
@@ -1364,6 +1506,7 @@ private struct SettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
+
         .navigationTitle("Settings")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .confirmationDialog("Clear browsing data and close all tabs?", isPresented: $confirmClear, titleVisibility: .visible) {

@@ -7,6 +7,8 @@ struct OnboardingView: View {
     @AppStorage("appearance") private var appearance = "System"
     @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
+    @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @State private var step = 0
     @State private var pulse = false
     @State private var glowSpin = false
@@ -216,7 +218,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header(
                     title: "Look and feel",
-                    subtitle: "Choose how Zalla should feel on day one. You can change this anytime in Settings."
+                    subtitle: "Zalla starts with a bottom address bar and Classic toolbar. Compact stays off unless you turn it on later in Settings."
                 )
 
                 miniBrowserPreview
@@ -238,6 +240,27 @@ struct OnboardingView: View {
                         ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
                     }
                     .pickerStyle(.menu)
+                }
+                .padding(20)
+                .background(cardBackground)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Browser chrome").font(.headline)
+                    Text("Defaults match daily browsing. You can try Compact later without changing anything now.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Picker("Toolbar", selection: $toolbarStyleRaw) {
+                        ForEach(ToolbarStyle.allCases) { style in
+                            Text(style.rawValue).tag(style.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Picker("Address bar", selection: $addressBarPlacementRaw) {
+                        ForEach(AddressBarPlacement.allCases) { placement in
+                            Text(placement.rawValue).tag(placement.rawValue)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
                 .padding(20)
                 .background(cardBackground)
@@ -422,23 +445,20 @@ struct OnboardingView: View {
         let muted = previewIsDark ? Color.white.opacity(0.45) : Color.black.opacity(0.35)
 
         return VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "lock.fill")
-                    .font(.caption2)
-                    .foregroundStyle(theme.primary)
-                Text("zalla.app")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(previewIsDark ? .white.opacity(0.85) : .primary)
+            // Top status strip only; address bar stays at the bottom to match app defaults.
+            HStack {
+                Text("Zalla")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(muted)
                 Spacer()
                 Circle()
                     .fill(theme.primary.opacity(0.85))
                     .frame(width: 8, height: 8)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(barBG, in: Capsule())
             .padding(.horizontal, 16)
-            .padding(.top, 14)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+            .background(chromeBG)
 
             VStack(alignment: .leading, spacing: 10) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -458,15 +478,31 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, minHeight: 88, alignment: .topLeading)
             .background(pageBG)
 
-            HStack {
-                ForEach(["chevron.backward", "chevron.forward", "square.on.square", "book", "ellipsis"], id: \.self) { name in
-                    Image(systemName: name)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(name == "ellipsis" ? theme.primary : muted)
-                        .frame(maxWidth: .infinity)
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(theme.primary)
+                    Text("zalla.app")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(previewIsDark ? .white.opacity(0.85) : .primary)
+                    Spacer()
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(barBG, in: Capsule())
+                .padding(.horizontal, 16)
+
+                HStack {
+                    ForEach(["chevron.backward", "chevron.forward", "square.on.square", "book", "ellipsis"], id: \.self) { name in
+                        Image(systemName: name)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(name == "ellipsis" ? theme.primary : muted)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.vertical, 10)
             }
-            .padding(.vertical, 12)
             .background(chromeBG)
         }
         .background(chromeBG, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -560,6 +596,13 @@ struct OnboardingView: View {
     }
 
     private func finish() {
+        // Keep onboarding aligned with real defaults unless the user chose otherwise above.
+        if toolbarStyleRaw.isEmpty {
+            toolbarStyleRaw = ToolbarStyle.classic.rawValue
+        }
+        if addressBarPlacementRaw.isEmpty {
+            addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
+        }
         hasCompletedOnboarding = true
     }
 

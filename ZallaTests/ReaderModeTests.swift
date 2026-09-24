@@ -37,4 +37,12 @@ final class ReaderModeTests: XCTestCase {
         XCTAssertTrue(html.contains("Hello &amp; welcome"))
         XCTAssertFalse(html.contains("<script"))
     }
+
+    func testExtractFailureMessagesOfferReloadOrStay() {
+        for failure in [ReaderMode.ExtractFailure.empty, .invalidPayload, .scriptError] {
+            let message = failure.userMessage.lowercased()
+            XCTAssertTrue(message.contains("reload") || message.contains("stay"))
+            XCTAssertFalse(message.contains(String(UnicodeScalar(0x2014)!)))
+        }
+    }
 }

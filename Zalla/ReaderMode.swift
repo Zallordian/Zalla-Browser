@@ -35,9 +35,11 @@ enum ReaderMode {
       var candidates = [
         document.querySelector('article'),
         document.querySelector('[itemprop="articleBody"]'),
-        document.querySelector('.post-content, .entry-content, .article-content, .article-body, .story-body'),
+        document.querySelector('.post-content, .entry-content, .article-content, .article-body, .story-body, .post-body, .rich-text, .markdown-body'),
+        document.querySelector('[data-testid="article-body"], [data-component="ArticleBody"]'),
         document.querySelector('[role="main"]'),
         document.querySelector('main'),
+        document.querySelector('#content, #main-content, #article, .content, .main-content'),
         document.body
       ];
       var article = null;
@@ -79,19 +81,46 @@ enum ReaderMode {
       });
       if (paragraphs.length < 2) {
         var raw = textOf(clone);
-        if (raw.length > 80) {
-          paragraphs = raw.split(/(?<=\\.)\\s+/).filter(function(s) {
-            return s.trim().length > 40;
-          }).slice(0, 60).map(function(s) {
+        if (raw.length > 60) {
+          paragraphs = raw.split(/(?<=[\\.\\?\\!])\\s+/).filter(function(s) {
+            return s.trim().length > 28;
+          }).slice(0, 80).map(function(s) {
             return { tag: 'p', text: s.trim() };
           });
         }
       }
-      if (paragraphs.length === 0 && textOf(document.body).length > 120) {
+      if (paragraphs.length === 0) {
+        var blocks = [];
+        try {
+          var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT, null);
+          var node;
+          while ((node = walker.nextNode())) {
+            if (!node || !node.tagName) continue;
+            var tag = node.tagName.toLowerCase();
+            if (['script','style','noscript','nav','footer','header','aside','button','svg'].indexOf(tag) >= 0) continue;
+            if (tag !== 'p' && tag !== 'div' && tag !== 'section' && tag !== 'span') continue;
+            if (node.children && node.children.length > 6) continue;
+            var t = textOf(node);
+            if (t.length < 45 || t.length > 1200) continue;
+            blocks.push(t);
+          }
+        } catch (e) {}
+        if (blocks.length >= 2) {
+          var seen = {};
+          paragraphs = blocks.filter(function(s) {
+            if (seen[s]) return false;
+            seen[s] = true;
+            return true;
+          }).slice(0, 50).map(function(s) {
+            return { tag: 'p', text: s };
+          });
+        }
+      }
+      if (paragraphs.length === 0 && textOf(document.body).length > 90) {
         var bodyText = textOf(document.body);
-        paragraphs = bodyText.split(/(?<=\\.)\\s+/).filter(function(s) {
-          return s.trim().length > 50;
-        }).slice(0, 40).map(function(s) {
+        paragraphs = bodyText.split(/(?<=[\\.\\?\\!])\\s+/).filter(function(s) {
+          return s.trim().length > 36;
+        }).slice(0, 50).map(function(s) {
           return { tag: 'p', text: s.trim() };
         });
       }
@@ -219,11 +248,11 @@ enum ReaderMode {
         var userMessage: String {
             switch self {
             case .empty:
-                return "Reader could not find enough article text on this page."
+                return "Reader could not find enough article text on this page. You can reload and try again, or stay on the original page."
             case .invalidPayload:
-                return "Reader could not understand this page's content."
+                return "Reader could not read this page's content. Reload, then open Reader again, or stay on the page."
             case .scriptError:
-                return "Reader could not run on this page. Try reloading, then open Reader again."
+                return "Reader could not run on this page. Reload, then open Reader again, or stay on the page."
             }
         }
     }

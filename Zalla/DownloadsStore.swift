@@ -161,7 +161,12 @@ enum DownloadsStore {
             }
         }
         let url = response.url
-        if url?.scheme?.lowercased() == "blob" {
+        if let scheme = url?.scheme?.lowercased(), scheme == "blob" || scheme == "data" {
+            return true
+        }
+        // Query hints often used by JS download endpoints.
+        if let query = url?.query?.lowercased(),
+           query.contains("download=1") || query.contains("download=true") || query.contains("attachment=1") {
             return true
         }
         guard let mime = response.mimeType?.lowercased() else {
@@ -210,7 +215,7 @@ enum DownloadsStore {
         let extensions = [
             ".pdf", ".zip", ".dmg", ".pkg", ".exe", ".msi", ".7z", ".rar",
             ".tar", ".gz", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
-            ".csv", ".ical", ".ics", ".apk", ".ipa"
+            ".csv", ".ical", ".ics", ".apk", ".ipa", ".bin", ".iso", ".wasm"
         ]
         return extensions.contains(where: { path.hasSuffix($0) })
     }
