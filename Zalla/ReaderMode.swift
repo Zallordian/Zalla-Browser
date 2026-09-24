@@ -211,7 +211,7 @@ enum ReaderMode {
         var paragraphs: [[String: String]]
     }
 
-    enum ExtractFailure: Equatable {
+    enum ExtractFailure: Error, Equatable {
         case empty
         case invalidPayload
         case scriptError
