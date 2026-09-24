@@ -1,4 +1,4 @@
-﻿name: Zalla
+name: Zalla
 options:
   bundleIdPrefix: com.zalla
   deploymentTarget:
