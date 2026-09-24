@@ -387,6 +387,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
         webView.allowsBackForwardNavigationGestures = true
+        // Avoid black flash behind page chrome and during empty/transient loads.
+        webView.backgroundColor = .systemBackground
+        webView.isOpaque = true
+        webView.underPageBackgroundColor = .systemBackground
         observations = [
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, _ in self?.refresh() },
             webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.refresh() },

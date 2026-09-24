@@ -147,6 +147,7 @@ private struct TabContent: View {
                 holdRevealOverlay
             }
         }
+        .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         .onChange(of: tab.url) { _, url in
             if !addressFocused {
                 address = url?.absoluteString ?? ""
@@ -345,6 +346,7 @@ private struct TabContent: View {
             classicToolbar
         } else {
             compactToolbar
+                .background { chromeMaterial(edges: .bottom) }
         }
     }
 
@@ -369,9 +371,14 @@ private struct TabContent: View {
     }
 
     private func chromeMaterial(edges: Edge.Set) -> some View {
+        // Solid base + strong systemBackground so notch/home-indicator strips stay opaque.
         Rectangle()
-            .fill(.ultraThinMaterial)
-            .overlay(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.28 : 0.55))
+            .fill(Color(uiColor: .secondarySystemBackground))
+            .overlay {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+            }
+            .overlay(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.78 : 0.90))
             .ignoresSafeArea(edges: edges)
     }
 
