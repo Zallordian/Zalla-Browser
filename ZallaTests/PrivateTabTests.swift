@@ -17,4 +17,14 @@ final class PrivateTabTests: XCTestCase {
         XCTAssertTrue(tab.webView.configuration.websiteDataStore.isPersistent)
     }
 
+    func testPopupTabReusesOpenerConfiguration() {
+        let opener = BrowserTab(isPrivate: true)
+        let popup = BrowserTab(isPrivate: opener.isPrivate, configuration: opener.webView.configuration)
+        XCTAssertTrue(popup.isPrivate)
+        XCTAssertTrue(
+            popup.webView.configuration.websiteDataStore === opener.webView.configuration.websiteDataStore,
+            "Popups share the opener's data store so sign-in popups keep their session"
+        )
+    }
+
 }

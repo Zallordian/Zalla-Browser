@@ -95,6 +95,41 @@ final class BrowserStore: ObservableObject {
         tab.onSessionChange = { [weak self] in
             self?.scheduleSessionSave()
         }
+        tab.onOpenWindow = { [weak self] opener, configuration in
+            self?.openChildTab(from: opener, configuration: configuration)
+        }
+        tab.onCloseWindow = { [weak self] tab in
+            self?.closeScriptWindow(tab)
+        }
+    }
+
+    // MARK: - Popups and new windows
+
+    /// window.open and target=_blank: a child tab built from WebKit's configuration, so the opener
+    /// relationship (OAuth, payment popups) keeps working. Opens next to its opener and takes focus.
+    private func openChildTab(from opener: BrowserTab, configuration: WKWebViewConfiguration) -> BrowserTab {
+        let child = BrowserTab(isPrivate: opener.isPrivate, configuration: configuration)
+        configure(child)
+        child.openerID = opener.id
+        child.hasPage = true
+        if let index = tabs.firstIndex(where: { $0.id == opener.id }) {
+            tabs.insert(child, at: index + 1)
+        } else {
+            tabs.append(child)
+        }
+        selectTab(child)
+        return child
+    }
+
+    /// window.close from a page: close that tab and go back to the page that opened it.
+    private func closeScriptWindow(_ tab: BrowserTab) {
+        guard tabs.contains(where: { $0.id == tab.id }) else { return }
+        let wasSelected = selectedID == tab.id
+        let openerID = tab.openerID
+        close(tab)
+        if wasSelected, let openerID, let opener = tabs.first(where: { $0.id == openerID }) {
+            selectedID = opener.id
+        }
     }
 
     // MARK: - Session restore
@@ -443,6 +478,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
     /// Fires when something worth saving in the tab session changes (committed URL or title).
     var onSessionChange: (() -> Void)?
+    /// Creates a child tab for window.open / target=_blank using WebKit's configuration.
+    var onOpenWindow: ((BrowserTab, WKWebViewConfiguration) -> BrowserTab?)?
+    /// Called when a page runs window.close on this tab.
+    var onCloseWindow: ((BrowserTab) -> Void)?
+    /// The tab that opened this one with window.open or target=_blank, if any.
+    var openerID: UUID?
     /// Saved state waiting for the tab to be opened after a cold launch.
     private var pendingRestore: TabSessionEntry?
     private var observations: [NSKeyValueObservation] = []
@@ -452,18 +493,30 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var readerOriginalURL: URL?
     private var lastSnapshotAt: Date?
 
-    init(isPrivate: Bool) {
+    /// Pass `configuration` only for popups: WebKit requires the child web view to use the exact
+    /// configuration it provides. That copy already shares the opener's data store, user script,
+    /// and message handler, so none of them are added again (a duplicate handler name would crash).
+    init(isPrivate: Bool, configuration popupConfiguration: WKWebViewConfiguration? = nil) {
         self.isPrivate = isPrivate
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = isPrivate ? .nonPersistent() : .default()
-        let controller = WKUserContentController()
-        let script = WKUserScript(source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
-        controller.addUserScript(script)
-        configuration.userContentController = controller
+        let configuration: WKWebViewConfiguration
+        var newController: WKUserContentController?
+        if let popupConfiguration {
+            configuration = popupConfiguration
+        } else {
+            configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = isPrivate ? .nonPersistent() : .default()
+            let controller = WKUserContentController()
+            let script = WKUserScript(source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+            controller.addUserScript(script)
+            configuration.userContentController = controller
+            newController = controller
+        }
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
-        scriptHandlerProxy.delegate = self
-        controller.add(scriptHandlerProxy, name: "zallaImage")
+        if let newController {
+            scriptHandlerProxy.delegate = self
+            newController.add(scriptHandlerProxy, name: "zallaImage")
+        }
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
@@ -747,10 +800,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             return
         }
         if ["http", "https", "about"].contains(scheme) {
-            if navigationAction.targetFrame == nil {
+            if navigationAction.targetFrame == nil, onOpenWindow == nil {
                 decisionHandler(.cancel)
                 webView.load(navigationAction.request)
-            } else { decisionHandler(.allow) }
+            } else {
+                // New-window actions are allowed so WebKit asks createWebViewWith for a child tab.
+                decisionHandler(.allow)
+            }
         } else {
             if navigationAction.navigationType == .linkActivated,
                ["mailto", "tel", "sms"].contains(scheme) { externalURL = url }
@@ -796,11 +852,33 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     private func hostController() -> UIViewController? {
         var responder: UIResponder? = webView
+        var found: UIViewController?
         while let current = responder {
-            if let controller = current as? UIViewController { return controller }
+            if let controller = current as? UIViewController { found = controller; break }
             responder = current.next
         }
-        return webView.window?.rootViewController
+        guard var host = found ?? webView.window?.rootViewController else { return nil }
+        // Present above any sheet that is already showing, or the alert would silently fail.
+        while let presented = host.presentedViewController, !presented.isBeingDismissed {
+            host = presented
+        }
+        return host
+    }
+
+    func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
+                 for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        if let child = onOpenWindow?(self, configuration) {
+            return child.webView
+        }
+        // No tab host: fall back to opening the link in this tab.
+        if let url = navigationAction.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
+            webView.load(navigationAction.request)
+        }
+        return nil
+    }
+
+    func webViewDidClose(_ webView: WKWebView) {
+        onCloseWindow?(self)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
