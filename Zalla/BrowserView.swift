@@ -106,6 +106,9 @@ private struct TabContent: View {
     @State private var quickActionFrame: CGRect = .zero
     @State private var showSearchPageInfo = false
     @State private var suppressSearchTap = false
+    @Namespace private var addressNamespace
+    /// Spring used when the address pill expands to fill the bar for editing and collapses back.
+    private static let addressExpandAnimation = Animation.spring(response: 0.35, dampingFraction: 0.85)
     /// Measured heights of the floating chrome (inside the safe area) so content can scroll clear of it.
     @State private var topChromeHeight: CGFloat = 0
     @State private var bottomChromeHeight: CGFloat = 0
@@ -200,7 +203,9 @@ private struct TabContent: View {
             } else {
                 if isEditingCompactAddress {
                     // Collapse Compact chrome when the field resigns (submit, cancel, or blur).
-                    isEditingCompactAddress = false
+                    withAnimation(Self.addressExpandAnimation) {
+                        isEditingCompactAddress = false
+                    }
                     address = tab.url?.absoluteString ?? ""
                 }
                 if isEditingClassicAddress {
@@ -733,11 +738,14 @@ private struct TabContent: View {
             }
             if isEditingCompactAddress {
                 // Reuse the Compact editing pill so focus, submit, and cancel behave the same.
+                // The matched geometry lets the search pill grow into the full-width editor.
                 compactPill
+                    .matchedGeometryEffect(id: "quickActionAddress", in: addressNamespace)
                     .padding(.horizontal, 16)
             } else {
                 HStack(spacing: 12) {
                     quickActionSearchPill
+                        .matchedGeometryEffect(id: "quickActionAddress", in: addressNamespace)
                         .frame(maxWidth: .infinity)
                     quickActionButton
                     HStack(spacing: 8) {
@@ -982,18 +990,25 @@ private struct TabContent: View {
                 ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
             }
             HStack(spacing: 12) {
-                if !toolbarLayout.compactLeading.isEmpty {
+                // While editing, the side buttons slide away and the pill springs out to fill the row.
+                if !isEditingCompactAddress, !toolbarLayout.compactLeading.isEmpty {
                     HStack(spacing: 8) {
                         ForEach(toolbarLayout.compactLeading) { kind in
                             compactItem(kind)
                         }
                     }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
                 compactPill
 
-                ForEach(toolbarLayout.compactTrailing) { kind in
-                    compactItem(kind)
+                if !isEditingCompactAddress, !toolbarLayout.compactTrailing.isEmpty {
+                    HStack(spacing: 12) {
+                        ForEach(toolbarLayout.compactTrailing) { kind in
+                            compactItem(kind)
+                        }
+                    }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .padding(.horizontal, 16)
@@ -1120,14 +1135,18 @@ private struct TabContent: View {
 
     private func beginCompactAddressEditing() {
         address = CompactAddressChrome.editingPrefill(url: tab.url)
-        isEditingCompactAddress = true
+        withAnimation(Self.addressExpandAnimation) {
+            isEditingCompactAddress = true
+        }
         // Focus after the TextField is in the hierarchy.
         focusAddressFieldSelectingAll()
     }
 
     private func cancelCompactAddressEditing() {
         addressFocused = false
-        isEditingCompactAddress = false
+        withAnimation(Self.addressExpandAnimation) {
+            isEditingCompactAddress = false
+        }
         address = tab.url?.absoluteString ?? ""
     }
 
@@ -1138,7 +1157,9 @@ private struct TabContent: View {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         tab.load(url)
         addressFocused = false
-        isEditingCompactAddress = false
+        withAnimation(Self.addressExpandAnimation) {
+            isEditingCompactAddress = false
+        }
         isEditingClassicAddress = false
     }
 
