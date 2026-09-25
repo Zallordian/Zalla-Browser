@@ -250,6 +250,7 @@ final class BrowserStore: ObservableObject {
         clearingData = true
         sessionSavingEnabled = false
         clearSavedSession()
+        MediaPermissionSession.memory.removeAll()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -267,6 +268,7 @@ final class BrowserStore: ObservableObject {
         clearingData = true
         sessionSavingEnabled = false
         clearSavedSession()
+        MediaPermissionSession.memory.removeAll()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -505,6 +507,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         } else {
             configuration = WKWebViewConfiguration()
             configuration.websiteDataStore = isPrivate ? .nonPersistent() : .default()
+            // Play video in the page (needed for camera previews and calls) instead of forcing full screen.
+            configuration.allowsInlineMediaPlayback = true
             let controller = WKUserContentController()
             let script = WKUserScript(source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
             controller.addUserScript(script)
@@ -879,6 +883,41 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webViewDidClose(_ webView: WKWebView) {
         onCloseWindow?(self)
+    }
+
+    /// Camera and microphone requests: ask per site with Allow / Don't Allow, and remember the
+    /// answer for this app session only. iOS shows its own one-time system prompt after Allow.
+    func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin,
+                 initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType,
+                 decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        let kind: MediaCaptureKind
+        switch type {
+        case .camera: kind = .camera
+        case .microphone: kind = .microphone
+        case .cameraAndMicrophone: kind = .cameraAndMicrophone
+        @unknown default: kind = .cameraAndMicrophone
+        }
+        let site = MediaCapturePrompt.siteLabel(scheme: origin.protocol, host: origin.host, port: origin.port)
+        let privateTab = isPrivate
+        if let remembered = MediaPermissionSession.memory.decision(site: site, kind: kind, isPrivate: privateTab) {
+            decisionHandler(remembered ? .grant : .deny)
+            return
+        }
+        guard let host = hostController() else { decisionHandler(.deny); return }
+        let alert = UIAlertController(
+            title: MediaCapturePrompt.title(site: site, kind: kind),
+            message: MediaCapturePrompt.message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: MediaCapturePrompt.denyTitle, style: .cancel) { _ in
+            MediaPermissionSession.memory.remember(false, site: site, kind: kind, isPrivate: privateTab)
+            decisionHandler(.deny)
+        })
+        alert.addAction(UIAlertAction(title: MediaCapturePrompt.allowTitle, style: .default) { _ in
+            MediaPermissionSession.memory.remember(true, site: site, kind: kind, isPrivate: privateTab)
+            decisionHandler(.grant)
+        })
+        host.present(alert, animated: true)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,

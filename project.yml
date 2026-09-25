@@ -30,6 +30,8 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoadsInWebContent: true
         NSPhotoLibraryAddUsageDescription: Zalla saves exported images to Photos when you choose Save to Photos.
+        NSCameraUsageDescription: Zalla uses the camera only when a website you are visiting asks for it and you allow it.
+        NSMicrophoneUsageDescription: Zalla uses the microphone only when a website you are visiting asks for it and you allow it.
         CFBundleIcons:
           CFBundlePrimaryIcon:
             CFBundleIconFiles:

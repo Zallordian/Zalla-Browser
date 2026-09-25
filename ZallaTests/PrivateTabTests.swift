@@ -17,6 +17,10 @@ final class PrivateTabTests: XCTestCase {
         XCTAssertTrue(tab.webView.configuration.websiteDataStore.isPersistent)
     }
 
+    func testTabsAllowInlineMediaPlayback() {
+        XCTAssertTrue(BrowserTab(isPrivate: false).webView.configuration.allowsInlineMediaPlayback)
+    }
+
     func testPopupTabReusesOpenerConfiguration() {
         let opener = BrowserTab(isPrivate: true)
         let popup = BrowserTab(isPrivate: opener.isPrivate, configuration: opener.webView.configuration)
