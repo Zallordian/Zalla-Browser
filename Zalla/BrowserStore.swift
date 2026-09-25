@@ -252,6 +252,7 @@ final class BrowserStore: ObservableObject {
         clearSavedSession()
         MediaPermissionSession.memory.removeAll()
         HTTPSOnlySession.exceptions.removeAll()
+        PageZoom.save([:])
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -271,6 +272,7 @@ final class BrowserStore: ObservableObject {
         clearSavedSession()
         MediaPermissionSession.memory.removeAll()
         HTTPSOnlySession.exceptions.removeAll()
+        PageZoom.save([:])
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -482,6 +484,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var httpsFallback: HTTPSFallback?
     /// Request Desktop Site for this tab. Applied to every navigation through WKWebpagePreferences.
     @Published private(set) var prefersDesktopSite = false
+    /// Current page zoom for this tab. Normal tabs remember it per site; private tabs only for this tab.
+    @Published private(set) var pageZoom = PageZoom.defaultLevel
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
@@ -503,6 +507,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var lastSnapshotAt: Date?
     /// The http address HTTPS-Only Mode upgraded, until the https load commits or fails.
     private var pendingHTTPSUpgrade: URL?
+    /// Zoom levels chosen in a private tab. Never written to disk.
+    private var privatePageZoom: [String: Double] = [:]
 
     /// Pass `configuration` only for popups: WebKit requires the child web view to use the exact
     /// configuration it provides. That copy already shares the opener's data store, user script,
@@ -605,6 +611,32 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         prefersDesktopSite.toggle()
         if hasPage, webView.url != nil {
             webView.reload()
+        }
+    }
+
+    /// Sets the zoom for the current page and remembers it for the site.
+    func setPageZoom(_ level: Double) {
+        let clamped = PageZoom.clamped(level)
+        pageZoom = clamped
+        webView.pageZoom = CGFloat(clamped)
+        guard let host = PageZoom.hostKey(for: webView.url ?? url) else { return }
+        if isPrivate {
+            privatePageZoom = PageZoom.updated(privatePageZoom, host: host, level: clamped)
+        } else {
+            PageZoom.save(PageZoom.updated(PageZoom.load(), host: host, level: clamped))
+        }
+    }
+
+    /// Applies the remembered zoom for the site that just committed.
+    private func applyStoredPageZoom() {
+        var level = PageZoom.defaultLevel
+        if let host = PageZoom.hostKey(for: webView.url) {
+            let store = isPrivate ? privatePageZoom.merging(PageZoom.load()) { mine, _ in mine } : PageZoom.load()
+            level = PageZoom.level(for: host, in: store)
+        }
+        pageZoom = level
+        if abs(Double(webView.pageZoom) - level) > 0.001 {
+            webView.pageZoom = CGFloat(level)
         }
     }
 
@@ -813,6 +845,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         pendingHTTPSUpgrade = nil
+        applyStoredPageZoom()
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

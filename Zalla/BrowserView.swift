@@ -35,9 +35,13 @@ struct BrowserView: View {
                 case .menu: BrowserMenuSheet(browser: browser, sheet: $sheet)
                 case .downloads: DownloadsView(browser: browser)
                 case .homePersonalization: HomePersonalizationView()
+                case .pageZoom:
+                    if let tab = browser.selected {
+                        PageZoomSheet(tab: tab)
+                    }
                 }
             }
-            .presentationDetents(item == .menu ? [.medium, .large] : [.large])
+            .presentationDetents(detents(for: item))
             .presentationDragIndicator(.visible)
         }
         .sheet(item: $browser.imageExport) { request in
@@ -53,8 +57,18 @@ struct BrowserView: View {
     }
 }
 
+extension BrowserView {
+    private func detents(for item: BrowserSheet) -> Set<PresentationDetent> {
+        switch item {
+        case .menu: return [.medium, .large]
+        case .pageZoom: return [.height(220)]
+        default: return [.large]
+        }
+    }
+}
+
 enum BrowserSheet: String, Identifiable {
-    case tabs, library, settings, menu, downloads, homePersonalization
+    case tabs, library, settings, menu, downloads, homePersonalization, pageZoom
     var id: String { rawValue }
 }
 
@@ -1295,6 +1309,9 @@ private struct BrowserMenuSheet: View {
                 }
                 .disabled(!(browser.selected?.hasPage ?? false))
                 .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
+                if let tab = browser.selected, tab.hasPage {
+                    PageZoomControl(tab: tab)
+                }
                 Button {
                     if let tab = browser.selected {
                         tab.toggleReaderMode(dark: colorScheme == .dark)
@@ -1340,6 +1357,71 @@ private struct BrowserMenuSheet: View {
             if let url = browser.selected?.url {
                 ActivityShareSheet(items: [url])
             }
+        }
+    }
+}
+
+/// Minus, current percent, plus, and reset for the page zoom of the current site.
+private struct PageZoomControl: View {
+    @ObservedObject var tab: BrowserTab
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label("Page zoom", systemImage: "textformat.size")
+            Spacer(minLength: 8)
+            Button {
+                tab.setPageZoom(PageZoom.previous(before: tab.pageZoom))
+            } label: {
+                Image(systemName: "minus")
+                    .frame(width: 32, height: 32)
+            }
+            .disabled(tab.pageZoom <= PageZoom.minimum + 0.001)
+            .accessibilityLabel("Zoom out")
+            Button {
+                tab.setPageZoom(PageZoom.defaultLevel)
+            } label: {
+                Text(PageZoom.percentText(tab.pageZoom))
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 52)
+            }
+            .accessibilityLabel("Reset zoom, now \(PageZoom.percentText(tab.pageZoom))")
+            Button {
+                tab.setPageZoom(PageZoom.next(after: tab.pageZoom))
+            } label: {
+                Image(systemName: "plus")
+                    .frame(width: 32, height: 32)
+            }
+            .disabled(tab.pageZoom >= PageZoom.maximum - 0.001)
+            .accessibilityLabel("Zoom in")
+        }
+        .buttonStyle(.borderless)
+    }
+}
+
+/// Small sheet opened from the toolbar Page Zoom button.
+private struct PageZoomSheet: View {
+    @ObservedObject var tab: BrowserTab
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            Section {
+                PageZoomControl(tab: tab)
+                Button("Reset to 100%") {
+                    tab.setPageZoom(PageZoom.defaultLevel)
+                }
+                .disabled(PageZoom.isDefault(tab.pageZoom))
+            } footer: {
+                Text(tab.isPrivate
+                    ? "Private tabs keep this zoom only until the tab closes."
+                    : "Zalla remembers this zoom for \(PageZoom.hostKey(for: tab.url) ?? "this site").")
+            }
+        }
+        .navigationTitle("Page Zoom")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         }
     }
 }
@@ -1976,7 +2058,7 @@ private struct SettingsView: View {
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, and website caches. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {
