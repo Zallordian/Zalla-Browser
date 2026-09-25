@@ -87,6 +87,7 @@ struct QuickActionFan: View {
     }
 
     private func dismiss() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         withAnimation(.easeIn(duration: 0.15)) { spread = false }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
             onDismiss()
@@ -101,7 +102,7 @@ struct QuickActionFan: View {
                 heldEntryID = nil
                 return
             }
-            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onDismiss()
             entry.action()
         } label: {
