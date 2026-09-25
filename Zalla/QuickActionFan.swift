@@ -9,6 +9,8 @@ struct QuickActionEntry: Identifiable {
     var titleOverride: String?
     var symbolOverride: String?
     let action: () -> Void
+    /// Optional press-and-hold action, used by Back and Forward to peek history.
+    var onHold: (() -> Void)?
 
     var id: String { item.id }
     var title: String { titleOverride ?? item.title }
@@ -34,6 +36,7 @@ struct QuickActionFan: View {
     let onDismiss: () -> Void
 
     @State private var spread = false
+    @State private var heldEntryID: String?
 
     var body: some View {
         GeometryReader { geo in
@@ -93,6 +96,11 @@ struct QuickActionFan: View {
     private func fanButton(_ entry: QuickActionEntry) -> some View {
         Button {
             guard entry.enabled else { return }
+            // A completed press-and-hold already handled this touch.
+            if heldEntryID == entry.id {
+                heldEntryID = nil
+                return
+            }
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
             onDismiss()
             entry.action()
@@ -129,7 +137,27 @@ struct QuickActionFan: View {
         }
         .buttonStyle(.plain)
         .disabled(!entry.enabled)
+        .simultaneousGesture(holdGesture(for: entry), including: entry.onHold == nil ? .none : .all)
         .accessibilityLabel(accessibilityLabel(for: entry))
+        .accessibilityActions {
+            if entry.enabled, let onHold = entry.onHold {
+                Button("Show history") {
+                    onDismiss()
+                    onHold()
+                }
+            }
+        }
+    }
+
+    private func holdGesture(for entry: QuickActionEntry) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.4)
+            .onEnded { _ in
+                guard entry.enabled, let onHold = entry.onHold else { return }
+                heldEntryID = entry.id
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onDismiss()
+                onHold()
+            }
     }
 
     private func accessibilityLabel(for entry: QuickActionEntry) -> String {

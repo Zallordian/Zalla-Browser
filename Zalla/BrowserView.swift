@@ -715,9 +715,19 @@ private struct TabContent: View {
         QuickActionItem.allCases.map { item -> QuickActionEntry in
             switch item {
             case .back:
-                return QuickActionEntry(item: item, enabled: tab.canGoBack) { tab.webView.goBack() }
+                return QuickActionEntry(
+                    item: item,
+                    enabled: tab.canGoBack,
+                    action: { tab.webView.goBack() },
+                    onHold: { showQuickActionHistory(.back) }
+                )
             case .forward:
-                return QuickActionEntry(item: item, enabled: tab.canGoForward) { tab.webView.goForward() }
+                return QuickActionEntry(
+                    item: item,
+                    enabled: tab.canGoForward,
+                    action: { tab.webView.goForward() },
+                    onHold: { showQuickActionHistory(.forward) }
+                )
             case .reload:
                 return QuickActionEntry(
                     item: item,
@@ -736,6 +746,17 @@ private struct TabContent: View {
             case .menu:
                 return QuickActionEntry(item: item) { sheet = .menu }
             }
+        }
+    }
+
+    /// Press and hold Back or Forward in the fan: close the fan, then show the same history peek
+    /// Classic and Compact use. Tap a page in the list to open it.
+    private func showQuickActionHistory(_ kind: HoldRevealKind) {
+        quickActionOpen = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            beginHoldReveal(kind)
+            // No Back or Forward button owns this touch, so do not swallow the next nav tap.
+            suppressNextNavTap = false
         }
     }
 
