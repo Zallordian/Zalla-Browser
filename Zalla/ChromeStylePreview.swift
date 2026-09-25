@@ -8,6 +8,8 @@ struct ChromeStylePreview: View {
     let placement: AddressBarPlacement
     let isDark: Bool
     let theme: ZallaTheme
+    /// Toolbar buttons to draw. Defaults to the built-in layout, as onboarding shows it.
+    var toolbarItems: ToolbarLayout = .default
 
     private var layout: ChromePreviewLayout { .make(style: style, placement: placement) }
     private var barBG: Color { isDark ? Color(white: 0.20) : Color.white }
@@ -48,6 +50,7 @@ struct ChromeStylePreview: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: style)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: placement)
         .animation(.easeInOut(duration: 0.28), value: isDark)
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: toolbarItems)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Preview: \(style.rawValue) toolbar, address bar at the \(placement.rawValue.lowercased())")
     }
@@ -158,19 +161,30 @@ struct ChromeStylePreview: View {
 
     private var navRow: some View {
         HStack {
-            ForEach(["chevron.backward", "chevron.forward", "square.and.arrow.up", "square.on.square", "ellipsis.circle"], id: \.self) { name in
-                Image(systemName: name)
+            ForEach(toolbarItems.classic) { kind in
+                Image(systemName: previewSymbol(kind, classic: true))
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(name == "ellipsis.circle" ? theme.primary : muted)
+                    .foregroundStyle(kind == .menu ? theme.primary : muted)
                     .frame(maxWidth: .infinity)
             }
         }
     }
 
+    /// Symbols as the onboarding preview has always drawn them.
+    private func previewSymbol(_ kind: ToolbarItemKind, classic: Bool) -> String {
+        switch kind {
+        case .back: return "chevron.backward"
+        case .forward: return "chevron.forward"
+        case .menu: return classic ? "ellipsis.circle" : "ellipsis"
+        default: return kind.symbolName
+        }
+    }
+
     private var floatingRow: some View {
         HStack(spacing: 6) {
-            miniCircle("chevron.backward")
-            miniCircle("chevron.forward")
+            ForEach(toolbarItems.compactLeading) { kind in
+                miniCircle(previewSymbol(kind, classic: false))
+            }
             HStack(spacing: 6) {
                 Image(systemName: "square.on.square")
                     .font(.system(size: 8, weight: .semibold))
@@ -184,8 +198,9 @@ struct ChromeStylePreview: View {
             .frame(height: 26)
             .background(barBG, in: Capsule())
             .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
-            miniCircle("square.and.arrow.up")
-            miniCircle("ellipsis")
+            ForEach(toolbarItems.compactTrailing) { kind in
+                miniCircle(previewSymbol(kind, classic: false))
+            }
         }
     }
 
@@ -220,14 +235,29 @@ struct ChromeStylePreview: View {
                     .foregroundStyle(.white)
             }
 
-            HStack {
+            HStack(spacing: 4) {
                 Spacer(minLength: 0)
-                miniSquare {
-                    Text("3")
-                        .font(.system(size: 9, weight: .bold))
+                ForEach(toolbarItems.quickActionBar) { kind in
+                    quickActionSlot(kind)
                 }
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private func quickActionSlot(_ kind: ToolbarItemKind) -> some View {
+        if kind == .tabs {
+            miniSquare {
+                Text("3")
+                    .font(.system(size: 9, weight: .bold))
+            }
+        } else {
+            Image(systemName: previewSymbol(kind, classic: false))
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(theme.primary)
+                .frame(width: 26, height: 26)
+                .background(barBG.opacity(0.55), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
     }
 

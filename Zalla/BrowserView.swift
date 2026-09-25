@@ -82,6 +82,7 @@ private struct TabContent: View {
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
+    @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
     @Environment(\.colorScheme) private var colorScheme
     @State private var address = ""
     @State private var showShare = false
@@ -117,6 +118,9 @@ private struct TabContent: View {
     }
     private var addressBarPlacement: AddressBarPlacement {
         AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
+    }
+    private var toolbarLayout: ToolbarLayout {
+        ToolbarLayout.decode(toolbarLayoutData)
     }
 
     var body: some View {
@@ -569,31 +573,98 @@ private struct TabContent: View {
         }
     }
 
+    /// Classic button row, built from the customizable toolbar layout.
     private var classicNavRow: some View {
         HStack {
+            ForEach(Array(toolbarLayout.classic.enumerated()), id: \.element) { index, kind in
+                if index > 0 {
+                    Spacer()
+                }
+                classicItem(kind)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func classicItem(_ kind: ToolbarItemKind) -> some View {
+        switch kind {
+        case .back:
             holdNavButton(
                 label: "Back",
                 icon: "chevron.left",
                 enabled: tab.canGoBack,
                 kind: .back
             ) { tab.webView.goBack() }
-            Spacer()
+        case .forward:
             holdNavButton(
                 label: "Forward",
                 icon: "chevron.right",
                 enabled: tab.canGoForward,
                 kind: .forward
             ) { tab.webView.goForward() }
-            Spacer()
+        case .share:
             control("Share page", icon: "square.and.arrow.up") { showShare = true }.disabled(tab.url == nil)
-            Spacer()
+        case .tabs:
             tabsButton
-            Spacer()
+        case .menu:
             Button { sheet = .menu } label: {
                 Image(systemName: "ellipsis.circle").font(.title3)
                     .frame(minWidth: 44, minHeight: 44)
             }
             .accessibilityLabel("Browser menu")
+        default:
+            control(toolbarTitle(kind), icon: toolbarSymbol(kind)) { performToolbarItem(kind) }
+                .disabled(!isToolbarItemEnabled(kind))
+        }
+    }
+
+    // MARK: - Customizable toolbar items
+
+    private func isToolbarItemEnabled(_ kind: ToolbarItemKind) -> Bool {
+        switch kind {
+        case .back: return tab.canGoBack
+        case .forward: return tab.canGoForward
+        case .reload, .reader, .find, .desktopSite, .pageZoom: return tab.hasPage
+        case .share, .addBookmark: return tab.url != nil
+        default: return true
+        }
+    }
+
+    private func toolbarTitle(_ kind: ToolbarItemKind) -> String {
+        switch kind {
+        case .reload: return tab.isLoading ? "Stop" : kind.title
+        case .reader: return tab.isReaderActive ? "Exit Reader" : kind.title
+        case .desktopSite: return tab.prefersDesktopSite ? "Mobile Site" : kind.title
+        default: return kind.title
+        }
+    }
+
+    private func toolbarSymbol(_ kind: ToolbarItemKind) -> String {
+        switch kind {
+        case .reload: return tab.isLoading ? "xmark" : kind.symbolName
+        case .desktopSite: return tab.prefersDesktopSite ? "iphone" : kind.symbolName
+        default: return kind.symbolName
+        }
+    }
+
+    private func performToolbarItem(_ kind: ToolbarItemKind) {
+        switch kind {
+        case .address: beginCompactAddressEditing()
+        case .back: tab.webView.goBack()
+        case .forward: tab.webView.goForward()
+        case .reload:
+            if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+        case .share: showShare = true
+        case .tabs: sheet = .tabs
+        case .newTab: browser.addTab()
+        case .bookmarks: sheet = .library
+        case .addBookmark: browser.bookmark(tab)
+        case .reader: tab.toggleReaderMode(dark: colorScheme == .dark)
+        case .find: tab.findOnPage()
+        case .desktopSite: tab.toggleDesktopSite()
+        case .pageZoom: sheet = .pageZoom
+        case .downloads: sheet = .downloads
+        case .menu: sheet = .menu
         }
     }
 
@@ -669,9 +740,11 @@ private struct TabContent: View {
                     quickActionSearchPill
                         .frame(maxWidth: .infinity)
                     quickActionButton
-                    HStack(spacing: 0) {
+                    HStack(spacing: 8) {
                         Spacer(minLength: 0)
-                        quickActionTabsButton
+                        ForEach(toolbarLayout.quickActionBar) { kind in
+                            quickActionBarItem(kind)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -783,6 +856,23 @@ private struct TabContent: View {
         .contextMenu { tabsContextMenu }
     }
 
+    @ViewBuilder
+    private func quickActionBarItem(_ kind: ToolbarItemKind) -> some View {
+        if kind == .tabs {
+            quickActionTabsButton
+        } else {
+            Button { performToolbarItem(kind) } label: {
+                Image(systemName: toolbarSymbol(kind))
+                    .font(.body.weight(.semibold))
+                    .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .contentShape(Rectangle())
+            }
+            .disabled(!isToolbarItemEnabled(kind))
+            .accessibilityLabel(toolbarTitle(kind))
+        }
+    }
+
     /// Accent-outlined rounded square matching the Classic tabs button, on a faint material tile
     /// so it stays legible when floating over page content.
     private func quickActionSideLabel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
@@ -810,14 +900,19 @@ private struct TabContent: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Quick actions")
-            .accessibilityHint("Shows Back, Forward, Reload, Tabs, New Tab, Share, and Menu")
+            .accessibilityHint(quickActionHint)
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { openQuickAction() }
             .accessibilityAction(named: "Search or enter address") { beginQuickActionAddressEditing() }
     }
 
+    private var quickActionHint: String {
+        let titles = toolbarLayout.quickActionFan.map(\.title)
+        return "Shows " + ListFormatter.localizedString(byJoining: titles)
+    }
+
     private var quickActionEntries: [QuickActionEntry] {
-        QuickActionItem.allCases.map { item -> QuickActionEntry in
+        toolbarLayout.quickActionFan.map { item -> QuickActionEntry in
             switch item {
             case .back:
                 return QuickActionEntry(
@@ -844,12 +939,15 @@ private struct TabContent: View {
                 }
             case .tabs:
                 return QuickActionEntry(item: item, badge: "\(browser.tabs.count)") { sheet = .tabs }
-            case .newTab:
-                return QuickActionEntry(item: item) { browser.addTab() }
-            case .share:
-                return QuickActionEntry(item: item, enabled: tab.url != nil) { showShare = true }
-            case .menu:
-                return QuickActionEntry(item: item) { sheet = .menu }
+            default:
+                return QuickActionEntry(
+                    item: item,
+                    enabled: isToolbarItemEnabled(item),
+                    titleOverride: toolbarTitle(item),
+                    symbolOverride: toolbarSymbol(item)
+                ) {
+                    performToolbarItem(item)
+                }
             }
         }
     }
@@ -884,36 +982,56 @@ private struct TabContent: View {
                 ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
             }
             HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    compactHoldCircle(
-                        icon: "chevron.left",
-                        enabled: tab.canGoBack,
-                        label: "Back",
-                        kind: .back
-                    ) { tab.webView.goBack() }
-
-                    compactHoldCircle(
-                        icon: "chevron.right",
-                        enabled: tab.canGoForward,
-                        label: "Forward",
-                        kind: .forward
-                    ) { tab.webView.goForward() }
+                if !toolbarLayout.compactLeading.isEmpty {
+                    HStack(spacing: 8) {
+                        ForEach(toolbarLayout.compactLeading) { kind in
+                            compactItem(kind)
+                        }
+                    }
                 }
 
                 compactPill
 
-                compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page") {
-                    showShare = true
-                }
-
-                compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu") {
-                    sheet = .menu
+                ForEach(toolbarLayout.compactTrailing) { kind in
+                    compactItem(kind)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 8)
         }
         .background(Color.clear)
+    }
+
+    @ViewBuilder
+    private func compactItem(_ kind: ToolbarItemKind) -> some View {
+        switch kind {
+        case .back:
+            compactHoldCircle(
+                icon: "chevron.left",
+                enabled: tab.canGoBack,
+                label: "Back",
+                kind: .back
+            ) { tab.webView.goBack() }
+        case .forward:
+            compactHoldCircle(
+                icon: "chevron.right",
+                enabled: tab.canGoForward,
+                label: "Forward",
+                kind: .forward
+            ) { tab.webView.goForward() }
+        case .share:
+            compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page") {
+                showShare = true
+            }
+        case .menu:
+            compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu") {
+                sheet = .menu
+            }
+        default:
+            compactCircle(icon: toolbarSymbol(kind), enabled: isToolbarItemEnabled(kind), label: toolbarTitle(kind)) {
+                performToolbarItem(kind)
+            }
+        }
     }
 
     private var compactPill: some View {
@@ -1280,6 +1398,10 @@ private struct BrowserMenuSheet: View {
 
     var body: some View {
         List {
+            if let tab = browser.selected {
+                // Back, Forward, Reload, and Tabs stay reachable even when removed from the toolbar.
+                MenuNavigationRow(tab: tab, onTabs: { sheet = .tabs }, onDone: { dismiss() })
+            }
             Section("Page actions") {
                 Button {
                     browser.addTab()
@@ -1358,6 +1480,46 @@ private struct BrowserMenuSheet: View {
                 ActivityShareSheet(items: [url])
             }
         }
+    }
+}
+
+/// Back, Forward, Reload, and Tabs at the top of the menu sheet.
+private struct MenuNavigationRow: View {
+    @ObservedObject var tab: BrowserTab
+    let onTabs: () -> Void
+    let onDone: () -> Void
+
+    var body: some View {
+        HStack {
+            navButton("Back", icon: "chevron.left", enabled: tab.canGoBack) {
+                tab.webView.goBack()
+                onDone()
+            }
+            navButton("Forward", icon: "chevron.right", enabled: tab.canGoForward) {
+                tab.webView.goForward()
+                onDone()
+            }
+            navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: tab.hasPage) {
+                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                onDone()
+            }
+            navButton("Tabs", icon: "square.on.square", enabled: true, action: onTabs)
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private func navButton(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.body.weight(.semibold))
+                Text(title)
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .disabled(!enabled)
+        .accessibilityLabel(title)
     }
 }
 
@@ -1953,6 +2115,9 @@ private struct SettingsView: View {
                         Text(placement.rawValue).tag(placement.rawValue)
                     }
                 }
+                NavigationLink("Customize Toolbar") {
+                    ToolbarEditorView(theme: theme)
+                }
                 NavigationLink("Home personalization") {
                     HomePersonalizationView()
                 }
@@ -2058,7 +2223,7 @@ private struct SettingsView: View {
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {

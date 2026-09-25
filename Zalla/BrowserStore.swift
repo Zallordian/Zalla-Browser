@@ -293,6 +293,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.removeObject(forKey: AddressBarPlacement.storageKey)
         defaults.removeObject(forKey: HTTPSOnly.storageKey)
+        defaults.removeObject(forKey: ToolbarLayout.storageKey)
         defaults.removeObject(forKey: "useCustomAccent")
         defaults.removeObject(forKey: "customAccentHex")
         defaults.removeObject(forKey: "customAccentGradient")

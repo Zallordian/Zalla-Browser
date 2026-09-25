@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One control revealed by the Quick Action button.
 struct QuickActionEntry: Identifiable {
-    let item: QuickActionItem
+    let item: ToolbarItemKind
     var enabled: Bool = true
     var badge: String?
     /// State-dependent overrides, such as Reload becoming Stop while a page loads.
