@@ -133,6 +133,15 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(AddressDisplay.collapsedLabel(url: nil, hasPage: false), "Search or enter a website")
     }
 
+    func testAddressDisplayPageSummary() {
+        let url = URL(string: "https://www.example.com/story")
+        XCTAssertEqual(AddressDisplay.pageSummary(title: "Big News", url: url, hasPage: true), "Big News, example.com")
+        XCTAssertEqual(AddressDisplay.pageSummary(title: "  ", url: url, hasPage: true), "example.com")
+        XCTAssertEqual(AddressDisplay.pageSummary(title: "example.com", url: url, hasPage: true), "example.com")
+        XCTAssertEqual(AddressDisplay.pageSummary(title: "Reader", url: nil, hasPage: true), "Reader")
+        XCTAssertEqual(AddressDisplay.pageSummary(title: "Big News", url: url, hasPage: false), "")
+    }
+
     func testChromeModeTipKeysAndCopy() {
         XCTAssertEqual(ChromeModeTips.compactSeenKey, "hasSeenCompactModeTip")
         XCTAssertEqual(ChromeModeTips.topBarSeenKey, "hasSeenTopBarPlacementTip")

@@ -208,6 +208,15 @@ enum AddressDisplay {
     static func editingText(url: URL?) -> String {
         url?.absoluteString ?? ""
     }
+
+    /// Page title then host, for the Quick Action search button's VoiceOver value. Empty on a new tab.
+    static func pageSummary(title: String, url: URL?, hasPage: Bool) -> String {
+        guard hasPage else { return "" }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let host = friendlyHost(from: url) else { return cleanTitle }
+        if cleanTitle.isEmpty || cleanTitle == host { return host }
+        return "\(cleanTitle), \(host)"
+    }
 }
 
 /// Safari-like connection security for collapsed address chrome.

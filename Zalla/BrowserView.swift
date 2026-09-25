@@ -89,6 +89,8 @@ private struct TabContent: View {
     @AppStorage(ChromeModeTips.quickActionSeenKey) private var hasSeenQuickActionTip = false
     @State private var quickActionOpen = false
     @State private var quickActionFrame: CGRect = .zero
+    @State private var showSearchPageInfo = false
+    @State private var suppressSearchTap = false
     /// Measured heights of the floating chrome (inside the safe area) so content can scroll clear of it.
     @State private var topChromeHeight: CGFloat = 0
     @State private var bottomChromeHeight: CGFloat = 0
@@ -655,16 +657,76 @@ private struct TabContent: View {
     }
 
     /// Compact search button. Same outlined square, size, and 44pt target as the tabs button.
+    /// Press and hold to peek the current page title and host without opening the editor.
     private var quickActionSearchButton: some View {
-        Button { beginQuickActionAddressEditing() } label: {
+        Button {
+            if suppressSearchTap {
+                suppressSearchTap = false
+                return
+            }
+            beginQuickActionAddressEditing()
+        } label: {
             quickActionSideLabel {
                 Image(systemName: "magnifyingglass")
                     .font(.footnote.weight(.bold))
             }
         }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.4).onEnded { _ in showQuickActionPageInfo() }
+        )
+        .overlay(alignment: addressBarPlacement == .top ? .topLeading : .bottomLeading) {
+            if showSearchPageInfo, tab.hasPage {
+                quickActionPageInfoBubble
+                    .offset(y: addressBarPlacement == .top ? 52 : -52)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: addressBarPlacement == .top ? .topLeading : .bottomLeading)))
+            }
+        }
         .accessibilityLabel("Search or enter address")
-        .accessibilityValue(tab.hasPage ? (AddressDisplay.friendlyHost(from: tab.url) ?? compactTitle) : "")
+        .accessibilityValue(quickActionPageAccessibilityValue)
         .accessibilityHint("Opens the address field")
+    }
+
+    /// Current page for VoiceOver: title first, then host.
+    private var quickActionPageAccessibilityValue: String {
+        AddressDisplay.pageSummary(title: compactTitle, url: tab.url, hasPage: tab.hasPage)
+    }
+
+    private var quickActionPageInfoBubble: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(compactTitle)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+            if let host = AddressDisplay.friendlyHost(from: tab.url) {
+                HStack(spacing: 4) {
+                    connectionSecurityAffordance(font: .caption2, textFont: .caption2.weight(.semibold))
+                    Text(host)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(width: 230, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func showQuickActionPageInfo() {
+        // On a new tab there is nothing to show, so let the tap open the editor as usual.
+        guard tab.hasPage else { return }
+        suppressSearchTap = true
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.easeOut(duration: 0.15)) { showSearchPageInfo = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation(.easeIn(duration: 0.2)) { showSearchPageInfo = false }
+            // The release after a hold may not reach the button (for example after sliding off).
+            suppressSearchTap = false
+        }
     }
 
     private var quickActionTabsButton: some View {
