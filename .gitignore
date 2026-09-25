@@ -6,3 +6,8 @@ xcuserdata/
 Zalla.xcodeproj/
 __pycache__/
 *.pyc
+*.orig
+*.rej
+*.mbox
+*~
+*.swp

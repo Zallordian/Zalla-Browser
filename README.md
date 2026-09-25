@@ -15,7 +15,7 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
-No external SDKs, analytics, account service, Zalla backend, or purchase flow. There is no tracker blocker yet. Tabs are not restored after termination. Each private tab is isolated, so logins are not shared across private tabs. Explicitly bookmarking or sharing a private page is a user-directed export.
+No external SDKs, analytics, account service, or Zalla backend. Optional tips and Zalla Unlock use StoreKit in-app purchases. Content blocking uses bundled rule lists converted from EasyList, EasyPrivacy, and Fanboy lists (see [tools/blocklists](tools/blocklists/README.md)). Open normal tabs are restored after termination. Each private tab is isolated, so logins are not shared across private tabs. Explicitly bookmarking or sharing a private page is a user-directed export.
 
 ## Build on a Mac
 
