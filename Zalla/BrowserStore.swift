@@ -480,6 +480,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var hasOnlySecureContent = true
     /// Set when HTTPS-Only Mode could not open a site securely; shows the in-app notice.
     @Published var httpsFallback: HTTPSFallback?
+    /// Request Desktop Site for this tab. Applied to every navigation through WKWebpagePreferences.
+    @Published private(set) var prefersDesktopSite = false
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
@@ -596,6 +598,14 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         readerOriginalURL = nil
         hasPage = true
         webView.load(URLRequest(url: url))
+    }
+
+    /// Switches between the desktop and mobile version of sites in this tab, then reloads.
+    func toggleDesktopSite() {
+        prefersDesktopSite.toggle()
+        if hasPage, webView.url != nil {
+            webView.reload()
+        }
     }
 
     /// Go Back on the HTTPS-Only notice: stay on the page that was showing, or the new tab page.
@@ -854,7 +864,16 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                 decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+                 preferences: WKWebpagePreferences,
+                 decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+        preferences.preferredContentMode = prefersDesktopSite ? .desktop : .recommended
+        decidePolicy(for: navigationAction, webView: webView) { policy in
+            decisionHandler(policy, preferences)
+        }
+    }
+
+    private func decidePolicy(for navigationAction: WKNavigationAction, webView: WKWebView,
+                              decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
         let scheme = url.scheme?.lowercased() ?? ""
         if scheme == "blob" || scheme == "data" {

@@ -1281,6 +1281,21 @@ private struct BrowserMenuSheet: View {
                 } label: { Label("Find on page", systemImage: "text.magnifyingglass") }
                 .disabled(!(browser.selected?.hasPage ?? false))
                 Button {
+                    browser.selected?.toggleDesktopSite()
+                    dismiss()
+                } label: {
+                    HStack {
+                        Label("Request Desktop Site", systemImage: "desktopcomputer")
+                        Spacer()
+                        if browser.selected?.prefersDesktopSite == true {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                        }
+                    }
+                }
+                .disabled(!(browser.selected?.hasPage ?? false))
+                .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
+                Button {
                     if let tab = browser.selected {
                         tab.toggleReaderMode(dark: colorScheme == .dark)
                     }
