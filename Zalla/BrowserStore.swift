@@ -36,6 +36,7 @@ final class BrowserStore: ObservableObject {
     private var sessionSaveTask: Task<Void, Never>?
     /// Off while restoring or clearing, so half-built tab lists never overwrite the saved session.
     private var sessionSavingEnabled = false
+    private var contentRulesObserver: NSObjectProtocol?
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
 
@@ -66,6 +67,15 @@ final class BrowserStore: ObservableObject {
             addTab()
         }
         sessionSavingEnabled = true
+        // New rule lists or per-site choices apply to each tab's next page load.
+        contentRulesObserver = NotificationCenter.default.addObserver(
+            forName: .zallaContentRulesChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.tabs.forEach { $0.applyContentBlocking(for: $0.webView.url) }
+            }
+        }
+        ContentBlocker.shared.start()
     }
 
     @discardableResult
@@ -305,6 +315,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ChromeModeTips.quickActionSeenKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
         HomeShortcuts.resetToDefaults()
+        ContentBlocker.shared.resetSettings()
         if UIApplication.shared.supportsAlternateIcons {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 UIApplication.shared.setAlternateIconName(nil) { _ in
@@ -641,6 +652,29 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         }
     }
 
+    /// Adds or removes content blocker rule lists for the page about to load. Popups share the
+    /// opener's content controller, so the most recent main-frame load in either decides.
+    func applyContentBlocking(for url: URL?) {
+        ContentBlocker.shared.apply(to: webView.configuration.userContentController, for: url)
+    }
+
+    /// Site the per-site blocking choice applies to, or nil on the new tab page and non-web pages.
+    var contentBlockingHost: String? {
+        guard hasPage, !isReaderActive, let current = webView.url ?? url,
+              ["http", "https"].contains(current.scheme?.lowercased() ?? "") else { return nil }
+        return ContentBlockingSettings.hostKey(for: current)
+    }
+
+    /// Blocking on this Site: saves the choice for the host, swaps rule lists, and reloads.
+    func setContentBlockingForSite(_ enabled: Bool) {
+        guard let host = contentBlockingHost else { return }
+        ContentBlocker.shared.setBlocking(enabled, forHost: host)
+        applyContentBlocking(for: webView.url)
+        if webView.url != nil {
+            webView.reload()
+        }
+    }
+
     /// Go Back on the HTTPS-Only notice: stay on the page that was showing, or the new tab page.
     func leaveHTTPSFallback() {
         httpsFallback = nil
@@ -937,6 +971,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 decisionHandler(.cancel)
                 webView.load(navigationAction.request)
             } else {
+                if navigationAction.targetFrame?.isMainFrame == true {
+                    applyContentBlocking(for: url)
+                }
                 // New-window actions are allowed so WebKit asks createWebViewWith for a child tab.
                 decisionHandler(.allow)
             }
