@@ -46,6 +46,21 @@
       "productID": "com.zalla.browser.tip.large",
       "referenceName": "Tip Large",
       "type": "Consumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": true,
+      "internalID": "6740000004",
+      "localizations": [
+        {
+          "description": "Stronger blocking, ad space hiding, cookie banner blocking, and custom rules.",
+          "displayName": "Zalla Unlock",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.zalla.browser.unlock",
+      "referenceName": "Zalla Unlock",
+      "type": "NonConsumable"
     }
   ],
   "settings": {

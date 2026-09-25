@@ -42,6 +42,8 @@ struct ZallaApp: App {
             .task {
                 // Finish any tip purchases that completed while Zalla was closed or awaiting approval.
                 TipTransactionObserver.start()
+                // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.
+                await ZallaUnlock.shared.refreshEntitlements()
             }
             .onChange(of: scenePhase) { _, phase in
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.

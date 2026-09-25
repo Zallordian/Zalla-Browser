@@ -56,8 +56,8 @@ enum SupporterState {
     }
 }
 
-/// Finishes tip transactions that arrive outside the purchase button, such as an approved
-/// Ask to Buy request or a purchase interrupted by the app closing.
+/// Finishes tip and Zalla Unlock transactions that arrive outside the purchase button, such as
+/// an approved Ask to Buy request, a purchase interrupted by the app closing, or a refund.
 enum TipTransactionObserver {
     private static var isStarted = false
 
@@ -78,13 +78,21 @@ enum TipTransactionObserver {
     private static func handle(_ result: VerificationResult<Transaction>) async {
         switch result {
         case .verified(let transaction):
+            if transaction.productID == ZallaUnlockProduct.id {
+                let revocationDate = transaction.revocationDate
+                await MainActor.run {
+                    ZallaUnlock.shared.apply(productID: ZallaUnlockProduct.id, revocationDate: revocationDate)
+                }
+                await transaction.finish()
+                return
+            }
             guard TipJar.isTipProduct(transaction.productID) else { return }
             if transaction.revocationDate == nil {
                 await MainActor.run { SupporterState.recordTip() }
             }
             await transaction.finish()
         case .unverified(let transaction, _):
-            guard TipJar.isTipProduct(transaction.productID) else { return }
+            guard TipJar.isTipProduct(transaction.productID) || transaction.productID == ZallaUnlockProduct.id else { return }
             await transaction.finish()
         }
     }
