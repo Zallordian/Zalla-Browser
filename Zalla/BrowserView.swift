@@ -1824,6 +1824,7 @@ private struct SettingsView: View {
     @State private var greenSlider = 0.23
     @State private var blueSlider = 0.31
     @State private var suggestIconForTheme: ZallaThemeID?
+    @Environment(\.colorScheme) private var colorScheme
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(
@@ -1865,6 +1866,13 @@ private struct SettingsView: View {
             }
 
             Section {
+                ChromeStylePreview(
+                    style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+                    placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom,
+                    isDark: previewIsDark,
+                    theme: theme
+                )
+                .padding(.vertical, 6)
                 themeRow(title: "Signature", ids: ZallaThemeID.featured)
                 DisclosureGroup("More accents") {
                     themeRow(title: nil, ids: ZallaThemeID.secondary)
@@ -1905,11 +1913,7 @@ private struct SettingsView: View {
             }
 
             Section {
-                Picker("Icon", selection: $appIconPreference) {
-                    ForEach(AppIconPreference.allCases) { option in
-                        Text(option.rawValue).tag(option.rawValue)
-                    }
-                }
+                iconGrid
                 .onChange(of: appIconPreference) { _, newValue in
                     applyIcon(AppIconPreference(rawValue: newValue) ?? .default)
                 }
@@ -2046,6 +2050,55 @@ private struct SettingsView: View {
         } message: { Text(bookmarkMessage ?? "") }
         .tint(theme.primary)
         .onAppear { loadCustomControls() }
+    }
+
+    private var previewIsDark: Bool {
+        switch appearance {
+        case "Dark": return true
+        case "Light": return false
+        default: return colorScheme == .dark
+        }
+    }
+
+    private var iconGrid: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 14) {
+            ForEach(AppIconPreference.allCases) { option in
+                iconOption(option)
+            }
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func iconOption(_ option: AppIconPreference) -> some View {
+        let isSelected = appIconPreference == option.rawValue
+        return Button {
+            appIconPreference = option.rawValue
+        } label: {
+            VStack(spacing: 6) {
+                Image(option.previewImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 52, height: 52)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                    }
+                    .padding(3)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15, style: .continuous)
+                            .strokeBorder(isSelected ? theme.primary : Color.clear, lineWidth: 2.5)
+                    }
+                Text(option.rawValue)
+                    .font(.caption2)
+                    .foregroundStyle(isSelected ? theme.primary : .secondary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(option.rawValue) icon")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     @ViewBuilder
