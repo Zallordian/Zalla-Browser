@@ -39,6 +39,12 @@ struct ZallaApp: App {
                     }
                 }
             }
+            .onChange(of: scenePhase) { _, phase in
+                // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
+                if phase != .active {
+                    browser.saveSession()
+                }
+            }
         }
     }
 }

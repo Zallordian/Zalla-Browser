@@ -16,8 +16,15 @@ private struct Library: Codable {
 
 @MainActor
 final class BrowserStore: ObservableObject {
-    @Published var tabs: [BrowserTab] = []
-    @Published var selectedID: UUID?
+    @Published var tabs: [BrowserTab] = [] {
+        didSet { scheduleSessionSave() }
+    }
+    @Published var selectedID: UUID? {
+        didSet {
+            selected?.restoreIfNeeded()
+            scheduleSessionSave()
+        }
+    }
     @Published private(set) var bookmarks: [SavedPage] = []
     @Published private(set) var history: [SavedPage] = []
     @Published private(set) var downloads: [DownloadRecord] = []
@@ -26,6 +33,9 @@ final class BrowserStore: ObservableObject {
     @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
     private var activeDownloadDelegates: [UUID: TabDownloadSession] = [:]
+    private var sessionSaveTask: Task<Void, Never>?
+    /// Off while restoring or clearing, so half-built tab lists never overwrite the saved session.
+    private var sessionSavingEnabled = false
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
 
@@ -52,11 +62,23 @@ final class BrowserStore: ObservableObject {
         if UserDefaults.standard.data(forKey: HomeShortcuts.storageKey) == nil {
             HomeShortcuts.save(HomeShortcuts.defaults)
         }
-        addTab()
+        if !restoreSession() {
+            addTab()
+        }
+        sessionSavingEnabled = true
     }
 
-    func addTab(isPrivate: Bool = false, url: URL? = nil) {
+    @discardableResult
+    func addTab(isPrivate: Bool = false, url: URL? = nil) -> BrowserTab {
         let tab = BrowserTab(isPrivate: isPrivate)
+        configure(tab)
+        tabs.append(tab)
+        selectedID = tab.id
+        if let url { tab.load(url) }
+        return tab
+    }
+
+    private func configure(_ tab: BrowserTab) {
         tab.onVisit = { [weak self] page in
             guard let self else { return }
             self.history.removeAll { $0.url == page.url }
@@ -70,9 +92,56 @@ final class BrowserStore: ObservableObject {
         tab.onDownloadDecision = { [weak self] tab, download, response, sourceURL in
             self?.beginDownload(tab: tab, download: download, response: response, sourceURL: sourceURL)
         }
-        tabs.append(tab)
-        selectedID = tab.id
-        if let url { tab.load(url) }
+        tab.onSessionChange = { [weak self] in
+            self?.scheduleSessionSave()
+        }
+    }
+
+    // MARK: - Session restore
+
+    /// Restores normal tabs from the last run. Only the selected tab loads now; the rest load when opened.
+    private func restoreSession() -> Bool {
+        guard let snapshot = TabSession.load(), !snapshot.isEmpty else { return false }
+        var restored: [BrowserTab] = []
+        for entry in snapshot.tabs {
+            let tab = BrowserTab(isPrivate: false)
+            configure(tab)
+            tab.prepareRestore(from: entry)
+            restored.append(tab)
+        }
+        tabs = restored
+        let index = snapshot.selectedIndex ?? (restored.count - 1)
+        selectedID = restored.indices.contains(index) ? restored[index].id : restored.last?.id
+        return true
+    }
+
+    private func scheduleSessionSave() {
+        guard sessionSavingEnabled else { return }
+        sessionSaveTask?.cancel()
+        sessionSaveTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            guard !Task.isCancelled else { return }
+            self?.saveSession()
+        }
+    }
+
+    /// Writes open normal tabs now. Called on changes (debounced) and when the app leaves the foreground.
+    func saveSession() {
+        guard sessionSavingEnabled else { return }
+        sessionSaveTask?.cancel()
+        sessionSaveTask = nil
+        let snapshot = TabSession.snapshot(from: tabs.map { $0.sessionSource(isSelected: $0.id == selectedID) })
+        do {
+            try TabSession.save(snapshot)
+        } catch {
+            // Session restore is best effort; never interrupt browsing for it.
+        }
+    }
+
+    private func clearSavedSession() {
+        sessionSaveTask?.cancel()
+        sessionSaveTask = nil
+        TabSession.clear()
     }
 
     func close(_ tab: BrowserTab) {
@@ -144,6 +213,8 @@ final class BrowserStore: ObservableObject {
 
     func clearBrowsingData() async {
         clearingData = true
+        sessionSavingEnabled = false
+        clearSavedSession()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -152,12 +223,15 @@ final class BrowserStore: ObservableObject {
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
         )
         addTab()
+        sessionSavingEnabled = true
         clearingData = false
     }
 
     /// Destructive reset used by Settings. Bookmarks are kept by default.
     func resetApp(keepingBookmarks: Bool = true) async {
         clearingData = true
+        sessionSavingEnabled = false
+        clearSavedSession()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -196,6 +270,7 @@ final class BrowserStore: ObservableObject {
             }
         }
         addTab()
+        sessionSavingEnabled = true
         clearingData = false
     }
 
@@ -366,6 +441,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
+    /// Fires when something worth saving in the tab session changes (committed URL or title).
+    var onSessionChange: (() -> Void)?
+    /// Saved state waiting for the tab to be opened after a cold launch.
+    private var pendingRestore: TabSessionEntry?
     private var observations: [NSKeyValueObservation] = []
     private let scriptHandlerProxy = WeakScriptMessageHandler()
     private var pendingDownloadResponse: URLResponse?
@@ -451,6 +530,49 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         readerOriginalURL = nil
         hasPage = true
         webView.load(URLRequest(url: url))
+    }
+
+    /// Shows a restored tab's title and URL without loading it yet.
+    func prepareRestore(from entry: TabSessionEntry) {
+        guard TabSession.isRestorable(entry.url) else { return }
+        pendingRestore = entry
+        title = entry.title
+        url = entry.url
+        hasPage = true
+    }
+
+    /// Loads a restored tab the first time it is shown: back/forward state when available, else the URL.
+    func restoreIfNeeded() {
+        guard let entry = pendingRestore else { return }
+        pendingRestore = nil
+        errorMessage = nil
+        if let state = entry.interactionState {
+            webView.interactionState = state
+            if webView.backForwardList.currentItem != nil { return }
+        }
+        load(entry.url)
+    }
+
+    /// Plain description of this tab for the session snapshot. Private tabs are filtered out later.
+    func sessionSource(isSelected: Bool) -> TabSession.Source {
+        if let pendingRestore {
+            return TabSession.Source(
+                isPrivate: isPrivate,
+                url: pendingRestore.url,
+                title: pendingRestore.title,
+                isSelected: isSelected,
+                interactionState: pendingRestore.interactionState
+            )
+        }
+        // Reader pages are local HTML, so save only the original URL for them.
+        let state = (isPrivate || isReaderActive) ? nil : webView.interactionState as? Data
+        return TabSession.Source(
+            isPrivate: isPrivate,
+            url: hasPage ? url : nil,
+            title: title,
+            isSelected: isSelected,
+            interactionState: state
+        )
     }
 
     func backHistoryItems(limit: Int = 5) -> [HistoryListItem] {
@@ -582,6 +704,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             readerAvailable = hasPage
             capturePreview()
         }
+        if !isPrivate { onSessionChange?() }
         guard !isPrivate, !isReaderActive, let url, ["http", "https"].contains(url.scheme ?? "") else { return }
         onVisit?(SavedPage(title: title, url: url))
     }
