@@ -1,0 +1,97 @@
+{
+  "lists": [
+    {
+      "id": "privacy",
+      "parts": [
+        {
+          "bytes": 6827826,
+          "name": "privacy",
+          "packedBytes": 504200,
+          "resource": "blocklist-privacy",
+          "rules": 56126,
+          "version": "ea0b5fc0a393"
+        }
+      ],
+      "tier": "free",
+      "title": "Trackers"
+    },
+    {
+      "id": "ads-basic",
+      "parts": [
+        {
+          "bytes": 5849061,
+          "name": "ads-basic",
+          "packedBytes": 517806,
+          "resource": "blocklist-ads-basic",
+          "rules": 55325,
+          "version": "ba72a89c4985"
+        }
+      ],
+      "tier": "free",
+      "title": "Common ad networks"
+    },
+    {
+      "id": "ads-extra",
+      "parts": [
+        {
+          "bytes": 707160,
+          "name": "ads-extra",
+          "packedBytes": 58522,
+          "resource": "blocklist-ads-extra",
+          "rules": 3877,
+          "version": "a00263f80b27"
+        }
+      ],
+      "tier": "paid",
+      "title": "Full ad blocking"
+    },
+    {
+      "id": "cosmetic",
+      "parts": [
+        {
+          "bytes": 1221739,
+          "name": "cosmetic",
+          "packedBytes": 231241,
+          "resource": "blocklist-cosmetic",
+          "rules": 5945,
+          "version": "77c8598a120b"
+        }
+      ],
+      "tier": "paid",
+      "title": "Hide ad spaces"
+    },
+    {
+      "id": "annoyances",
+      "parts": [
+        {
+          "bytes": 3666940,
+          "name": "annoyances",
+          "packedBytes": 622682,
+          "resource": "blocklist-annoyances",
+          "rules": 18374,
+          "version": "507fb230c2c1"
+        }
+      ],
+      "tier": "paid",
+      "title": "Cookie banners and annoyances"
+    }
+  ],
+  "sources": {
+    "annoyance": {
+      "url": "https://secure.fanboy.co.nz/fanboy-annoyance.txt",
+      "version": "202609250225"
+    },
+    "cookie": {
+      "url": "https://secure.fanboy.co.nz/fanboy-cookiemonster.txt",
+      "version": "unknown"
+    },
+    "easylist": {
+      "url": "https://easylist.to/easylist/easylist.txt",
+      "version": "202609250310"
+    },
+    "easyprivacy": {
+      "url": "https://easylist.to/easylist/easyprivacy.txt",
+      "version": "202609250310"
+    }
+  }
+}
