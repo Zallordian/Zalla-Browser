@@ -2259,6 +2259,16 @@ private struct SettingsView: View {
             }
 
             Section {
+                NavigationLink {
+                    SupportZallaView(theme: theme)
+                } label: {
+                    SupportZallaRow(theme: theme)
+                }
+            } footer: {
+                Text("Optional tips through the App Store. They do not unlock features.")
+            }
+
+            Section {
                 Link(destination: URL(string: "https://zalla.gg/privacy/")!) {
                     Label("Privacy Policy", systemImage: "doc.text")
                 }

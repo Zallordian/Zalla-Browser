@@ -102,5 +102,8 @@ schemes:
     build:
       targets:
         Zalla: all
+    run:
+      config: Debug
+      storeKitConfiguration: Zalla.storekit
     test:
       targets: [ZallaTests]

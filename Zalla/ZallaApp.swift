@@ -39,6 +39,10 @@ struct ZallaApp: App {
                     }
                 }
             }
+            .task {
+                // Finish any tip purchases that completed while Zalla was closed or awaiting approval.
+                TipTransactionObserver.start()
+            }
             .onChange(of: scenePhase) { _, phase in
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
                 if phase != .active {
