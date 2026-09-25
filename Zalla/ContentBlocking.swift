@@ -84,7 +84,6 @@ struct HiddenElementRule: Codable, Equatable, Identifiable {
     var id = UUID()
     var host: String
     var selector: String
-    var createdAt = Date()
 }
 
 /// One rule in WebKit's content blocker JSON format.

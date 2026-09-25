@@ -233,11 +233,6 @@ final class BrowserStore: ObservableObject {
         return added
     }
 
-    func removeBookmarks(at offsets: IndexSet) {
-        bookmarks.remove(atOffsets: offsets)
-        save()
-    }
-
     func removeBookmark(id: UUID) {
         bookmarks.removeAll { $0.id == id }
         save()
