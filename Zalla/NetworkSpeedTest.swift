@@ -13,6 +13,44 @@ enum NetworkSpeedEndpoints {
     }
     /// Upload echo endpoint used by Cloudflare's public measurement tooling.
     static let uploadURL = URL(string: "https://speed.cloudflare.com/__up")!
+
+    /// Transfer sizes tried in order. The download endpoint rejects some sizes with 403
+    /// (for example 12.5 MB), so only sizes that answer 200 are listed, with a small fallback.
+    static let downloadSizes = [10_000_000, 1_000_000]
+    static let uploadSizes = [4_000_000, 1_000_000]
+
+    /// Fresh, cache-free session with timeouts that suit a phone on cellular or Wi-Fi.
+    static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 45
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
+    }
+}
+
+/// Plain-language copy for failed measurements. Never shows raw error codes.
+enum NetworkSpeedMessages {
+    static let offline = "You appear to be offline. Check your connection and try again."
+    static let timedOut = "The measurement timed out. Try again on a more stable connection."
+    static let unreachable = "Could not reach the test server. Check your connection and try again."
+
+    static func friendlyMessage(for error: Error) -> String {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost, NSURLErrorDataNotAllowed:
+                return offline
+            case NSURLErrorTimedOut:
+                return timedOut
+            default:
+                break
+            }
+        }
+        return unreachable
+    }
 }
 
 enum NetworkSpeedPhase: String, Equatable {
@@ -40,6 +78,7 @@ final class NetworkSpeedTester: ObservableObject {
     @Published private(set) var needleProgress: Double = 0
 
     private var runTask: Task<Void, Never>?
+    private let session = NetworkSpeedEndpoints.makeSession()
 
     var isRunning: Bool {
         switch phase {
@@ -75,14 +114,14 @@ final class NetworkSpeedTester: ObservableObject {
             animateNeedle(toward: min(latency / 200, 0.25))
 
             phase = .download
-            let download = try await measureDownload(bytes: 12_500_000)
+            let download = try await measureWithFallback(sizes: NetworkSpeedEndpoints.downloadSizes, measureDownload)
             try Task.checkCancellation()
             result.downloadMbps = download
             liveMbps = download
             animateNeedle(toward: needleFraction(mbps: download))
 
             phase = .upload
-            let upload = try await measureUpload(bytes: 4_000_000)
+            let upload = try await measureWithFallback(sizes: NetworkSpeedEndpoints.uploadSizes, measureUpload)
             try Task.checkCancellation()
             result.uploadMbps = upload
             liveMbps = upload
@@ -112,7 +151,7 @@ final class NetworkSpeedTester: ObservableObject {
             var request = URLRequest(url: NetworkSpeedEndpoints.latencyURL, timeoutInterval: 12)
             request.httpMethod = "GET"
             request.cachePolicy = .reloadIgnoringLocalCacheData
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200..<400).contains(http.statusCode) else {
                 throw URLError(.badServerResponse)
             }
@@ -122,12 +161,26 @@ final class NetworkSpeedTester: ObservableObject {
         return values.reduce(0, +) / Double(values.count)
     }
 
+    /// Tries each size in turn when the server rejects one, so a single refused size never ends the test.
+    private func measureWithFallback(sizes: [Int], _ measure: @MainActor (Int) async throws -> Double) async throws -> Double {
+        var lastError: Error = URLError(.badServerResponse)
+        for bytes in sizes {
+            try Task.checkCancellation()
+            do {
+                return try await measure(bytes)
+            } catch let error as URLError where error.code == .badServerResponse {
+                lastError = error
+            }
+        }
+        throw lastError
+    }
+
     private func measureDownload(bytes: Int) async throws -> Double {
         let url = NetworkSpeedEndpoints.downloadURL(bytes: bytes)
-        var request = URLRequest(url: url, timeoutInterval: 60)
+        var request = URLRequest(url: url, timeoutInterval: 20)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let start = Date()
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         let elapsed = max(Date().timeIntervalSince(start), 0.001)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -140,13 +193,12 @@ final class NetworkSpeedTester: ObservableObject {
 
     private func measureUpload(bytes: Int) async throws -> Double {
         let payload = Data(count: bytes)
-        var request = URLRequest(url: NetworkSpeedEndpoints.uploadURL, timeoutInterval: 60)
+        var request = URLRequest(url: NetworkSpeedEndpoints.uploadURL, timeoutInterval: 20)
         request.httpMethod = "POST"
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-        request.httpBody = payload
         request.cachePolicy = .reloadIgnoringLocalCacheData
         let start = Date()
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let (_, response) = try await session.upload(for: request, from: payload)
         let elapsed = max(Date().timeIntervalSince(start), 0.001)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
@@ -170,18 +222,7 @@ final class NetworkSpeedTester: ObservableObject {
     }
 
     private func friendlyError(_ error: Error) -> String {
-        let ns = error as NSError
-        if ns.domain == NSURLErrorDomain {
-            switch ns.code {
-            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
-                return "You appear to be offline. Check your connection and try again."
-            case NSURLErrorTimedOut:
-                return "The measurement timed out. Try again on a more stable connection."
-            default:
-                break
-            }
-        }
-        return "Could not finish the measurement. \(error.localizedDescription)"
+        NetworkSpeedMessages.friendlyMessage(for: error)
     }
 }
 
