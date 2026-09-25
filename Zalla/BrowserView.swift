@@ -1159,6 +1159,8 @@ private struct TabContent: View {
     private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .font(.body.weight(.semibold))
+            // Accent when there is somewhere to go, like the other bar buttons; dim when not.
+            .foregroundStyle(enabled ? theme.primary : Color.primary)
             .frame(width: 48, height: 48)
             .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
@@ -1222,6 +1224,7 @@ private struct TabContent: View {
 
     private func holdNavButton(label: String, icon: String, enabled: Bool, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
+            .foregroundStyle(enabled ? theme.primary : Color.primary)
             .frame(minWidth: 52, minHeight: 52)
             .contentShape(Rectangle())
             .opacity(enabled ? 1 : 0.35)
