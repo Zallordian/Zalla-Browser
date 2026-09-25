@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Mini browser used by onboarding Quick Setup. Redraws for every
 /// toolbar style and address placement combination so the choice is visible before it is made.
+/// Like the real browser, the page runs edge to edge and the chrome floats over a soft shade.
 struct ChromeStylePreview: View {
     let style: ToolbarStyle
     let placement: AddressBarPlacement
@@ -9,29 +10,35 @@ struct ChromeStylePreview: View {
     let theme: ZallaTheme
 
     private var layout: ChromePreviewLayout { .make(style: style, placement: placement) }
-    private var chromeBG: Color { isDark ? Color(white: 0.12) : Color(white: 0.96) }
     private var barBG: Color { isDark ? Color(white: 0.20) : Color.white }
     private var pageBG: Color { isDark ? Color(white: 0.07) : Color.white }
     private var muted: Color { isDark ? Color.white.opacity(0.45) : Color.black.opacity(0.35) }
     private var strong: Color { isDark ? Color.white.opacity(0.88) : Color.black.opacity(0.78) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            statusStrip
-            if layout.addressAtTop {
-                chromeRow(isTop: true)
-            }
+        ZStack {
             page
-            if !layout.addressAtTop {
-                chromeRow(isTop: false)
-            } else if layout.showsNavRow && layout.navRowAtBottom {
-                navRow
-                    .padding(.vertical, 8)
-                    .background(chromeBG)
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    statusStrip
+                    if layout.addressAtTop {
+                        chromeRow(isTop: true)
+                    }
+                }
+                .background(scrim(isTop: true, strong: layout.addressAtTop))
+                Spacer(minLength: 0)
+                if !layout.addressAtTop {
+                    chromeRow(isTop: false)
+                        .background(scrim(isTop: false))
+                } else if layout.showsNavRow && layout.navRowAtBottom {
+                    navRow
+                        .padding(.vertical, 8)
+                        .background(scrim(isTop: false))
+                }
             }
         }
         .frame(height: 210)
-        .background(chromeBG)
+        .background(pageBG)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -60,7 +67,19 @@ struct ChromeStylePreview: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 4)
-        .background(chromeBG)
+    }
+
+    /// Soft shade that deepens toward the screen edge, matching the browser's translucent chrome.
+    private func scrim(isTop: Bool, strong: Bool = true) -> some View {
+        let shade: Color = isDark ? .black : .white
+        let edgeOpacity = strong ? (isDark ? 0.58 : 0.72) : (isDark ? 0.35 : 0.45)
+        return LinearGradient(
+            colors: [shade.opacity(0), shade.opacity(edgeOpacity)],
+            startPoint: isTop ? .bottom : .top,
+            endPoint: isTop ? .top : .bottom
+        )
+        .padding(isTop ? .bottom : .top, -14)
+        .allowsHitTesting(false)
     }
 
     private var page: some View {
@@ -79,9 +98,20 @@ struct ChromeStylePreview: View {
                 .fill(muted.opacity(0.2))
                 .frame(maxWidth: 130)
                 .frame(height: 6)
-            Spacer(minLength: 0)
+            // Hero block runs under the bottom chrome so the see-through shade is visible.
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [theme.primary.opacity(0.38), theme.primary.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 4)
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, layout.addressAtTop ? 76 : 32)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(pageBG)
     }
@@ -105,7 +135,6 @@ struct ChromeStylePreview: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .background(chromeBG)
         .transition(.move(edge: isTop ? .top : .bottom).combined(with: .opacity))
     }
 
@@ -162,19 +191,13 @@ struct ChromeStylePreview: View {
 
     private var quickActionRow: some View {
         HStack(spacing: 10) {
-            HStack(spacing: 5) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 8))
-                    .foregroundStyle(muted)
-                Text("zalla.gg")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(strong)
-                    .lineLimit(1)
+            HStack {
+                miniSquare {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 8, weight: .bold))
+                }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 24)
-            .background(barBG, in: Capsule())
             .frame(maxWidth: .infinity)
 
             ZStack {
@@ -189,18 +212,23 @@ struct ChromeStylePreview: View {
 
             HStack {
                 Spacer(minLength: 0)
-                Text("3")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(muted)
-                    .frame(width: 14, height: 15)
-                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(muted, lineWidth: 1.2))
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(muted)
-                    .padding(.leading, 8)
+                miniSquare {
+                    Text("3")
+                        .font(.system(size: 9, weight: .bold))
+                }
             }
             .frame(maxWidth: .infinity)
         }
+    }
+
+    /// Matching accent-outlined squares for the Quick Action search and tabs buttons.
+    private func miniSquare<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .foregroundStyle(theme.primary)
+            .frame(width: 14, height: 15)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(theme.primary, lineWidth: 1.2))
+            .frame(width: 26, height: 26)
+            .background(barBG.opacity(0.55), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
     }
 
     private func miniCircle(_ name: String) -> some View {

@@ -89,6 +89,9 @@ private struct TabContent: View {
     @AppStorage(ChromeModeTips.quickActionSeenKey) private var hasSeenQuickActionTip = false
     @State private var quickActionOpen = false
     @State private var quickActionFrame: CGRect = .zero
+    /// Measured heights of the floating chrome (inside the safe area) so content can scroll clear of it.
+    @State private var topChromeHeight: CGFloat = 0
+    @State private var bottomChromeHeight: CGFloat = 0
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -102,52 +105,27 @@ private struct TabContent: View {
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                if tab.hasPage {
-                    WebSurface(webView: tab.webView)
-                } else {
-                    NewTabView(
-                        browser: browser,
-                        tab: tab,
-                        onOpenLibrary: { sheet = .library },
-                        onOpenTabs: { sheet = .tabs }
-                    )
-                }
-                if let error = tab.errorMessage {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(error)
-                            .font(.caption)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack(spacing: 12) {
-                            Button("Reload") {
-                                tab.dismissError()
-                                tab.webView.reload()
-                            }
-                            .font(.caption.weight(.semibold))
-                            Button("Stay on page") {
-                                tab.dismissError()
-                            }
-                            .font(.caption.weight(.semibold))
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.regularMaterial)
-                }
+            // Page layer runs edge to edge, under the chrome and into the safe areas.
+            if tab.hasPage {
+                WebSurface(
+                    webView: tab.webView,
+                    chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomChromeHeight, right: 0)
+                )
+                // Container only: the keyboard still resizes the page like before.
+                .ignoresSafeArea(.container, edges: .all)
+            } else {
+                NewTabView(
+                    browser: browser,
+                    tab: tab,
+                    onOpenLibrary: { sheet = .library },
+                    onOpenTabs: { sheet = .tabs }
+                )
+                // Extra safe area so home content starts clear of the bars but still scrolls under them.
+                .safeAreaPadding(.top, topChromeHeight)
+                .safeAreaPadding(.bottom, bottomChromeHeight)
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if addressBarPlacement == .top {
-                    topChrome
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if addressBarPlacement == .bottom {
-                    bottomChrome
-                } else if toolbarStyle == .classic {
-                    classicNavOnly
-                }
-            }
+
+            chromeLayer
 
             if holdKind != nil, !holdItems.isEmpty {
                 holdRevealOverlay
@@ -269,6 +247,62 @@ private struct TabContent: View {
         }
     }
 
+    /// Floating chrome over the page. Empty space between the bars passes touches through to the page.
+    private var chromeLayer: some View {
+        VStack(spacing: 0) {
+            if addressBarPlacement == .top {
+                topChrome
+                    .contentShape(Rectangle())
+                    .background(ChromeHeightReader(key: TopChromeHeightKey.self))
+            } else {
+                // Keeps the status bar legible over full-screen pages when no bar sits at the top.
+                Color.clear
+                    .frame(height: 0)
+                    .background { chromeScrim(edge: .top, extent: 0) }
+            }
+            Spacer(minLength: 0)
+            if let error = tab.errorMessage {
+                errorBanner(error)
+            }
+            Group {
+                if addressBarPlacement == .bottom {
+                    bottomChrome
+                } else if toolbarStyle == .classic {
+                    classicNavOnly
+                }
+            }
+            .contentShape(Rectangle())
+            .background(ChromeHeightReader(key: BottomChromeHeightKey.self))
+        }
+        .onPreferenceChange(TopChromeHeightKey.self) { topChromeHeight = $0 }
+        .onPreferenceChange(BottomChromeHeightKey.self) { bottomChromeHeight = $0 }
+    }
+
+    private func errorBanner(_ error: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(error)
+                .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Button("Reload") {
+                    tab.dismissError()
+                    tab.webView.reload()
+                }
+                .font(.caption.weight(.semibold))
+                Button("Stay on page") {
+                    tab.dismissError()
+                }
+                .font(.caption.weight(.semibold))
+                Spacer(minLength: 0)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
     private var holdRevealOverlay: some View {
         ZStack(alignment: .bottom) {
             Color.black.opacity(0.28)
@@ -366,13 +400,13 @@ private struct TabContent: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 8)
                 .padding(.bottom, 8)
-                .background { chromeMaterial(edges: .top) }
+                .background { chromeScrim(edge: .top) }
         case .compact:
             compactToolbar
-                .background { chromeMaterial(edges: .top) }
+                .background { chromeScrim(edge: .top) }
         case .quickAction:
             quickActionToolbar
-                .background { chromeMaterial(edges: .top) }
+                .background { chromeScrim(edge: .top) }
         }
     }
 
@@ -383,10 +417,10 @@ private struct TabContent: View {
             classicToolbar
         case .compact:
             compactToolbar
-                .background { chromeMaterial(edges: .bottom) }
+                .background { chromeScrim(edge: .bottom) }
         case .quickAction:
             quickActionToolbar
-                .background { chromeMaterial(edges: .bottom) }
+                .background { chromeScrim(edge: .bottom) }
         }
     }
 
@@ -397,7 +431,7 @@ private struct TabContent: View {
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 6)
-        .background { chromeMaterial(edges: .bottom) }
+        .background { chromeScrim(edge: .bottom) }
     }
 
     private var classicNavOnly: some View {
@@ -407,19 +441,42 @@ private struct TabContent: View {
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 6)
-        .background { chromeMaterial(edges: .bottom) }
+        .background { chromeScrim(edge: .bottom) }
     }
 
-    private func chromeMaterial(edges: Edge.Set) -> some View {
-        // Solid base + strong systemBackground so notch/home-indicator strips stay opaque.
-        Rectangle()
-            .fill(Color(uiColor: .secondarySystemBackground))
-            .overlay {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-            }
-            .overlay(Color(uiColor: .systemBackground).opacity(colorScheme == .dark ? 0.78 : 0.90))
-            .ignoresSafeArea(edges: edges)
+    /// Soft translucent shade behind floating chrome: clear on the page side, deepening toward the
+    /// screen edge and running full-bleed into the safe area. Dark mode fades to black; light mode
+    /// fades to white. A masked ultra-thin material adds a light blur so controls stay legible over
+    /// busy pages without a solid band. `extent` lets the fade start a little beyond the controls.
+    private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 28) -> some View {
+        let isDark = colorScheme == .dark
+        let shade: Color = isDark ? .black : .white
+        let towardEdge = edge == .bottom
+        let fade = LinearGradient(
+            stops: [
+                .init(color: shade.opacity(0), location: 0),
+                .init(color: shade.opacity(isDark ? 0.34 : 0.45), location: 0.45),
+                .init(color: shade.opacity(isDark ? 0.58 : 0.72), location: 1)
+            ],
+            startPoint: towardEdge ? .top : .bottom,
+            endPoint: towardEdge ? .bottom : .top
+        )
+        let blurMask = LinearGradient(
+            colors: [.clear, .black.opacity(0.85), .black],
+            startPoint: towardEdge ? .top : .bottom,
+            endPoint: towardEdge ? .bottom : .top
+        )
+        return ZStack {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .mask { blurMask }
+                .opacity(isDark ? 0.55 : 0.7)
+            fade
+        }
+        .padding(towardEdge ? .top : .bottom, -extent)
+        .ignoresSafeArea(.container, edges: towardEdge ? .bottom : .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     @ViewBuilder
@@ -563,9 +620,10 @@ private struct TabContent: View {
 
     // MARK: - Quick Action chrome
 
-    /// Quick Action: address chip on the left, crimson center control, tabs and reload on the right.
-    /// Tapping the center control fans out Back, Forward, Tabs, New Tab, Share, and Menu.
-    /// Tapping the address chip, or pressing and holding the center control, opens address editing.
+    /// Quick Action: search button on the left, crimson center control, tabs button on the right.
+    /// The two side buttons share one outlined-square style so the center control stays centered.
+    /// Tapping the center control fans out Back, Forward, Reload, Tabs, New Tab, Share, and Menu.
+    /// Tapping the search button, or pressing and holding the center control, opens address editing.
     private var quickActionToolbar: some View {
         VStack(spacing: 8) {
             if tab.isLoading {
@@ -577,22 +635,15 @@ private struct TabContent: View {
                     .padding(.horizontal, 16)
             } else {
                 HStack(spacing: 12) {
-                    quickActionAddressChip
-                        .frame(maxWidth: .infinity)
-                    quickActionButton
-                    HStack(spacing: 2) {
+                    HStack(spacing: 0) {
+                        quickActionSearchButton
                         Spacer(minLength: 0)
-                        tabsButton
-                        if tab.hasPage {
-                            Button {
-                                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
-                            } label: {
-                                Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(minWidth: 44, minHeight: 44)
-                            }
-                            .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
-                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    quickActionButton
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        quickActionTabsButton
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -603,38 +654,39 @@ private struct TabContent: View {
         .padding(.bottom, 8)
     }
 
-    private var quickActionAddressLabel: String {
-        if tab.hasPage {
-            return AddressDisplay.friendlyHost(from: tab.url) ?? compactTitle
+    /// Compact search button. Same outlined square, size, and 44pt target as the tabs button.
+    private var quickActionSearchButton: some View {
+        Button { beginQuickActionAddressEditing() } label: {
+            quickActionSideLabel {
+                Image(systemName: "magnifyingglass")
+                    .font(.footnote.weight(.bold))
+            }
         }
-        return "Search"
+        .accessibilityLabel("Search or enter address")
+        .accessibilityValue(tab.hasPage ? (AddressDisplay.friendlyHost(from: tab.url) ?? compactTitle) : "")
+        .accessibilityHint("Opens the address field")
     }
 
-    private var quickActionAddressChip: some View {
-        HStack(spacing: 6) {
-            if tab.hasPage {
-                connectionSecurityAffordance(font: .caption2, textFont: .caption2.weight(.semibold))
-            } else {
-                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+    private var quickActionTabsButton: some View {
+        Button { sheet = .tabs } label: {
+            quickActionSideLabel {
+                Text("\(browser.tabs.count)")
+                    .font(.subheadline.bold())
             }
-            Text(quickActionAddressLabel)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 44)
-        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
-        .contentShape(Capsule())
-        .onTapGesture { beginQuickActionAddressEditing() }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Address, \(tab.hasPage ? quickActionAddressLabel : "Search or enter a website")")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Double tap to edit address or search")
+        .accessibilityLabel("Tabs, \(browser.tabs.count) open")
+        .contextMenu { tabsContextMenu }
+    }
+
+    /// Accent-outlined rounded square matching the Classic tabs button, on a faint material tile
+    /// so it stays legible when floating over page content.
+    private func quickActionSideLabel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .frame(width: 24, height: 26)
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(lineWidth: 1.7))
+            .frame(width: 44, height: 44)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(Rectangle())
     }
 
     private var quickActionButton: some View {
@@ -653,7 +705,7 @@ private struct TabContent: View {
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Quick actions")
-            .accessibilityHint("Shows Back, Forward, Tabs, New Tab, Share, and Menu")
+            .accessibilityHint("Shows Back, Forward, Reload, Tabs, New Tab, Share, and Menu")
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { openQuickAction() }
             .accessibilityAction(named: "Search or enter address") { beginQuickActionAddressEditing() }
@@ -666,6 +718,15 @@ private struct TabContent: View {
                 return QuickActionEntry(item: item, enabled: tab.canGoBack) { tab.webView.goBack() }
             case .forward:
                 return QuickActionEntry(item: item, enabled: tab.canGoForward) { tab.webView.goForward() }
+            case .reload:
+                return QuickActionEntry(
+                    item: item,
+                    enabled: tab.hasPage,
+                    titleOverride: tab.isLoading ? "Stop" : nil,
+                    symbolOverride: tab.isLoading ? "xmark" : nil
+                ) {
+                    if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                }
             case .tabs:
                 return QuickActionEntry(item: item, badge: "\(browser.tabs.count)") { sheet = .tabs }
             case .newTab:
@@ -985,6 +1046,31 @@ private struct TabContent: View {
     }
 }
 
+private struct TopChromeHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct BottomChromeHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+/// Reports the laid-out height of a chrome bar (its safe-area bleed is not included).
+private struct ChromeHeightReader<Key: PreferenceKey>: View where Key.Value == CGFloat {
+    let key: Key.Type
+
+    var body: some View {
+        GeometryReader { geo in
+            Color.clear.preference(key: key, value: geo.size.height)
+        }
+    }
+}
+
 private struct HoldMenuFrameKey: PreferenceKey {
     static var defaultValue: CGRect = .zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
@@ -1031,8 +1117,32 @@ private extension UIResponder {
 
 private struct WebSurface: UIViewRepresentable {
     let webView: WKWebView
-    func makeUIView(context: Context) -> WKWebView { webView }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
+    /// Heights of the floating chrome over the page, not counting the device safe area.
+    var chromeInsets: UIEdgeInsets = .zero
+
+    func makeUIView(context: Context) -> WKWebView {
+        Self.apply(chromeInsets, to: webView)
+        return webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        Self.apply(chromeInsets, to: uiView)
+    }
+
+    /// Lets pages scroll fully clear of the translucent chrome. The scroll view keeps its automatic
+    /// adjustment, which already adds the notch and home indicator insets now that the web view is
+    /// full-bleed, so only the bar heights are added here.
+    private static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
+        let scrollView = webView.scrollView
+        guard scrollView.contentInset != insets else { return }
+        let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
+        scrollView.contentInset = insets
+        scrollView.verticalScrollIndicatorInsets = insets
+        if wasAtTop {
+            // Keep the top of the page just below the top bar instead of hidden under it.
+            scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: -scrollView.adjustedContentInset.top)
+        }
+    }
 }
 
 private struct BrowserMenuSheet: View {

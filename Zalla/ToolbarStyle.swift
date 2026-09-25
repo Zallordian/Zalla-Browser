@@ -54,7 +54,7 @@ enum ChromeModeTips {
         "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
 
     static let quickActionMessage =
-        "Quick Action keeps one button at the center of your chrome. Tap it to reveal Back, Forward, Tabs, New Tab, Share, and Menu. Tap the address, or press and hold the button, to search."
+        "Quick Action keeps one crimson button at the center of a see-through toolbar. Tap it to reveal Back, Forward, Reload, Tabs, New Tab, Share, and Menu. Tap the search icon on the left, or press and hold the button, to search or enter an address."
 
     static let holdRevealMessage =
         "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
@@ -64,6 +64,7 @@ enum ChromeModeTips {
 enum QuickActionItem: String, CaseIterable, Identifiable {
     case back
     case forward
+    case reload
     case tabs
     case newTab
     case share
@@ -75,6 +76,7 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
         switch self {
         case .back: return "Back"
         case .forward: return "Forward"
+        case .reload: return "Reload"
         case .tabs: return "Tabs"
         case .newTab: return "New Tab"
         case .share: return "Share"
@@ -86,6 +88,7 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
         switch self {
         case .back: return "chevron.left"
         case .forward: return "chevron.right"
+        case .reload: return "arrow.clockwise"
         case .tabs: return "square.on.square"
         case .newTab: return "plus"
         case .share: return "square.and.arrow.up"
@@ -96,7 +99,8 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
 
 /// Pure layout math for the Quick Action fan.
 enum QuickActionLayout {
-    static let radius: Double = 128
+    /// Wide enough that seven buttons and their labels never touch, narrow enough for a 375pt screen.
+    static let radius: Double = 140
     static let startAngle: Double = 165
     static let endAngle: Double = 15
 

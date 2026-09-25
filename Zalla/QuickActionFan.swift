@@ -5,9 +5,14 @@ struct QuickActionEntry: Identifiable {
     let item: QuickActionItem
     var enabled: Bool = true
     var badge: String?
+    /// State-dependent overrides, such as Reload becoming Stop while a page loads.
+    var titleOverride: String?
+    var symbolOverride: String?
     let action: () -> Void
 
     var id: String { item.id }
+    var title: String { titleOverride ?? item.title }
+    var symbolName: String { symbolOverride ?? item.symbolName }
 }
 
 /// Measures the Quick Action button so the fan can open from its exact center.
@@ -94,7 +99,7 @@ struct QuickActionFan: View {
         } label: {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
-                    Image(systemName: entry.item.symbolName)
+                    Image(systemName: entry.symbolName)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(entry.enabled ? theme.primary : Color.secondary)
                         .frame(width: 52, height: 52)
@@ -111,7 +116,7 @@ struct QuickActionFan: View {
                             .offset(x: 4, y: -4)
                     }
                 }
-                Text(entry.item.title)
+                Text(entry.title)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
@@ -131,7 +136,7 @@ struct QuickActionFan: View {
         if entry.item == .tabs, let badge = entry.badge {
             return "Tabs, \(badge) open"
         }
-        return entry.item.title
+        return entry.title
     }
 
     private var closeButton: some View {

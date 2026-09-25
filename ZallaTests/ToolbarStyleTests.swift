@@ -20,8 +20,10 @@ final class ToolbarStyleTests: XCTestCase {
     }
 
     func testQuickActionItemsOrderAndCopy() {
-        XCTAssertEqual(QuickActionItem.allCases, [.back, .forward, .tabs, .newTab, .share, .menu])
+        XCTAssertEqual(QuickActionItem.allCases, [.back, .forward, .reload, .tabs, .newTab, .share, .menu])
         XCTAssertEqual(QuickActionItem.newTab.title, "New Tab")
+        XCTAssertEqual(QuickActionItem.reload.title, "Reload")
+        XCTAssertEqual(QuickActionItem.reload.symbolName, "arrow.clockwise")
         for item in QuickActionItem.allCases {
             XCTAssertFalse(item.title.isEmpty)
             XCTAssertFalse(item.symbolName.isEmpty)
@@ -29,8 +31,8 @@ final class ToolbarStyleTests: XCTestCase {
     }
 
     func testQuickActionLayoutAnglesSpreadLeftToRight() {
-        let angles = QuickActionLayout.angles(count: 6)
-        XCTAssertEqual(angles.count, 6)
+        let angles = QuickActionLayout.angles(count: QuickActionItem.allCases.count)
+        XCTAssertEqual(angles.count, 7)
         XCTAssertEqual(angles.first ?? 0, QuickActionLayout.startAngle, accuracy: 0.001)
         XCTAssertEqual(angles.last ?? 0, QuickActionLayout.endAngle, accuracy: 0.001)
         XCTAssertEqual(QuickActionLayout.angles(count: 1), [90])
@@ -49,6 +51,19 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertGreaterThan(topFirst.height, 0, "Top chrome fans downward")
         XCTAssertEqual(topFirst.width, bottomFirst.width, accuracy: 0.001)
         XCTAssertEqual(QuickActionLayout.offset(index: 99, count: count, placement: .bottom), .zero)
+    }
+
+    func testQuickActionFanSpacingFitsAllItems() {
+        let count = QuickActionItem.allCases.count
+        let offsets = (0..<count).map { QuickActionLayout.offset(index: $0, count: count, placement: .bottom) }
+        for index in 1..<count {
+            let dx = offsets[index].width - offsets[index - 1].width
+            let dy = offsets[index].height - offsets[index - 1].height
+            XCTAssertGreaterThan((dx * dx + dy * dy).squareRoot(), 56, "Fan buttons must not overlap")
+        }
+        // Outermost 52pt buttons stay on a 375pt wide screen when the fan opens from the center.
+        let widest = offsets.map { abs($0.width) }.max() ?? 0
+        XCTAssertLessThanOrEqual(widest + 26, 187.5)
     }
 
     func testChromePreviewLayoutReflectsEveryCombination() {
@@ -125,6 +140,8 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(ChromeModeTips.quickActionSeenKey, "hasSeenQuickActionTip")
         XCTAssertFalse(ChromeModeTips.quickActionMessage.contains(String(UnicodeScalar(0x2014)!)))
         XCTAssertFalse(ChromeModeTips.compactMessage.contains(String(UnicodeScalar(0x2014)!)))
+        XCTAssertTrue(ChromeModeTips.quickActionMessage.contains("search icon"))
+        XCTAssertFalse(ChromeModeTips.quickActionMessage.contains("Tap the address"))
         XCTAssertFalse(ChromeModeTips.topBarMessage.isEmpty)
         XCTAssertFalse(ChromeModeTips.holdRevealMessage.isEmpty)
     }
