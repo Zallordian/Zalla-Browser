@@ -18,12 +18,22 @@ final class ThemeTests: XCTestCase {
         XCTAssertNil(AppIconPreference.default.alternateIconName)
         XCTAssertEqual(AppIconPreference.dark.alternateIconName, "AppIconDark")
         XCTAssertEqual(AppIconPreference.tinted.alternateIconName, "AppIconTinted")
+        XCTAssertEqual(AppIconPreference.ocean.alternateIconName, "AppIconOcean")
+    }
+
+    func testEveryAccentHasItsOwnIcon() {
+        let icons = ZallaThemeID.allCases.map(\.suggestedAppIcon)
+        XCTAssertEqual(Set(icons).count, ZallaThemeID.allCases.count)
+        for icon in AppIconPreference.allCases {
+            XCTAssertEqual(icon.previewImageName, "IconPreview\(icon.rawValue)")
+        }
     }
 
     func testSuggestedIconsPerAccent() {
         XCTAssertEqual(ZallaThemeID.zallaRed.suggestedAppIcon, .default)
-        XCTAssertEqual(ZallaThemeID.space.suggestedAppIcon, .dark)
-        XCTAssertEqual(ZallaThemeID.ocean.suggestedAppIcon, .tinted)
+        XCTAssertEqual(ZallaThemeID.space.suggestedAppIcon, .space)
+        XCTAssertEqual(ZallaThemeID.ocean.suggestedAppIcon, .ocean)
+        XCTAssertEqual(ZallaThemeID.yellow.suggestedAppIcon, .yellow)
     }
 
     func testCustomHexNormalization() {
@@ -40,10 +50,13 @@ final class ThemeTests: XCTestCase {
     func testClosestAppIconForCustomHex() {
         XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "E33B4F"), .default)
         XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "1A1A2E"), .dark)
-        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "1F8A9E"), .tinted)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "1F8A9E"), .ocean)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "FF7A30"), .orange)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "3070F0"), .blue)
+        XCTAssertEqual(ZallaTheme.closestAppIcon(forCustomHex: "8C8C8C"), .tinted)
         XCTAssertEqual(
             ZallaTheme.recommendedAppIcon(themeID: ZallaThemeID.space.rawValue, useCustom: false, customHex: "E33B4F"),
-            .dark
+            .space
         )
         XCTAssertEqual(
             ZallaTheme.recommendedAppIcon(themeID: ZallaThemeID.zallaRed.rawValue, useCustom: true, customHex: "1A1A2E"),

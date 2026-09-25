@@ -38,37 +38,70 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         [.orange, .yellow, .green, .blue, .indigo, .violet]
     }
 
-    /// Best-fit alternate icon among shipped assets (Default / Dark / Tinted only).
+    /// The shipped app icon drawn in this accent. Zalla Red is the primary icon.
     var suggestedAppIcon: AppIconPreference {
         switch self {
-        case .zallaRed, .orange, .yellow:
-            return .default
-        case .space, .indigo, .violet, .blue:
-            return .dark
-        case .ocean, .forest, .green:
-            return .tinted
+        case .zallaRed: return .default
+        case .orange: return .orange
+        case .yellow: return .yellow
+        case .green: return .green
+        case .blue: return .blue
+        case .indigo: return .indigo
+        case .violet: return .violet
+        case .ocean: return .ocean
+        case .forest: return .forest
+        case .space: return .space
+        }
+    }
+
+    /// Main accent color as hex, used to match custom colors to the nearest shipped icon.
+    var primaryHex: String {
+        switch self {
+        case .zallaRed: return "E33B4F"
+        case .orange: return "F06A2F"
+        case .yellow: return "E0A21A"
+        case .green: return "2FA866"
+        case .blue: return "2F6FED"
+        case .indigo: return "4F5BD5"
+        case .violet: return "8B3DDB"
+        case .ocean: return "1F8A9E"
+        case .forest: return "2F7A4A"
+        case .space: return "6B7CFF"
         }
     }
 }
 
 extension ZallaTheme {
-    /// Maps a custom accent hex to the closest shipped alternate icon.
-    /// True per-accent PNG icons are not bundled; this keeps runtime selection consistent.
+    /// Maps a custom accent hex to the closest shipped icon: the nearest accent icon by color,
+    /// Dark for very dark colors, and Tinted for grays.
     static func closestAppIcon(forCustomHex hex: String) -> AppIconPreference {
         let (r, g, b) = rgbComponents(from: hex)
         let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        if luminance < 0.28 {
+        if luminance < 0.12 {
             return .dark
         }
-        // Cool / teal / green accents pair with the tinted mark.
-        if g >= r && (g + b) > (r * 1.55) {
+        if max(r, g, b) - min(r, g, b) < 0.12 {
             return .tinted
         }
-        // Blue / indigo / violet leaning accents pair with Dark.
-        if b > r && b >= g {
-            return .dark
+        var best = ZallaThemeID.zallaRed
+        var bestDistance = Double.greatestFiniteMagnitude
+        for id in ZallaThemeID.allCases {
+            let distance = colorDistance((r, g, b), rgbComponents(from: id.primaryHex))
+            if distance < bestDistance {
+                bestDistance = distance
+                best = id
+            }
         }
-        return .default
+        return best.suggestedAppIcon
+    }
+
+    /// Weighted RGB distance ("redmean"), closer to perceived difference than plain RGB.
+    static func colorDistance(_ a: (Double, Double, Double), _ b: (Double, Double, Double)) -> Double {
+        let meanRed = (a.0 + b.0) / 2
+        let dr = a.0 - b.0
+        let dg = a.1 - b.1
+        let db = a.2 - b.2
+        return (2 + meanRed) * dr * dr + 4 * dg * dg + (3 - meanRed) * db * db
     }
 
     /// Resolves the recommended icon for the current accent settings.
@@ -210,16 +243,30 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
     case `default` = "Default"
     case dark = "Dark"
     case tinted = "Tinted"
+    case orange = "Orange"
+    case yellow = "Yellow"
+    case green = "Green"
+    case blue = "Blue"
+    case indigo = "Indigo"
+    case violet = "Violet"
+    case ocean = "Ocean"
+    case forest = "Forest"
+    case space = "Space"
 
     var id: String { rawValue }
 
     /// Alternate icon name passed to UIApplication.setAlternateIconName. nil restores primary.
+    /// Each name matches an .appiconset in Assets.xcassets and an entry in project.yml.
     var alternateIconName: String? {
         switch self {
         case .default: return nil
-        case .dark: return "AppIconDark"
-        case .tinted: return "AppIconTinted"
+        default: return "AppIcon\(rawValue)"
         }
+    }
+
+    /// Small copy of the icon for Settings. App icon sets cannot be loaded with UIImage(named:).
+    var previewImageName: String {
+        "IconPreview\(rawValue)"
     }
 
     static func apply(_ preference: AppIconPreference, completion: ((String?) -> Void)? = nil) {

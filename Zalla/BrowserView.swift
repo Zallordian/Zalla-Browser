@@ -1901,7 +1901,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Accent")
             } footer: {
-                Text("Accents are optional. Zalla Red remains the default. Custom colors map to the closest Default, Dark, or Tinted icon.")
+                Text("Accents are optional. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
             }
 
             Section {
@@ -1919,7 +1919,7 @@ private struct SettingsView: View {
             } header: {
                 Text("App icon")
             } footer: {
-                Text("Shipped alternate icons are Default, Dark, and Tinted. Per-accent PNG icons are not included in this build.")
+                Text("Every accent has a matching icon, plus Dark and Tinted.")
             }
 
             Section {
