@@ -498,6 +498,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var prefersDesktopSite = false
     /// Current page zoom for this tab. Normal tabs remember it per site; private tabs only for this tab.
     @Published private(set) var pageZoom = PageZoom.defaultLevel
+    /// True while Hide Element waits for a tap on the page.
+    @Published var isPickingElement = false
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?

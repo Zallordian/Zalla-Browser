@@ -163,6 +163,14 @@ private struct TabContent: View {
                 }
             }
 
+            if tab.isPickingElement {
+                ElementPickerBanner(onCancel: { tab.cancelElementPicker() })
+                    .padding(.top, topChromeHeight + 8)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+                    .zIndex(5)
+            }
+
             chromeLayer
 
             if holdKind != nil, !holdItems.isEmpty {
@@ -1457,6 +1465,7 @@ private struct BrowserMenuSheet: View {
                 .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
                 if let tab = browser.selected, tab.hasPage {
                     PageZoomControl(tab: tab)
+                    SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
                 }
                 Button {
                     if let tab = browser.selected {
@@ -2241,13 +2250,16 @@ private struct SettingsView: View {
             }
 
             Section {
+                NavigationLink("Content Blocking") {
+                    ContentBlockingView()
+                }
                 Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("Content Blocking stops trackers and common ads on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {
@@ -2275,15 +2287,20 @@ private struct SettingsView: View {
                 Link(destination: URL(string: "https://zalla.gg/support/")!) {
                     Label("Support", systemImage: "questionmark.circle")
                 }
+                NavigationLink {
+                    AcknowledgementsView()
+                } label: {
+                    Label("Acknowledgements", systemImage: "text.book.closed")
+                }
             } header: {
                 Text("Privacy and support")
             } footer: {
-                Text("Opens zalla.gg in Safari.")
+                Text("Privacy Policy and Support open zalla.gg in Safari.")
             }
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing remains free. Optional creative tools are planned as a single lifetime purchase around $1. Image export is free in this build.")
+                Text("Core browsing and blocking of trackers and common ads are free. Zalla Unlock is an optional one time purchase for extra blocking tools. Image export is free.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
