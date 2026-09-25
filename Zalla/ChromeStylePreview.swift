@@ -191,13 +191,23 @@ struct ChromeStylePreview: View {
 
     private var quickActionRow: some View {
         HStack(spacing: 10) {
-            HStack {
-                miniSquare {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 8, weight: .bold))
-                }
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(theme.primary)
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 7))
+                    .foregroundStyle(muted)
+                Text("zalla.gg")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(strong)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
             }
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(theme.primary.opacity(0.08), in: Capsule())
+            .overlay(Capsule().stroke(theme.primary, lineWidth: 1.2))
             .frame(maxWidth: .infinity)
 
             ZStack {
@@ -221,7 +231,7 @@ struct ChromeStylePreview: View {
         }
     }
 
-    /// Matching accent-outlined squares for the Quick Action search and tabs buttons.
+    /// Accent-outlined square for the Quick Action tabs button (stroke matches the search pill).
     private func miniSquare<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
             .foregroundStyle(theme.primary)

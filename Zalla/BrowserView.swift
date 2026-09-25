@@ -622,10 +622,10 @@ private struct TabContent: View {
 
     // MARK: - Quick Action chrome
 
-    /// Quick Action: search button on the left, crimson center control, tabs button on the right.
-    /// The two side buttons share one outlined-square style so the center control stays centered.
+    /// Quick Action: outlined search pill on the left, crimson center control, tabs button on the right.
+    /// Both sides are equal-width containers so the center control stays centered.
     /// Tapping the center control fans out Back, Forward, Reload, Tabs, New Tab, Share, and Menu.
-    /// Tapping the search button, or pressing and holding the center control, opens address editing.
+    /// Tapping the search pill, or pressing and holding the center control, opens address editing.
     private var quickActionToolbar: some View {
         VStack(spacing: 8) {
             if tab.isLoading {
@@ -637,11 +637,8 @@ private struct TabContent: View {
                     .padding(.horizontal, 16)
             } else {
                 HStack(spacing: 12) {
-                    HStack(spacing: 0) {
-                        quickActionSearchButton
-                        Spacer(minLength: 0)
-                    }
-                    .frame(maxWidth: .infinity)
+                    quickActionSearchPill
+                        .frame(maxWidth: .infinity)
                     quickActionButton
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
@@ -656,9 +653,10 @@ private struct TabContent: View {
         .padding(.bottom, 8)
     }
 
-    /// Compact search button. Same outlined square, size, and 44pt target as the tabs button.
-    /// Press and hold to peek the current page title and host without opening the editor.
-    private var quickActionSearchButton: some View {
+    /// Outlined search pill: clear fill with a faint accent tint, accent capsule stroke matching the
+    /// tabs button, accent magnifier, and the host (with the lock or Not Secure indicator) or Search.
+    /// Press and hold to peek the full page title and host without opening the editor.
+    private var quickActionSearchPill: some View {
         Button {
             if suppressSearchTap {
                 suppressSearchTap = false
@@ -666,11 +664,27 @@ private struct TabContent: View {
             }
             beginQuickActionAddressEditing()
         } label: {
-            quickActionSideLabel {
+            HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.footnote.weight(.bold))
+                    .foregroundStyle(theme.primary)
+                if tab.hasPage {
+                    connectionSecurityAffordance(font: .caption2, textFont: .caption2.weight(.semibold))
+                }
+                Text(AddressDisplay.quickActionPillLabel(title: compactTitle, url: tab.url, hasPage: tab.hasPage))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12)
+            .frame(height: 36)
+            .background(theme.primary.opacity(0.08), in: Capsule(style: .continuous))
+            .overlay(Capsule(style: .continuous).stroke(theme.primary, lineWidth: 1.7))
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.4).onEnded { _ in showQuickActionPageInfo() }
         )

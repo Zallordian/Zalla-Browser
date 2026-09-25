@@ -54,7 +54,7 @@ enum ChromeModeTips {
         "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
 
     static let quickActionMessage =
-        "Quick Action keeps one crimson button at the center of a see-through toolbar. Tap it to reveal Back, Forward, Reload, Tabs, New Tab, Share, and Menu. Tap the search icon on the left, or press and hold the button, to search or enter an address."
+        "Quick Action keeps one crimson button at the center of a see-through toolbar. Tap it to reveal Back, Forward, Reload, Tabs, New Tab, Share, and Menu. Tap the search bar on the left, or press and hold the button, to search or enter an address."
 
     static let holdRevealMessage =
         "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
@@ -209,7 +209,15 @@ enum AddressDisplay {
         url?.absoluteString ?? ""
     }
 
-    /// Page title then host, for the Quick Action search button's VoiceOver value. Empty on a new tab.
+    /// Idle text in the Quick Action search pill: friendly host, else page title, else Search.
+    static func quickActionPillLabel(title: String, url: URL?, hasPage: Bool) -> String {
+        guard hasPage else { return "Search" }
+        if let host = friendlyHost(from: url) { return host }
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleanTitle.isEmpty ? "Search" : cleanTitle
+    }
+
+    /// Page title then host, for the Quick Action search pill's VoiceOver value. Empty on a new tab.
     static func pageSummary(title: String, url: URL?, hasPage: Bool) -> String {
         guard hasPage else { return "" }
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)

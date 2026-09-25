@@ -133,6 +133,14 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(AddressDisplay.collapsedLabel(url: nil, hasPage: false), "Search or enter a website")
     }
 
+    func testQuickActionPillLabel() {
+        let url = URL(string: "https://www.example.com/story")
+        XCTAssertEqual(AddressDisplay.quickActionPillLabel(title: "Big News", url: url, hasPage: true), "example.com")
+        XCTAssertEqual(AddressDisplay.quickActionPillLabel(title: "Reader", url: nil, hasPage: true), "Reader")
+        XCTAssertEqual(AddressDisplay.quickActionPillLabel(title: " ", url: nil, hasPage: true), "Search")
+        XCTAssertEqual(AddressDisplay.quickActionPillLabel(title: "Big News", url: url, hasPage: false), "Search")
+    }
+
     func testAddressDisplayPageSummary() {
         let url = URL(string: "https://www.example.com/story")
         XCTAssertEqual(AddressDisplay.pageSummary(title: "Big News", url: url, hasPage: true), "Big News, example.com")
@@ -149,7 +157,7 @@ final class ToolbarStyleTests: XCTestCase {
         XCTAssertEqual(ChromeModeTips.quickActionSeenKey, "hasSeenQuickActionTip")
         XCTAssertFalse(ChromeModeTips.quickActionMessage.contains(String(UnicodeScalar(0x2014)!)))
         XCTAssertFalse(ChromeModeTips.compactMessage.contains(String(UnicodeScalar(0x2014)!)))
-        XCTAssertTrue(ChromeModeTips.quickActionMessage.contains("search icon"))
+        XCTAssertTrue(ChromeModeTips.quickActionMessage.contains("search bar"))
         XCTAssertFalse(ChromeModeTips.quickActionMessage.contains("Tap the address"))
         XCTAssertFalse(ChromeModeTips.topBarMessage.isEmpty)
         XCTAssertFalse(ChromeModeTips.holdRevealMessage.isEmpty)
