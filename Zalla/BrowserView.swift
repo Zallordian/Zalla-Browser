@@ -127,6 +127,21 @@ private struct TabContent: View {
                 .safeAreaPadding(.bottom, bottomChromeHeight)
             }
 
+            if let fallback = tab.httpsFallback {
+                ZStack {
+                    Color(uiColor: .systemBackground)
+                        .ignoresSafeArea()
+                    HTTPSFallbackView(
+                        host: fallback.host,
+                        theme: theme,
+                        onGoBack: { tab.leaveHTTPSFallback() },
+                        onContinue: { tab.continueOverHTTP() }
+                    )
+                    .safeAreaPadding(.top, topChromeHeight)
+                    .safeAreaPadding(.bottom, bottomChromeHeight)
+                }
+            }
+
             chromeLayer
 
             if holdKind != nil, !holdItems.isEmpty {
@@ -1795,6 +1810,7 @@ private struct SettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
+    @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = false
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -1935,12 +1951,13 @@ private struct SettingsView: View {
             }
 
             Section {
+                Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("Clear browsing data closes all tabs and removes history, cookies, and website caches. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, and website caches. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style, address bar placement, HTTPS-Only Mode, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {

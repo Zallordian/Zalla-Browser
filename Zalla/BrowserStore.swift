@@ -251,6 +251,7 @@ final class BrowserStore: ObservableObject {
         sessionSavingEnabled = false
         clearSavedSession()
         MediaPermissionSession.memory.removeAll()
+        HTTPSOnlySession.exceptions.removeAll()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -269,6 +270,7 @@ final class BrowserStore: ObservableObject {
         sessionSavingEnabled = false
         clearSavedSession()
         MediaPermissionSession.memory.removeAll()
+        HTTPSOnlySession.exceptions.removeAll()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -288,6 +290,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: "appIconPreference")
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.removeObject(forKey: AddressBarPlacement.storageKey)
+        defaults.removeObject(forKey: HTTPSOnly.storageKey)
         defaults.removeObject(forKey: "useCustomAccent")
         defaults.removeObject(forKey: "customAccentHex")
         defaults.removeObject(forKey: "customAccentGradient")
@@ -475,6 +478,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var isReaderActive = false
     @Published var readerAvailable = false
     @Published var hasOnlySecureContent = true
+    /// Set when HTTPS-Only Mode could not open a site securely; shows the in-app notice.
+    @Published var httpsFallback: HTTPSFallback?
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
@@ -494,6 +499,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var pendingDownloadURL: URL?
     private var readerOriginalURL: URL?
     private var lastSnapshotAt: Date?
+    /// The http address HTTPS-Only Mode upgraded, until the https load commits or fails.
+    private var pendingHTTPSUpgrade: URL?
 
     /// Pass `configuration` only for popups: WebKit requires the child web view to use the exact
     /// configuration it provides. That copy already shares the opener's data store, user script,
@@ -569,7 +576,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     """
 
     private func refresh() {
-        if !isReaderActive {
+        if !isReaderActive, httpsFallback == nil {
             title = webView.title ?? webView.url?.host ?? "New tab"
             url = webView.url
         }
@@ -583,10 +590,48 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func load(_ url: URL) {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         errorMessage = nil
+        httpsFallback = nil
+        pendingHTTPSUpgrade = nil
         isReaderActive = false
         readerOriginalURL = nil
         hasPage = true
         webView.load(URLRequest(url: url))
+    }
+
+    /// Go Back on the HTTPS-Only notice: stay on the page that was showing, or the new tab page.
+    func leaveHTTPSFallback() {
+        httpsFallback = nil
+        if webView.backForwardList.currentItem == nil {
+            hasPage = false
+            title = "New tab"
+            url = nil
+        } else {
+            refresh()
+        }
+    }
+
+    /// Continue to Site on the HTTPS-Only notice: allow http for this host until the app closes.
+    func continueOverHTTP() {
+        guard let fallback = httpsFallback else { return }
+        HTTPSOnlySession.exceptions.allow(fallback.host)
+        load(fallback.url)
+    }
+
+    private func showHTTPSFallback(for httpURL: URL) {
+        pendingHTTPSUpgrade = nil
+        errorMessage = nil
+        httpsFallback = HTTPSFallback(url: httpURL)
+        url = httpURL
+        title = httpURL.host ?? title
+        hasPage = true
+    }
+
+    /// Main-frame GET loads that HTTPS-Only Mode may upgrade. Back and forward keep their history entry.
+    private func isHTTPSOnlyCandidate(_ navigationAction: WKNavigationAction) -> Bool {
+        guard HTTPSOnly.isEnabled, !isReaderActive,
+              navigationAction.targetFrame?.isMainFrame == true,
+              navigationAction.navigationType != .backForward else { return false }
+        return (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET"
     }
 
     /// Shows a restored tab's title and URL without loading it yet.
@@ -750,9 +795,14 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         errorMessage = nil
+        httpsFallback = nil
         if !isReaderActive {
             readerAvailable = false
         }
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        pendingHTTPSUpgrade = nil
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -767,6 +817,16 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if let original = pendingHTTPSUpgrade {
+            if HTTPSOnly.isUpgradeFailure(error) {
+                showHTTPSFallback(for: original)
+                return
+            }
+            // A cancelled or replaced load keeps the pending upgrade; any other failure ends it.
+            if HTTPSOnly.isInterruption(error) { return }
+            pendingHTTPSUpgrade = nil
+        }
+        if httpsFallback != nil { return }
         show(error)
     }
 
@@ -804,6 +864,22 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             return
         }
         if ["http", "https", "about"].contains(scheme) {
+            if scheme == "http", let original = pendingHTTPSUpgrade,
+               navigationAction.navigationType == .other,
+               isHTTPSOnlyCandidate(navigationAction),
+               original.host?.lowercased() == url.host?.lowercased() {
+                // The https page sent us back to http for the same site, so it has no working secure version.
+                decisionHandler(.cancel)
+                showHTTPSFallback(for: original)
+                return
+            }
+            if scheme == "http", isHTTPSOnlyCandidate(navigationAction),
+               let secureURL = HTTPSOnly.upgradedURL(for: url, exceptions: HTTPSOnlySession.exceptions) {
+                decisionHandler(.cancel)
+                pendingHTTPSUpgrade = url
+                webView.load(URLRequest(url: secureURL))
+                return
+            }
             if navigationAction.targetFrame == nil, onOpenWindow == nil {
                 decisionHandler(.cancel)
                 webView.load(navigationAction.request)
