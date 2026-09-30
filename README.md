@@ -15,6 +15,21 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 14
+
+- The Flame (free): confirm, then erase tabs, history, cookies, and site data, and close the app.
+- HTTPS-Only Mode is on by default, with a warning page and a per-site Continue anyway. Local and private network addresses are exempt.
+- New tab page: no preloaded shortcuts, a plus tile, an edit menu, and an Add Shortcut sheet (bundled popular sites, bookmarks, or a typed address). Press and hold a link on a page to Add to Dashboard.
+- Theme packs in Zalla Unlock: Space and Jungle, each with an accent, an app icon, new tab backgrounds, and an optional refresh animation that respects Reduce Motion.
+- Swipe from the screen edge to go back and forward (Settings toggle, on by default). Swipe down on a page or in any list to put the keyboard away.
+- The translucent toolbar material is now a plain live blur, and the web view is see-through, so pages scroll visibly beneath the bars.
+- Privacy report (free): per site and overall counts of things Zalla did itself (links cleaned, HTTPS upgrades, cookie banners closed) plus third-party sites the page contacted. There is deliberately no "trackers blocked" total, because WebKit content rules do not report one.
+- Cookie banner closing: presses reject or necessary only on known banners, never accept. Off in private tabs. Settings toggle in Privacy.
+- Per-site Request Desktop Site, kept per host. Downloads open in Quick Look. Bookmark import reads more Safari, Chrome, and Firefox HTML exports.
+- Friendly pages for no internet, timeouts, unreachable sites, and bad certificates. A How to section in Settings.
+- Links from other apps: `zalla://open?url=<address>` opens in Zalla. Becoming the system default browser needs Apple's browser entitlement, which is not requested yet, so http and https links from other apps are not routed to Zalla.
+- Passwords: Zalla has no vault. Sign-in uses Apple AutoFill and passkeys through WebKit and the system.
+
 No external SDKs, analytics, account service, or Zalla backend. Optional tips and Zalla Unlock use StoreKit in-app purchases. Content blocking uses bundled rule lists converted from EasyList, EasyPrivacy, and Fanboy lists (see [tools/blocklists](tools/blocklists/README.md)). Open normal tabs are restored after termination. Each private tab is isolated, so logins are not shared across private tabs. Explicitly bookmarking or sharing a private page is a user-directed export.
 
 ## Build on a Mac

@@ -2552,7 +2552,7 @@ private struct SettingsView: View {
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, and background packs.")
+                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, the Flame, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space and Jungle theme packs.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

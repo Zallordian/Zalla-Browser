@@ -14,6 +14,22 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 14",
+            name: "Built Around You",
+            highlights: [
+                "The Flame: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
+                "HTTPS-Only Mode is now on by default, with a clear warning page and a per-site Continue anyway",
+                "A tidier new tab page: no preloaded shortcuts, a plus tile, and an Add Shortcut list of popular sites, your bookmarks, or any address. Press and hold a link on any page to add it",
+                "Space and Jungle theme packs in Zalla Unlock: accents, icons, backgrounds, and an optional refresh animation that respects Reduce Motion",
+                "Swipe in from the screen edge to go back and forward, with a switch in Settings",
+                "Privacy report for the page you are on and for everything Zalla has done for you, plus optional cookie banner closing that never presses accept",
+                "Friendly pages for no internet, slow sites, and bad certificates",
+                "A How to section in Settings for Quick Action and the other gestures"
+            ],
+            improvements: "The toolbar blur now stays live over scrolling pages. Swipe down on a page to put the keyboard away, everywhere. Request Desktop Site is remembered per site. Downloads open in a proper preview. Bookmark import understands more Safari and Chrome exports. Zalla can open links from other apps.",
+            fixes: "Fixed the toolbar background looking frozen instead of translucent."
+        ),
+        ChangelogEntry(
             version: "1.0",
             name: "Private by Default",
             highlights: [
@@ -113,6 +129,16 @@ enum SafetyOverview {
                 title: "HTTPS-Only Mode",
                 detail: "Opens sites over secure connections and asks before loading one that does not support them.",
                 status: httpsOnly ? "On" : "Off", isOn: httpsOnly
+            ),
+            SafetyItem(
+                title: "The Flame",
+                detail: "Erases tabs, history, cookies, and site data in one confirmed tap, then closes Zalla. Free.",
+                status: "Ready", isOn: true
+            ),
+            SafetyItem(
+                title: "Cookie banners",
+                detail: "Picks reject or necessary only on consent banners it recognizes. It never presses accept.",
+                status: CookieBannerDismiss.enabled(in: defaults) ? "On" : "Off", isOn: CookieBannerDismiss.enabled(in: defaults)
             ),
             SafetyItem(
                 title: "Clean tracking from links",
