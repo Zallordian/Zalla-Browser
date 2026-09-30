@@ -44,6 +44,8 @@ final class BrowserStore: ObservableObject {
     @Published private(set) var downloads: [DownloadRecord] = []
     @Published var storageError: String?
     @Published var clearingData = false
+    /// True from the moment the Flame is confirmed until the app closes.
+    @Published private(set) var isBurning = false
     @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
     private var activeDownloadDelegates: [UUID: TabDownloadSession] = [:]
@@ -419,6 +421,35 @@ final class BrowserStore: ObservableObject {
         save()
     }
 
+    /// The Flame: close every tab, erase history, cookies, and site data (private tabs included),
+    /// then close the app. Bookmarks and downloads are kept.
+    func burnEverythingAndClose() async {
+        guard !isBurning else { return }
+        isBurning = true
+        clearingData = true
+        sessionSavingEnabled = false
+        clearSavedSession()
+        let privateStores = tabs.filter(\.isPrivate).map { $0.webView.configuration.websiteDataStore }
+        MediaPermissionSession.memory.removeAll()
+        HTTPSOnlySession.exceptions.removeAll()
+        PageZoom.save([:])
+        speaker.stop()
+        tabs.forEach { $0.webView.stopLoading() }
+        tabs.removeAll()
+        selectedID = nil
+        clearHistory()
+        let types = WKWebsiteDataStore.allWebsiteDataTypes()
+        for store in privateStores {
+            await store.removeData(ofTypes: types, modifiedSince: .distantPast)
+        }
+        await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: .distantPast)
+        URLCache.shared.removeAllCachedResponses()
+        HTTPCookieStorage.shared.removeCookies(since: .distantPast)
+        // Leave the confirmation on screen for a beat, then close. Nothing is restored on the next launch.
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        exit(0)
+    }
+
     func clearBrowsingData() async {
         clearingData = true
         sessionSavingEnabled = false
@@ -681,6 +712,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var httpsFallback: HTTPSFallback?
     /// Request Desktop Site for this tab. Applied to every navigation through WKWebpagePreferences.
     @Published private(set) var prefersDesktopSite = false
+    private var privateDesktopHosts: Set<String> = []
     /// Current page zoom for this tab. Normal tabs remember it per site; private tabs only for this tab.
     @Published private(set) var pageZoom = PageZoom.defaultLevel
     /// True while Hide Element waits for a tap on the page.
@@ -746,10 +778,15 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
-        webView.allowsBackForwardNavigationGestures = true
-        // Avoid black flash behind page chrome and during empty/transient loads.
-        webView.backgroundColor = .systemBackground
-        webView.isOpaque = true
+        webView.allowsBackForwardNavigationGestures = SwipeNavigation.isEnabled
+        // Swiping down on the page drags the keyboard away, like Safari.
+        webView.scrollView.keyboardDismissMode = .interactive
+        // The web view stays see-through so the chrome material above it has live page pixels to blur.
+        // An opaque background here made the bars look like a frozen picture. The color under the page
+        // (overscroll and load gaps) is still solid, so there is no black flash.
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        webView.isOpaque = false
         webView.underPageBackgroundColor = .systemBackground
         observations = [
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, _ in self?.refresh() },
@@ -831,12 +868,30 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.load(URLRequest(url: url))
     }
 
-    /// Switches between the desktop and mobile version of sites in this tab, then reloads.
+    /// Switches between the desktop and mobile version of this site, then reloads. The choice is remembered
+    /// for the site, so it is still there next visit. Private tabs remember it only until they close.
     func toggleDesktopSite() {
         prefersDesktopSite.toggle()
+        let current = webView.url ?? url
+        if isPrivate {
+            if let key = DesktopSitePreference.key(for: current) {
+                if prefersDesktopSite { privateDesktopHosts.insert(key) } else { privateDesktopHosts.remove(key) }
+            }
+        } else {
+            DesktopSitePreference.set(prefersDesktopSite, for: current)
+        }
         if hasPage, webView.url != nil {
             webView.reload()
         }
+    }
+
+    /// True when this site was switched to its desktop version earlier.
+    private func remembersDesktop(for url: URL?) -> Bool {
+        if isPrivate {
+            guard let key = DesktopSitePreference.key(for: url) else { return false }
+            return privateDesktopHosts.contains(key)
+        }
+        return DesktopSitePreference.isDesktop(url)
     }
 
     /// Sets the zoom for the current page and remembers it for the site.
@@ -1210,6 +1265,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  preferences: WKWebpagePreferences,
                  decisionHandler: @escaping (WKNavigationActionPolicy, WKWebpagePreferences) -> Void) {
+        if navigationAction.targetFrame?.isMainFrame ?? true, let target = navigationAction.request.url,
+           ["http", "https"].contains(target.scheme?.lowercased() ?? "") {
+            let remembered = remembersDesktop(for: target)
+            if remembered != prefersDesktopSite { prefersDesktopSite = remembered }
+        }
         preferences.preferredContentMode = prefersDesktopSite ? .desktop : .recommended
         decidePolicy(for: navigationAction, webView: webView) { policy in
             decisionHandler(policy, preferences)
@@ -1443,6 +1503,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         let shortcut = HomeShortcut(title: title, urlString: normalized, symbolName: known?.symbolName ?? "globe")
         let added = HomeShortcuts.add(shortcut)
         showToast(added ? "Added to your dashboard." : "Already on your dashboard, or it is full.")
+    }
+
+    /// Applies the Settings toggle for edge swipes to this tab.
+    func setSwipeNavigation(_ enabled: Bool) {
+        webView.allowsBackForwardNavigationGestures = enabled
     }
 
     func showToast(_ message: String) {

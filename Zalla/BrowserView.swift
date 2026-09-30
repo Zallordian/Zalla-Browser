@@ -49,6 +49,9 @@ struct BrowserView: View {
                 PrivateLockView(browser: browser)
             }
         }
+        .overlay {
+            if browser.isBurning { FlameProgressOverlay() }
+        }
         .sheet(item: $browser.imageExport) { request in
             ImageExportSheet(request: request)
                 .presentationDetents([.medium, .large])
@@ -1448,6 +1451,7 @@ private struct BrowserMenuSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @State private var showShare = false
+    @State private var confirmFlame = false
 
     var body: some View {
         List {
@@ -1527,7 +1531,17 @@ private struct BrowserMenuSheet: View {
                     sheet = .settings
                 } label: { Label("Settings", systemImage: "gearshape") }
             }
+            Section {
+                Button(role: .destructive) {
+                    confirmFlame = true
+                } label: {
+                    Label { Text("Flame") } icon: { FlameMark(size: 22) }
+                }
+            } footer: {
+                Text("Closes every tab, erases history, cookies, and site data, then closes Zalla.")
+            }
         }
+        .flameConfirmation(isPresented: $confirmFlame, browser: browser, onBurn: { dismiss() })
         .navigationTitle("Menu")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -1660,6 +1674,7 @@ private struct TabsView: View {
     /// Tab waiting to join a group that is being created from its menu.
     @State private var tabForNewGroup: BrowserTab?
     @State private var showUpsell = false
+    @State private var confirmFlame = false
 
     private let columns = [GridItem(.adaptive(minimum: 156), spacing: 16)]
 
@@ -1762,8 +1777,17 @@ private struct TabsView: View {
                     Button("Close All", role: .destructive) { confirmCloseAll = true }
                 }
             }
+            ToolbarItem(placement: .bottomBar) {
+                Button {
+                    confirmFlame = true
+                } label: {
+                    Label { Text("Flame") } icon: { FlameMark(size: 22) }
+                }
+                .accessibilityHint("Erases tabs, history, cookies, and site data, then closes Zalla")
+            }
             ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         }
+        .flameConfirmation(isPresented: $confirmFlame, browser: browser, onBurn: { dismiss() })
         .confirmationDialog("Close all tabs?", isPresented: $confirmCloseAll, titleVisibility: .visible) {
             Button("Close All", role: .destructive) {
                 showUndoClose = false
@@ -2229,6 +2253,7 @@ private struct SettingsView: View {
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
+    @AppStorage(SwipeNavigation.storageKey) private var swipeNavigation = true
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -2353,6 +2378,10 @@ private struct SettingsView: View {
                     showImporter = true
                 } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
                 Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
+                Toggle("Swipe from edges to go back", isOn: $swipeNavigation)
+                    .onChange(of: swipeNavigation) { _, newValue in
+                        browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
+                    }
                 Button {
                     exportBookmarks()
                 } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
@@ -2360,10 +2389,15 @@ private struct SettingsView: View {
             } header: {
                 Text("Browsing")
             } footer: {
-                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them.")
+                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari.")
             }
 
             Section("Tools") {
+                NavigationLink {
+                    HowToListView()
+                } label: {
+                    Label("How to", systemImage: "questionmark.bubble")
+                }
                 NavigationLink {
                     NetworkSpeedView()
                 } label: {

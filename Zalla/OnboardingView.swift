@@ -499,7 +499,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
                 if (ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic) == .quickAction {
-                    Text("Tip: tap the center button for your controls, or the search bar to search.")
+                    Text("Tip: tap the center button for your controls, or the search bar to search. Settings has a How to section for the rest.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

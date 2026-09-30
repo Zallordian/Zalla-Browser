@@ -30,6 +30,7 @@ struct NewTabView: View {
     @State private var isEditing = false
     @State private var editingShortcut: HomeShortcut?
     @State private var showAddShortcut = false
+    @State private var confirmFlame = false
     @FocusState private var searchFocused: Bool
 
     private var theme: ZallaTheme {
@@ -76,6 +77,7 @@ struct NewTabView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .flameConfirmation(isPresented: $confirmFlame, browser: browser)
         .sheet(isPresented: $showAddShortcut) {
             AddShortcutSheet(browser: browser, shortcuts: $shortcuts)
                 .presentationDetents([.large])
@@ -399,6 +401,11 @@ struct NewTabView: View {
                 withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
             } label: {
                 Label("Shortcuts", systemImage: "square.grid.2x2")
+            }
+            Button(role: .destructive) {
+                confirmFlame = true
+            } label: {
+                Label("Flame", systemImage: "flame")
             }
         } label: {
             Image(systemName: "pencil")
