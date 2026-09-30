@@ -97,6 +97,8 @@ enum AboutLinks {
     static let support = URL(string: "https://zalla.gg/support")!
     static let feedbackEmail = "ZallaBrowser@pm.me"
     static var feedbackURL: URL { URL(string: "mailto:\(feedbackEmail)?subject=Zalla%20feedback")! }
+    /// Flip to true once the real story copy replaces the placeholder below.
+    static let showsStory = false
     static let storyPlaceholder = "The story behind Zalla is coming soon."
 }
 

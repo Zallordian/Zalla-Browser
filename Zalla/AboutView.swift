@@ -50,9 +50,11 @@ struct AboutView: View {
                 }
             }
 
-            Section("Our story") {
-                Text(AboutLinks.storyPlaceholder)
-                    .foregroundStyle(.secondary)
+            if AboutLinks.showsStory {
+                Section("Our story") {
+                    Text(AboutLinks.storyPlaceholder)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Version and contact") {

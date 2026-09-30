@@ -29,6 +29,7 @@ final class AboutTests: XCTestCase {
         XCTAssertEqual(AboutLinks.feedbackEmail, "ZallaBrowser@pm.me")
         XCTAssertEqual(AboutLinks.feedbackURL.scheme, "mailto")
         XCTAssertEqual(AboutLinks.storyPlaceholder, "The story behind Zalla is coming soon.")
+        XCTAssertFalse(AboutLinks.showsStory, "The story section stays hidden until real copy exists")
     }
 
     func testSafetyOverviewReflectsSettings() {
