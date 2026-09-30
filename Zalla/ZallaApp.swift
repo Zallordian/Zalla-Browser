@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct ZallaApp: App {
@@ -9,6 +10,9 @@ struct ZallaApp: App {
     @AppStorage("useCustomAccent") private var useCustomAccent = false
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage("customAccentGradient") private var customAccentGradient = true
+    @AppStorage("appIconPreference") private var appIconPreference = AppIconPreference.default.rawValue
+    /// Watched so a lapsed Unlock re-resolves the accent right away instead of at the next launch.
+    @StateObject private var unlock = ZallaUnlock.shared
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(
@@ -17,6 +21,18 @@ struct ZallaApp: App {
             customHex: customAccentHex,
             gradient: customAccentGradient
         )
+    }
+
+    /// Without Zalla Unlock, a locked app icon goes back to the primary icon. The accent already falls back on its own.
+    private func fallBackIfLocked() {
+        guard !unlock.isUnlocked else { return }
+        let storedIsLocked = AppIconPreference(rawValue: appIconPreference)?.requiresUnlock ?? false
+        let activeIsLocked = AppIconPreference.allCases.contains {
+            $0.requiresUnlock && $0.alternateIconName == UIApplication.shared.alternateIconName
+        }
+        guard storedIsLocked || activeIsLocked else { return }
+        appIconPreference = AppIconPreference.default.rawValue
+        AppIconPreference.apply(.default)
     }
 
     var body: some Scene {
@@ -49,7 +65,11 @@ struct ZallaApp: App {
                 TipTransactionObserver.start()
                 // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.
                 await ZallaUnlock.shared.refreshEntitlements()
+                fallBackIfLocked()
                 await browser.runAutoClearIfDue()
+            }
+            .onChange(of: unlock.isUnlocked) { _, _ in
+                fallBackIfLocked()
             }
             .onChange(of: scenePhase) { _, phase in
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
