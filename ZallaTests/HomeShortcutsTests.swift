@@ -114,7 +114,8 @@ final class HomeShortcutAddingTests: XCTestCase {
         XCTAssertNil(HomeShortcuts.normalizedURLString(""))
         XCTAssertNil(HomeShortcuts.normalizedURLString("two words"))
         XCTAssertNil(HomeShortcuts.normalizedURLString("javascript:alert(1)"))
-        XCTAssertNil(HomeShortcuts.normalizedURLString("nodots"))
+        XCTAssertNil(HomeShortcuts.normalizedURLString("ftp://example.com"))
+        XCTAssertEqual(HomeShortcuts.normalizedURLString("localhost:8080"), "https://localhost:8080")
     }
 
     func testDuplicatesIgnoreSchemeWwwCaseAndSlash() {
@@ -134,7 +135,7 @@ final class HomeShortcutAddingTests: XCTestCase {
 
     func testMakeShortcutNeedsTitleAndAddress() {
         XCTAssertNil(HomeShortcuts.makeShortcut(title: "", urlString: "example.com"))
-        XCTAssertNil(HomeShortcuts.makeShortcut(title: "X", urlString: "nope"))
+        XCTAssertNil(HomeShortcuts.makeShortcut(title: "X", urlString: "two words"))
         XCTAssertEqual(HomeShortcuts.makeShortcut(title: "X", urlString: "example.com")?.urlString, "https://example.com")
     }
 }
