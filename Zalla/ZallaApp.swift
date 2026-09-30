@@ -29,6 +29,8 @@ struct ZallaApp: App {
                 }
             }
             .tint(theme.primary)
+            // Swipe down on any scrolling screen to put the keyboard away.
+            .scrollDismissesKeyboard(.interactively)
             .onOpenURL { url in
                 browser.openIncoming(url)
             }

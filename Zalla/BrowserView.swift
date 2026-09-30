@@ -42,6 +42,7 @@ struct BrowserView: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .presentationDetents(detents(for: item))
             .presentationDragIndicator(.visible)
         }
