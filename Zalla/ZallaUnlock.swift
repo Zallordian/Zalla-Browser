@@ -11,6 +11,14 @@ enum ZallaUnlockProduct {
         productID == id && revocationDate == nil
     }
 
+    /// The entitlement to keep after reading StoreKit. A verified purchase wins. An unverified result
+    /// for the unlock proves nothing either way, so the cached answer stays. Verified absence turns it off.
+    static func resolvedEntitlement(verifiedOwned: Bool, sawUnverifiedUnlock: Bool, cached: Bool) -> Bool {
+        if verifiedOwned { return true }
+        if sawUnverifiedUnlock { return cached }
+        return false
+    }
+
     enum Copy {
         static let title = "Zalla Unlock"
         static let subtitle = "One time purchase"
@@ -130,13 +138,20 @@ final class ZallaUnlock: ObservableObject {
     /// Reads current entitlements from StoreKit and updates the cache.
     func refreshEntitlements() async {
         var owned = false
+        var sawUnverifiedUnlock = false
         for await result in Transaction.currentEntitlements {
-            if case .verified(let transaction) = result,
-               ZallaUnlockProduct.grants(productID: transaction.productID, revocationDate: transaction.revocationDate) {
-                owned = true
+            switch result {
+            case .verified(let transaction):
+                if ZallaUnlockProduct.grants(productID: transaction.productID, revocationDate: transaction.revocationDate) {
+                    owned = true
+                }
+            case .unverified(let transaction, _):
+                if transaction.productID == ZallaUnlockProduct.id { sawUnverifiedUnlock = true }
             }
         }
-        setUnlocked(owned)
+        setUnlocked(ZallaUnlockProduct.resolvedEntitlement(
+            verifiedOwned: owned, sawUnverifiedUnlock: sawUnverifiedUnlock, cached: ZallaUnlockCache.load()
+        ))
     }
 
     /// Transaction.updates for the unlock product: purchases approved later, refunds, and revocations.

@@ -13,6 +13,13 @@ final class ZallaUnlockTests: XCTestCase {
         XCTAssertFalse(ZallaUnlockProduct.grants(productID: TipJar.smallID, revocationDate: nil))
     }
 
+    func testUnverifiedResultNeverRevokesACachedPurchase() {
+        XCTAssertTrue(ZallaUnlockProduct.resolvedEntitlement(verifiedOwned: true, sawUnverifiedUnlock: false, cached: false))
+        XCTAssertTrue(ZallaUnlockProduct.resolvedEntitlement(verifiedOwned: false, sawUnverifiedUnlock: true, cached: true))
+        XCTAssertFalse(ZallaUnlockProduct.resolvedEntitlement(verifiedOwned: false, sawUnverifiedUnlock: true, cached: false))
+        XCTAssertFalse(ZallaUnlockProduct.resolvedEntitlement(verifiedOwned: false, sawUnverifiedUnlock: false, cached: true))
+    }
+
     func testCacheRoundTrip() {
         let defaults = UserDefaults(suiteName: "ZallaUnlockTests")!
         defaults.removePersistentDomain(forName: "ZallaUnlockTests")
