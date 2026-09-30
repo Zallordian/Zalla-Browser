@@ -64,6 +64,7 @@ struct NewTabBackgroundView: View {
             case .preset(let id):
                 if let preset = NewTabCatalog.preset(id: id) {
                     NewTabPresetFill(preset: preset)
+                        .overlay { NewTabDecorView(decor: preset.decor) }
                 } else {
                     standardBackground
                 }
@@ -293,5 +294,59 @@ struct NewTabBackgroundSheet: View {
         photoMessage = nil
         photoRevision += 1
         storedValue = NewTabBackground.photo.storageValue
+    }
+}
+
+/// Stars for the Space pack and leaves for the Jungle pack. Drawn once, never animated.
+struct NewTabDecorView: View {
+    let decor: NewTabPreset.Decor
+
+    var body: some View {
+        switch decor {
+        case .none:
+            EmptyView()
+        case .stars:
+            Canvas { context, size in
+                var seed: UInt64 = 0x9E3779B97F4A7C15
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                for _ in 0..<70 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let r = 0.6 + next() * 1.4
+                    let alpha = 0.25 + next() * 0.65
+                    let rect = CGRect(x: x, y: y, width: r * 2, height: r * 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(.white.opacity(alpha)))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .leaves:
+            GeometryReader { geo in
+                ZStack {
+                    leaf(size: 120, angle: -20, opacity: 0.16)
+                        .position(x: 10, y: 40)
+                    leaf(size: 90, angle: 35, opacity: 0.12)
+                        .position(x: geo.size.width - 20, y: 120)
+                    leaf(size: 150, angle: 160, opacity: 0.14)
+                        .position(x: geo.size.width - 10, y: geo.size.height - 60)
+                    leaf(size: 100, angle: 200, opacity: 0.12)
+                        .position(x: 20, y: geo.size.height - 140)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func leaf(size: CGFloat, angle: Double, opacity: Double) -> some View {
+        Image(systemName: "leaf.fill")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(angle))
+            .foregroundStyle(Color.white.opacity(opacity))
     }
 }

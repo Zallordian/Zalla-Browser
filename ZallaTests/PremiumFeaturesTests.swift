@@ -83,7 +83,7 @@ final class PremiumFeaturesTests: XCTestCase {
 
     func testUnlockCopyListsEveryPremiumFeature() {
         let note = ZallaUnlockProduct.Copy.note.lowercased()
-        for word in ["stronger blocking", "face id", "tab groups", "listen", "css", "auto-clear", "background packs"] {
+        for word in ["stronger blocking", "face id", "tab groups", "listen", "css", "auto-clear", "background packs", "theme packs"] {
             XCTAssertTrue(note.contains(word), word)
         }
         XCTAssertFalse(note.contains("\u{2014}"))

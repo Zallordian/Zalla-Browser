@@ -14,7 +14,7 @@ enum ZallaUnlockProduct {
     enum Copy {
         static let title = "Zalla Unlock"
         static let subtitle = "One time purchase"
-        static let note = "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, and background packs. Buy once, keep it on this Apple Account."
+        static let note = "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, background packs, and the Space and Jungle theme packs. Buy once, keep it on this Apple Account."
         static let unavailable = "Unlock isn't available yet."
         static let pending = "Your purchase is waiting for approval."
         static let failed = "The purchase did not go through. Please try again later."

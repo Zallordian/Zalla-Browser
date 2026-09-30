@@ -695,6 +695,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var canGoForward = false
     @Published var hasPage = false
     @Published var errorMessage: String?
+    /// A failed page load, shown as a full-page message instead of a small banner.
+    @Published var pageError: FriendlyError?
     @Published var externalURL: URL?
     @Published var previewImage: UIImage?
     @Published var isReaderActive = false
@@ -717,6 +719,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageZoom = PageZoom.defaultLevel
     /// True while Hide Element waits for a tap on the page.
     @Published var isPickingElement = false
+    /// Bumps on every reload the user asks for, so a theme pack can play its refresh animation.
+    @Published private(set) var refreshPulse = 0
     /// A short confirmation shown over the page, such as after Add to Dashboard. Clears itself.
     @Published var toast: String?
     var onVisit: ((SavedPage) -> Void)?
@@ -860,6 +864,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func load(_ url: URL) {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         errorMessage = nil
+        pageError = nil
         httpsFallback = nil
         pendingHTTPSUpgrade = nil
         isReaderActive = false
@@ -1200,6 +1205,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         errorMessage = nil
+        pageError = nil
         httpsFallback = nil
         if !isReaderActive {
             readerAvailable = false
@@ -1245,11 +1251,31 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     private func show(_ error: Error) {
         guard (error as NSError).code != NSURLErrorCancelled else { return }
-        errorMessage = error.localizedDescription
+        let friendly = FriendlyError(error: error, fallbackURL: webView.url ?? url)
+        // Only a real network failure gets the full page. Odd errors keep the small banner.
+        if friendly.kind != .other {
+            pageError = friendly
+            errorMessage = nil
+        } else {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func dismissError() {
         errorMessage = nil
+        pageError = nil
+    }
+
+    /// Tries the failed address again.
+    func retryFailedPage() {
+        let target = pageError?.failedURL ?? webView.url ?? url
+        pageError = nil
+        errorMessage = nil
+        if let target, ["http", "https"].contains(target.scheme?.lowercased() ?? "") {
+            load(target)
+        } else {
+            webView.reload()
+        }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
@@ -1503,6 +1529,16 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         let shortcut = HomeShortcut(title: title, urlString: normalized, symbolName: known?.symbolName ?? "globe")
         let added = HomeShortcuts.add(shortcut)
         showToast(added ? "Added to your dashboard." : "Already on your dashboard, or it is full.")
+    }
+
+    /// Reload or stop, from any reload button.
+    func reloadOrStop() {
+        if isLoading {
+            webView.stopLoading()
+        } else {
+            refreshPulse += 1
+            webView.reload()
+        }
     }
 
     /// Applies the Settings toggle for edge swipes to this tab.

@@ -94,6 +94,9 @@ private struct TabContent: View {
     @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(ThemePacks.refreshAnimationKey) private var refreshAnimationOn = true
+    @ObservedObject private var unlockState = ZallaUnlock.shared
     @State private var address = ""
     @State private var showShare = false
     @State private var isEditingCompactAddress = false
@@ -173,6 +176,21 @@ private struct TabContent: View {
                 }
             }
 
+            if let failure = tab.pageError {
+                ZStack {
+                    Color(uiColor: .systemBackground)
+                        .ignoresSafeArea()
+                    FriendlyErrorView(
+                        error: failure,
+                        theme: theme,
+                        onRetry: { tab.retryFailedPage() },
+                        onDismiss: { tab.dismissError() }
+                    )
+                    .safeAreaPadding(.top, topChromeHeight)
+                    .safeAreaPadding(.bottom, bottomChromeHeight)
+                }
+            }
+
             if tab.isPickingElement {
                 ElementPickerBanner(onCancel: { tab.cancelElementPicker() })
                     .padding(.top, topChromeHeight + 8)
@@ -180,6 +198,17 @@ private struct TabContent: View {
                     .transition(.opacity)
                     .zIndex(5)
             }
+
+            ThemeRefreshEffect(
+                pack: ThemePacks.activeRefresh(
+                    themeID: themeID,
+                    useCustomAccent: useCustomAccent,
+                    unlocked: unlockState.isUnlocked,
+                    animationOn: refreshAnimationOn,
+                    reduceMotion: reduceMotion
+                ),
+                pulse: tab.refreshPulse
+            )
 
             chromeLayer
 
@@ -590,7 +619,7 @@ private struct TabContent: View {
                     .accessibilityHint("Shows the full URL for editing")
             }
             Button {
-                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                tab.reloadOrStop()
             } label: { Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise") }
             .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
             .frame(minWidth: 44, minHeight: 44)
@@ -687,7 +716,7 @@ private struct TabContent: View {
         case .back: tab.webView.goBack()
         case .forward: tab.webView.goForward()
         case .reload:
-            if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+            tab.reloadOrStop()
         case .share: showShare = true
         case .tabs: sheet = .tabs
         case .newTab: browser.addTab()
@@ -974,7 +1003,7 @@ private struct TabContent: View {
                     titleOverride: tab.isLoading ? "Stop" : nil,
                     symbolOverride: tab.isLoading ? "xmark" : nil
                 ) {
-                    if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                    tab.reloadOrStop()
                 }
             case .tabs:
                 return QuickActionEntry(item: item, badge: "\(browser.tabs.count)") { sheet = .tabs }
@@ -1134,7 +1163,7 @@ private struct TabContent: View {
                 Spacer(minLength: 0)
                 if tab.hasPage {
                     Button {
-                        if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                        tab.reloadOrStop()
                     } label: {
                         Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
@@ -1572,7 +1601,7 @@ private struct MenuNavigationRow: View {
                 onDone()
             }
             navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: tab.hasPage) {
-                if tab.isLoading { tab.webView.stopLoading() } else { tab.webView.reload() }
+                tab.reloadOrStop()
                 onDone()
             }
             navButton("Tabs", icon: "square.on.square", enabled: true, action: onTabs)
@@ -2267,6 +2296,8 @@ private struct SettingsView: View {
     @State private var greenSlider = 0.23
     @State private var blueSlider = 0.31
     @State private var suggestIconForTheme: ZallaThemeID?
+    @State private var showThemeUpsell = false
+    @ObservedObject private var unlock = ZallaUnlock.shared
     @Environment(\.colorScheme) private var colorScheme
 
     private var theme: ZallaTheme {
@@ -2320,6 +2351,11 @@ private struct SettingsView: View {
                 )
                 .padding(.vertical, 6)
                 themeRow(title: "Signature", ids: ZallaThemeID.featured)
+                NavigationLink {
+                    ThemePacksView()
+                } label: {
+                    Label("Theme packs", systemImage: "sparkles")
+                }
                 DisclosureGroup("More accents") {
                     themeRow(title: nil, ids: ZallaThemeID.secondary)
                 }
@@ -2534,6 +2570,7 @@ private struct SettingsView: View {
         )) {
             Button("OK") { bookmarkMessage = nil }
         } message: { Text(bookmarkMessage ?? "") }
+        .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
         .tint(theme.primary)
         .onAppear { loadCustomControls() }
     }
@@ -2558,6 +2595,10 @@ private struct SettingsView: View {
     private func iconOption(_ option: AppIconPreference) -> some View {
         let isSelected = appIconPreference == option.rawValue
         return Button {
+            if option.requiresUnlock && !unlock.isUnlocked {
+                showThemeUpsell = true
+                return
+            }
             appIconPreference = option.rawValue
         } label: {
             VStack(spacing: 6) {
@@ -2575,7 +2616,7 @@ private struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .strokeBorder(isSelected ? theme.primary : Color.clear, lineWidth: 2.5)
                     }
-                Text(option.rawValue)
+                Text(option.requiresUnlock && !unlock.isUnlocked ? "\(option.rawValue) \u{1F512}" : option.rawValue)
                     .font(.caption2)
                     .foregroundStyle(isSelected ? theme.primary : .secondary)
                     .lineLimit(1)
@@ -2599,6 +2640,10 @@ private struct SettingsView: View {
                 ForEach(ids) { id in
                     let swatch = ZallaTheme.theme(for: id)
                     Button {
+                        if id.requiresUnlock && !unlock.isUnlocked {
+                            showThemeUpsell = true
+                            return
+                        }
                         useCustomAccent = false
                         themeID = id.rawValue
                         suggestIconForTheme = id
@@ -2614,15 +2659,22 @@ private struct SettingsView: View {
                                             .foregroundStyle(.white)
                                     }
                                 }
-                            Text(id.displayName)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                            HStack(spacing: 2) {
+                                Text(id.displayName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                if id.requiresUnlock && !unlock.isUnlocked {
+                                    Image(systemName: "lock.fill")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(id.displayName)
+                    .accessibilityLabel(id.requiresUnlock && !unlock.isUnlocked ? "\(id.displayName), needs Zalla Unlock" : id.displayName)
                 }
             }
         }

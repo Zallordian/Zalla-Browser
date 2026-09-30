@@ -96,3 +96,55 @@ final class HTTPSOnlyTests: XCTestCase {
         XCTAssertTrue(HTTPSOnly.enabled(in: defaults))
     }
 }
+
+final class FriendlyErrorTests: XCTestCase {
+    private func error(_ code: Int) -> NSError { NSError(domain: NSURLErrorDomain, code: code) }
+
+    func testClassifiesCommonFailures() {
+        XCTAssertEqual(FriendlyErrorKind.classify(error(NSURLErrorNotConnectedToInternet)), .offline)
+        XCTAssertEqual(FriendlyErrorKind.classify(error(NSURLErrorTimedOut)), .timeout)
+        XCTAssertEqual(FriendlyErrorKind.classify(error(NSURLErrorServerCertificateUntrusted)), .badCertificate)
+        XCTAssertEqual(FriendlyErrorKind.classify(error(NSURLErrorCannotFindHost)), .notFound)
+        XCTAssertEqual(FriendlyErrorKind.classify(error(NSURLErrorCannotConnectToHost)), .cannotConnect)
+        XCTAssertEqual(FriendlyErrorKind.classify(NSError(domain: "other", code: 1)), .other)
+    }
+
+    func testCopyIsPresentAndHasNoEmDash() {
+        let dash = String(UnicodeScalar(0x2014)!)
+        for kind in [FriendlyErrorKind.offline, .timeout, .badCertificate, .notFound, .cannotConnect, .other] {
+            XCTAssertFalse(kind.title.isEmpty)
+            XCTAssertFalse(kind.message.isEmpty)
+            XCTAssertFalse(kind.title.contains(dash))
+            XCTAssertFalse(kind.message.contains(dash))
+        }
+        XCTAssertFalse(FriendlyErrorKind.badCertificate.offersRetry)
+    }
+
+    func testFailingURLIsPickedUp() {
+        let url = URL(string: "https://example.com/x")!
+        let failure = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut, userInfo: [NSURLErrorFailingURLErrorKey: url])
+        XCTAssertEqual(FriendlyError(error: failure, fallbackURL: nil).host, "example.com")
+    }
+}
+
+final class BrowserBehaviorTests: XCTestCase {
+    func testSwipeNavigationDefaultsOn() {
+        let defaults = UserDefaults(suiteName: "zalla.swipe.tests")!
+        defaults.removePersistentDomain(forName: "zalla.swipe.tests")
+        XCTAssertTrue(SwipeNavigation.enabled(in: defaults))
+        defaults.set(false, forKey: SwipeNavigation.storageKey)
+        XCTAssertFalse(SwipeNavigation.enabled(in: defaults))
+    }
+
+    func testDesktopSiteIsRememberedPerHost() {
+        let defaults = UserDefaults(suiteName: "zalla.desktop.tests")!
+        defaults.removePersistentDomain(forName: "zalla.desktop.tests")
+        let url = URL(string: "https://www.example.com/page")!
+        XCTAssertFalse(DesktopSitePreference.isDesktop(url, in: defaults))
+        DesktopSitePreference.set(true, for: url, in: defaults)
+        XCTAssertTrue(DesktopSitePreference.isDesktop(URL(string: "https://example.com/other"), in: defaults))
+        XCTAssertFalse(DesktopSitePreference.isDesktop(URL(string: "https://example.org"), in: defaults))
+        DesktopSitePreference.set(false, for: url, in: defaults)
+        XCTAssertFalse(DesktopSitePreference.isDesktop(url, in: defaults))
+    }
+}

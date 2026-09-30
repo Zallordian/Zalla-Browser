@@ -424,6 +424,7 @@ struct ZallaUnlockSheet: View {
                     Label("Per-site CSS", systemImage: "paintbrush")
                     Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
                     Label("Background packs for new tabs", systemImage: "photo.on.rectangle.angled")
+                    Label("Space and Jungle theme packs, with matching icons and refresh animations", systemImage: "sparkles")
                 }
                 Section {
                     UnlockPurchaseRow(unlock: unlock)

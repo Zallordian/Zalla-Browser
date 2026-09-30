@@ -12,8 +12,12 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
     case ocean
     case forest
     case space
+    case jungle
 
     var id: String { rawValue }
+
+    /// Jungle arrives with its theme pack, which is part of Zalla Unlock. Older accents stay free.
+    var requiresUnlock: Bool { self == .jungle }
 
     var displayName: String {
         switch self {
@@ -27,11 +31,12 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .ocean: return "Ocean"
         case .forest: return "Forest"
         case .space: return "Space"
+        case .jungle: return "Jungle"
         }
     }
 
     /// Featured accents shown first in Settings (refined, not a wall of chips).
-    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space] }
+    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space, .jungle] }
 
     /// Secondary rainbow accents, presented more quietly.
     static var secondary: [ZallaThemeID] {
@@ -51,6 +56,7 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .ocean: return .ocean
         case .forest: return .forest
         case .space: return .space
+        case .jungle: return .jungle
         }
     }
 
@@ -67,6 +73,7 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .ocean: return "1F8A9E"
         case .forest: return "2F7A4A"
         case .space: return "6B7CFF"
+        case .jungle: return "8DB63C"
         }
     }
 }
@@ -85,7 +92,7 @@ extension ZallaTheme {
         }
         var best = ZallaThemeID.zallaRed
         var bestDistance = Double.greatestFiniteMagnitude
-        for id in ZallaThemeID.allCases {
+        for id in ZallaThemeID.allCases where !id.requiresUnlock {
             let distance = colorDistance((r, g, b), rgbComponents(from: id.primaryHex))
             if distance < bestDistance {
                 bestDistance = distance
@@ -166,11 +173,16 @@ struct ZallaTheme: Equatable {
             return ZallaTheme(id: id, primary: hex("2F7A4A"), bright: hex("4A9B64"), deep: hex("1B4D30"), highlight: hex("6BB87A"), gradientEnd: hex("3A6B3F"))
         case .space:
             return ZallaTheme(id: id, primary: hex("6B7CFF"), bright: hex("8B9BFF"), deep: hex("3A4499"), highlight: hex("B0A0FF"), gradientEnd: hex("9B6BFF"))
+        case .jungle:
+            return ZallaTheme(id: id, primary: hex("8DB63C"), bright: hex("A8D354"), deep: hex("4E6F1E"), highlight: hex("C5E27A"), gradientEnd: hex("3F9B4E"))
         }
     }
 
     static func theme(forRaw raw: String) -> ZallaTheme {
-        theme(for: ZallaThemeID(rawValue: raw) ?? .zallaRed)
+        let id = ZallaThemeID(rawValue: raw) ?? .zallaRed
+        // Pack accents need Zalla Unlock. Without it, the default accent is used.
+        if id.requiresUnlock, !ZallaUnlockCache.load() { return theme(for: .zallaRed) }
+        return theme(for: id)
     }
 
     /// Resolves preset or custom accent for chrome tinting.
@@ -252,8 +264,12 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
     case ocean = "Ocean"
     case forest = "Forest"
     case space = "Space"
+    case jungle = "Jungle"
 
     var id: String { rawValue }
+
+    /// Jungle is part of its theme pack, so it needs Zalla Unlock to pick.
+    var requiresUnlock: Bool { self == .jungle }
 
     /// Alternate icon name passed to UIApplication.setAlternateIconName. nil restores primary.
     /// Each name matches an .appiconset in Assets.xcassets and an entry in project.yml.

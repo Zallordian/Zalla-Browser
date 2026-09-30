@@ -50,3 +50,35 @@ final class NewTabTests: XCTestCase {
         }
     }
 }
+
+final class ThemePackTests: XCTestCase {
+    func testPacksPointAtRealThingsAndNeedUnlock() {
+        XCTAssertEqual(ThemePacks.all.map(\.id), ["space", "jungle"])
+        for pack in ThemePacks.all {
+            let preset = NewTabCatalog.preset(id: pack.backgroundPresetID)
+            XCTAssertNotNil(preset, pack.id)
+            XCTAssertTrue(preset?.requiresUnlock == true)
+            XCTAssertEqual(pack.themeID.suggestedAppIcon, pack.icon)
+            XCTAssertFalse(pack.tagline.contains("\u{2014}"))
+        }
+        XCTAssertTrue(ZallaThemeID.jungle.requiresUnlock)
+        XCTAssertTrue(AppIconPreference.jungle.requiresUnlock)
+        XCTAssertFalse(ZallaThemeID.space.requiresUnlock)
+    }
+
+    func testRefreshAnimationRules() {
+        let base = { (unlocked: Bool, on: Bool, reduce: Bool, custom: Bool) in
+            ThemePacks.activeRefresh(themeID: "space", useCustomAccent: custom, unlocked: unlocked, animationOn: on, reduceMotion: reduce)
+        }
+        XCTAssertEqual(base(true, true, false, false)?.id, "space")
+        XCTAssertNil(base(false, true, false, false))
+        XCTAssertNil(base(true, false, false, false))
+        XCTAssertNil(base(true, true, true, false))
+        XCTAssertNil(base(true, true, false, true))
+        XCTAssertNil(ThemePacks.activeRefresh(themeID: "ocean", useCustomAccent: false, unlocked: true, animationOn: true, reduceMotion: false))
+    }
+
+    func testCustomColorsNeverPickALockedIcon() {
+        XCTAssertNotEqual(ZallaTheme.closestAppIcon(forCustomHex: "8DB63C"), .jungle)
+    }
+}

@@ -7,6 +7,13 @@ struct NewTabPreset: Identifiable, Equatable {
         case radial
     }
 
+    /// Optional drawn details on top of the gradient. Static, so they cost no battery.
+    enum Decor: Equatable {
+        case none
+        case stars
+        case leaves
+    }
+
     let id: String
     let name: String
     let colors: [String]
@@ -15,6 +22,7 @@ struct NewTabPreset: Identifiable, Equatable {
     let isDark: Bool
     /// Pack id for Zalla Unlock backgrounds, nil for the free ones.
     let pack: String?
+    var decor: Decor = .none
 
     var requiresUnlock: Bool { pack != nil }
 }
@@ -35,7 +43,9 @@ enum NewTabCatalog {
     static let packs: [NewTabPack] = [
         NewTabPack(id: "warm", name: "Warm Pack"),
         NewTabPack(id: "cool", name: "Cool Pack"),
-        NewTabPack(id: "nature", name: "Nature Pack")
+        NewTabPack(id: "nature", name: "Nature Pack"),
+        NewTabPack(id: "space", name: "Space Pack"),
+        NewTabPack(id: "jungle", name: "Jungle Pack")
     ]
 
     static let packed: [NewTabPreset] = [
@@ -50,7 +60,14 @@ enum NewTabCatalog {
         NewTabPreset(id: "forest", name: "Forest", colors: ["3B8F5B", "0F2D1B"], style: .linear, isDark: true, pack: "nature"),
         NewTabPreset(id: "meadow", name: "Meadow", colors: ["E2F6D0", "9AD08F"], style: .linear, isDark: false, pack: "nature"),
         NewTabPreset(id: "dune", name: "Dune", colors: ["F6E8C8", "D8B77F"], style: .linear, isDark: false, pack: "nature"),
-        NewTabPreset(id: "stone", name: "Stone", colors: ["8E939C", "464A52"], style: .linear, isDark: true, pack: "nature")
+        NewTabPreset(id: "stone", name: "Stone", colors: ["8E939C", "464A52"], style: .linear, isDark: true, pack: "nature"),
+        NewTabPreset(id: "nebula", name: "Nebula", colors: ["4B2AA8", "1B1145", "07071A"], style: .radial, isDark: true, pack: "space", decor: .stars),
+        NewTabPreset(id: "deepspace", name: "Deep Space", colors: ["10112B", "000000"], style: .linear, isDark: true, pack: "space", decor: .stars),
+        NewTabPreset(id: "moonrise", name: "Moonrise", colors: ["8B9BFF", "2A2F73", "0D0E2A"], style: .linear, isDark: true, pack: "space", decor: .stars),
+        NewTabPreset(id: "canopy", name: "Canopy", colors: ["3F9B4E", "17472B", "071A0F"], style: .linear, isDark: true, pack: "jungle", decor: .leaves),
+        NewTabPreset(id: "understory", name: "Understory", colors: ["8DB63C", "2F5F2A"], style: .linear, isDark: true, pack: "jungle", decor: .leaves),
+        NewTabPreset(id: "monsoon", name: "Monsoon", colors: ["1F4D3A", "07160F"], style: .radial, isDark: true, pack: "jungle", decor: .leaves),
+        NewTabPreset(id: "mist", name: "Mist", colors: ["E4F0D0", "A5C883"], style: .linear, isDark: false, pack: "jungle", decor: .leaves)
     ]
 
     static var all: [NewTabPreset] { free + packed }
