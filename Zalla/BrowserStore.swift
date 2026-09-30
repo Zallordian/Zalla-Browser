@@ -1219,7 +1219,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         guard message.name == "zallaImage",
               let body = message.body as? [String: Any],
               let src = body["src"] as? String,
-              let imageURL = URL(string: src) else { return }
+              let imageURL = URL(string: src),
+              ["http", "https", "data"].contains(imageURL.scheme?.lowercased() ?? "") else { return }
         Task { await prepareImageExport(from: imageURL) }
     }
 
