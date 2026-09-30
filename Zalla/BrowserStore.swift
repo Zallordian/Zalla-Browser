@@ -488,6 +488,7 @@ final class BrowserStore: ObservableObject {
         LocationSettings.clear()
         SiteCSS.clearAll()
         defaults.removeObject(forKey: PrivateTabLock.storageKey)
+        defaults.removeObject(forKey: TabSleep.storageKey)
         AutoClear.resetSettings()
         groups = []
         TabGroupStore.save([])
@@ -934,7 +935,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Unloads the page to free memory while keeping the tab, its title, address, and history.
     /// Skips tabs that are private, still loading, playing media, or using the camera or microphone.
     func sleep() {
-        guard !isPrivate, hasPage, !isSleeping, pendingRestore == nil, !isReaderActive, !isLoading,
+        // Popups keep their opener link only while loaded, so tabs opened by a page stay awake.
+        guard !isPrivate, openerID == nil, hasPage, !isSleeping, pendingRestore == nil, !isReaderActive, !isLoading,
               httpsFallback == nil, !isPickingElement,
               let current = webView.url, TabSession.isRestorable(current),
               webView.cameraCaptureState == .none,
@@ -973,7 +975,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         errorMessage = nil
         if let state = entry.interactionState {
             webView.interactionState = state
-            if webView.backForwardList.currentItem != nil { return }
+            // A woken tab still holds the blank page it slept on, so check the restored entry is a real page.
+            if let restored = webView.backForwardList.currentItem?.url, restored.scheme?.lowercased() != "about" { return }
         }
         load(entry.url)
     }

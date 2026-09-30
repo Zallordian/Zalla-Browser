@@ -1,6 +1,6 @@
 # Zalla
 
-**Built around you.** A free, privacy-conscious iPhone browser, with optional creative tools planned as a one-time lifetime unlock around US $1.
+**Built around you.** A free, privacy-conscious iPhone browser, with a one-time Zalla Unlock of about $2 (the price shown in the App Store is the one that applies).
 
 ## Current milestone
 

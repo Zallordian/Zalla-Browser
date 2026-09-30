@@ -8,7 +8,7 @@ Make a premium, useful gateway to the internet available without selling user da
 - iPhone first, native SwiftUI and system WebKit. iOS 17 is a provisional minimum.
 - No account, analytics SDK, advertising SDK, proprietary credential vault, or cloud sync.
 - Core browsing and meaningful privacy controls remain free.
-- Proposed lifetime upgrade around US $1, using a StoreKit non-consumable. Final localized price comes from App Store Connect and StoreKit, not a hardcoded price. No subscription.
+- Zalla Unlock: a lifetime upgrade of about $2 (US $1.99 price point), using a StoreKit non-consumable. Final localized price comes from App Store Connect and StoreKit, not a hardcoded price. No subscription. Unlock covers stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, and background packs. Core blocking, Privacy Shield, and image export stay free.
 - Launch upgrade candidates: local image Export As, saved session collections, and extra appearance presets. These are proposals, not yet implemented or sold.
 - System credential integration should be tested on real devices; never claim password-manager compatibility before verifying it.
 

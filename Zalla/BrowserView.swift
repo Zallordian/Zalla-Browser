@@ -2417,6 +2417,11 @@ private struct SettingsView: View {
                 } label: {
                     Label("Acknowledgements", systemImage: "text.book.closed")
                 }
+                NavigationLink {
+                    AboutView()
+                } label: {
+                    Label("About Zalla", systemImage: "info.circle")
+                }
             } header: {
                 Text("Privacy and support")
             } footer: {

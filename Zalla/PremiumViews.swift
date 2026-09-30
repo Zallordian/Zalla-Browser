@@ -127,6 +127,7 @@ struct ListenMenuRows: View {
 /// Covers a locked private tab until Face ID (or the passcode) succeeds.
 struct PrivateLockView: View {
     @ObservedObject var browser: BrowserStore
+    @Environment(\.scenePhase) private var scenePhase
     @State private var asked = false
 
     var body: some View {
@@ -162,10 +163,15 @@ struct PrivateLockView: View {
                 .font(.subheadline)
             }
         }
-        .task {
-            guard !asked else { return }
-            asked = true
-            await browser.unlockPrivateTabs()
+        .task(id: scenePhase) {
+            // Ask once each time Zalla comes back to the front. The Face ID prompt itself briefly makes
+            // the app inactive, which must not trigger another prompt.
+            if scenePhase == .background {
+                asked = false
+            } else if scenePhase == .active, !asked {
+                asked = true
+                await browser.unlockPrivateTabs()
+            }
         }
     }
 }
