@@ -45,7 +45,7 @@ enum CookieBannerDismiss {
         for (var i = 0; node && i < 8; i++, node = node.parentElement) {
           var text = ((node.id || '') + ' ' + (node.className && node.className.toString ? node.className.toString() : '') +
             ' ' + (node.getAttribute ? (node.getAttribute('role') || '') + ' ' + (node.getAttribute('aria-label') || '') : '')).toLowerCase();
-          if (/cookie|consent|gdpr|privacy|cmp|onetrust|didomi|cookiebot|truste|dialog/.test(text)) return true;
+          if (/cookie|consent|gdpr|privacy|cmp|onetrust|didomi|cookiebot|truste/.test(text)) return true;
         }
         return false;
       }
