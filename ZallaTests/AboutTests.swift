@@ -9,8 +9,9 @@ final class AboutTests: XCTestCase {
     }
 
     func testChangelogOrderAndContent() {
-        XCTAssertEqual(Changelog.releases.first?.version, "Build 14")
-        XCTAssertEqual(Changelog.releases.first?.name, "Built Around You")
+        XCTAssertEqual(Changelog.releases.first?.version, "Build 15")
+        XCTAssertEqual(Changelog.releases.first?.name, "Fewer Loose Ends")
+        XCTAssertEqual(Changelog.releases.dropFirst().first?.version, "Build 14")
         XCTAssertEqual(Changelog.releases.last?.version, "1.0")
         XCTAssertEqual(Changelog.releases.last?.name, "Private by Default")
         XCTAssertEqual(Changelog.beta.map(\.version), ["Beta 3", "Beta 2", "Beta 1"])

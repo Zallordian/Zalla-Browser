@@ -15,9 +15,19 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 15
+
+- The Flame is now Burn It All (free). It sits in Tabs, the Menu, and as an optional Quick Action button, no longer in the new tab edit menu, and its icon follows the accent color.
+- Listen to Page keeps playing in the background (audio background mode). Local network access is declared for LAN addresses.
+- If Zalla Unlock lapses, locked accents and app icons fall back to the default right away. A purchase check that cannot be verified never removes a cached Unlock.
+- HTTPS-Only: local ranges now include 100.64.0.0/10, `::` and mapped IPv4. Timeouts show the normal error page. Upgrades are counted only when the secure page loads.
+- Cookie banner closing ignores generic dialogs. Link cleaning is capped per navigation. Bookmark import parses in the background and decodes numeric entities.
+- The About "Our story" section is hidden until there is real copy (one flag, `AboutLinks.showsStory`).
+- Privacy manifest added (no tracking, no collected data, UserDefaults reason CA92.1).
+
 ## Build 14
 
-- Burn It All (free): confirm, then erase tabs, history, cookies, and site data, and close the app. It lives in Tabs, the Menu, and as a Quick Action button option.
+- Burn It All (free, called the Flame in Build 14): confirm, then erase tabs, history, cookies, and site data, and close the app.
 - HTTPS-Only Mode is on by default, with a warning page and a per-site Continue anyway. Local and private network addresses are exempt.
 - New tab page: no preloaded shortcuts, a plus tile, an edit menu, and an Add Shortcut sheet (bundled popular sites, bookmarks, or a typed address). Press and hold a link on a page to Add to Dashboard.
 - Theme packs in Zalla Unlock: Space and Jungle, each with an accent, an app icon, new tab backgrounds, and an optional refresh animation that respects Reduce Motion.

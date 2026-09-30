@@ -14,10 +14,21 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 15",
+            name: "Fewer Loose Ends",
+            highlights: [
+                "The Flame is now Burn It All, and its icon wears your accent color. Find it in Tabs, the Menu, or add it to your Quick Action buttons",
+                "Listen to Page keeps talking when you leave the app or lock your phone",
+                "Zalla can now reach devices on your local network, like a printer page or a home server, when you open their address"
+            ],
+            improvements: "Bookmark import runs in the background and reads more kinds of special characters. Local and private network addresses, including Tailscale ones, always open as typed. Timeouts now show the normal error page instead of the encryption warning. The HTTPS upgrade count in your privacy report only counts pages that really loaded securely.",
+            fixes: "If Zalla Unlock ever lapses, locked accents and icons return to the default straight away. A hiccup while checking a purchase no longer takes Unlock away. Locked private tabs are properly hidden from VoiceOver. Cookie banner closing no longer touches ordinary pop-ups. Link cleaning cannot loop. Reset App now resets the search bar width, and Burn It All also forgets which sites you asked for the desktop version of."
+        ),
+        ChangelogEntry(
             version: "Build 14",
             name: "Built Around You",
             highlights: [
-                "Burn It All: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
+                "The Flame, since renamed Burn It All: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
                 "HTTPS-Only Mode is now on by default, with a clear warning page and a per-site Continue anyway",
                 "A tidier new tab page: no preloaded shortcuts, a plus tile, and an Add Shortcut list of popular sites, your bookmarks, or any address. Press and hold a link on any page to add it",
                 "Space and Jungle theme packs in Zalla Unlock: accents, icons, backgrounds, and an optional refresh animation that respects Reduce Motion",
