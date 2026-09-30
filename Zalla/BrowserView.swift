@@ -76,13 +76,15 @@ private struct TabContent: View {
     @ObservedObject var browser: BrowserStore
     @ObservedObject var tab: BrowserTab
     @Binding var sheet: BrowserSheet?
-    @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
+    @AppStorage(SearchEngine.storageKey) private var searchEngine = SearchEngine.defaultEngine.rawValue
+    @AppStorage(SearchEngine.customTemplateKey) private var customSearchTemplate = ""
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
+    @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @Environment(\.colorScheme) private var colorScheme
     @State private var address = ""
     @State private var showShare = false
@@ -584,6 +586,8 @@ private struct TabContent: View {
                 beginClassicAddressEditing()
             }
         }
+        // The width slider only narrows the resting bar; editing uses the full width.
+        .searchBarWidth(addressFocused || isEditingClassicAddress ? SearchBarWidth.full : searchBarWidthValue)
     }
 
     /// Classic button row, built from the customizable toolbar layout.
@@ -737,7 +741,8 @@ private struct TabContent: View {
 
     /// Quick Action: outlined search pill on the left, crimson center control, tabs button on the right.
     /// Both sides are equal-width containers so the center control stays centered.
-    /// Tapping the center control fans out Back, Forward, Reload, Tabs, New Tab, Share, and Menu.
+    /// Tapping the center control fans out Back, Forward, Reload, Tabs, New Tab, and Share. Menu is a
+    /// toolbar button beside Tabs (on the outer edge by default), placed by Customize Toolbar.
     /// Tapping the search pill, or pressing and holding the center control, opens address editing.
     private var quickActionToolbar: some View {
         VStack(spacing: 8) {
@@ -754,6 +759,7 @@ private struct TabContent: View {
                 HStack(spacing: 12) {
                     quickActionSearchPill
                         .matchedGeometryEffect(id: "quickActionAddress", in: addressNamespace)
+                        .searchBarWidth(searchBarWidthValue)
                         .frame(maxWidth: .infinity)
                     quickActionButton
                     HStack(spacing: 8) {
@@ -1009,6 +1015,7 @@ private struct TabContent: View {
                 }
 
                 compactPill
+                    .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
 
                 if !isEditingCompactAddress, !toolbarLayout.compactTrailing.isEmpty {
                     HStack(spacing: 12) {
@@ -1159,9 +1166,9 @@ private struct TabContent: View {
     }
 
     private func submitAddress() {
-        let engine = SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+        let engine = SearchEngine(rawValue: searchEngine) ?? SearchEngine.defaultEngine
         // Always resolve through AddressResolver so search stays inside Zalla's webview.
-        guard let url = AddressResolver.resolve(address, engine: engine) else { return }
+        guard let url = AddressResolver.resolve(address, engine: engine, customTemplate: customSearchTemplate) else { return }
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         tab.load(url)
         addressFocused = false
@@ -2093,7 +2100,6 @@ private struct SettingsView: View {
     @ObservedObject var browser: BrowserStore
     @Environment(\.dismiss) private var dismiss
     @AppStorage("appearance") private var appearance = "System"
-    @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
@@ -2222,9 +2228,7 @@ private struct SettingsView: View {
             }
 
             Section {
-                Picker("Search engine", selection: $searchEngine) {
-                    ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
-                }
+                SearchEngineSettingsRows()
                 Button {
                     showImporter = true
                 } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }

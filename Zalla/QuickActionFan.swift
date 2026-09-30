@@ -38,6 +38,8 @@ struct QuickActionFan: View {
     @State private var spread = false
     @State private var heldEntryID: String?
 
+    private static let buttonSize = CGFloat(QuickActionLayout.buttonSize)
+
     var body: some View {
         GeometryReader { geo in
             let frame = geo.frame(in: .global)
@@ -106,33 +108,32 @@ struct QuickActionFan: View {
             onDismiss()
             entry.action()
         } label: {
-            VStack(spacing: 5) {
-                ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .topTrailing) {
+                // The icon and its label both sit inside the circle.
+                VStack(spacing: 3) {
                     Image(systemName: entry.symbolName)
-                        .font(.body.weight(.semibold))
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(entry.enabled ? theme.primary : Color.secondary)
-                        .frame(width: 52, height: 52)
-                        .background(.regularMaterial, in: Circle())
-                        .overlay(Circle().strokeBorder(theme.primary.opacity(0.18), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
-                    if let badge = entry.badge {
-                        Text(badge)
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .frame(minWidth: 18, minHeight: 18)
-                            .background(theme.primary, in: Capsule())
-                            .offset(x: 4, y: -4)
-                    }
+                    Text(entry.title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
-                Text(entry.title)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(.regularMaterial, in: Capsule())
+                .padding(.horizontal, 4)
+                .frame(width: Self.buttonSize, height: Self.buttonSize)
+                .background(.regularMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(theme.primary.opacity(0.18), lineWidth: 1))
+                .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                if let badge = entry.badge {
+                    Text(badge)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .frame(minWidth: 18, minHeight: 18)
+                        .background(theme.primary, in: Capsule())
+                        .offset(x: 2, y: -2)
+                }
             }
             .opacity(entry.enabled ? 1 : 0.45)
         }

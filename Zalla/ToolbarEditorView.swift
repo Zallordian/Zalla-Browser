@@ -8,6 +8,7 @@ struct ToolbarEditorView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage("appearance") private var appearance = "System"
+    @AppStorage(SearchBarWidth.storageKey) private var searchBarWidth = SearchBarWidth.full
     @Environment(\.colorScheme) private var colorScheme
     @State private var target: ToolbarEditTarget = .classic
     @State private var layout = ToolbarLayout.default
@@ -26,6 +27,7 @@ struct ToolbarEditorView: View {
     var body: some View {
         List {
             previewSection
+            searchBarWidthSection
             itemsSection
             availableSection
             Section {
@@ -62,6 +64,34 @@ struct ToolbarEditorView: View {
             }
         } footer: {
             Text("Changes apply right away. Items you remove stay available in the Menu.")
+        }
+    }
+
+    private var searchBarWidthSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Search bar width")
+                    Spacer()
+                    Text(SearchBarWidth.percentText(searchBarWidth))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(
+                    value: Binding(
+                        get: { SearchBarWidth.clamped(searchBarWidth) },
+                        set: { searchBarWidth = SearchBarWidth.clamped($0) }
+                    ),
+                    in: SearchBarWidth.minimum...SearchBarWidth.full
+                )
+                .accessibilityLabel("Search bar width")
+                .accessibilityValue(SearchBarWidth.percentText(searchBarWidth))
+            }
+            if !SearchBarWidth.isFull(searchBarWidth) {
+                Button("Reset to full width") { searchBarWidth = SearchBarWidth.full }
+            }
+        } footer: {
+            Text("Makes the resting search bar narrower. It always uses the full width while you type.")
         }
     }
 
@@ -118,6 +148,8 @@ struct ToolbarEditorView: View {
         }
         if target.requiresMenu {
             text += " Menu always stays so every action is reachable."
+        } else if target == .quickActionFan {
+            text += " Menu is a toolbar button beside Tabs."
         }
         return text
     }

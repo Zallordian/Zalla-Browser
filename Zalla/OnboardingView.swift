@@ -5,7 +5,7 @@ struct OnboardingView: View {
     @ObservedObject var browser: BrowserStore
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("appearance") private var appearance = "System"
-    @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
+    @AppStorage(SearchEngine.storageKey) private var searchEngine = SearchEngine.defaultEngine.rawValue
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
@@ -285,11 +285,11 @@ struct OnboardingView: View {
                             Text("Search engine").font(.headline)
                             Spacer()
                             Picker("Search engine", selection: $searchEngine) {
-                                ForEach(SearchEngine.allCases, id: \.rawValue) { Text($0.rawValue).tag($0.rawValue) }
+                                ForEach(SearchEngine.choices(customTemplate: nil), id: \.rawValue) { Text($0.displayName).tag($0.rawValue) }
                             }
                             .pickerStyle(.menu)
                         }
-                        Text("Searches open inside Zalla. Your chosen engine receives what you search for.")
+                        Text("Searches open inside Zalla. Your chosen engine receives what you search for. You can change it later by pressing and holding the engine label on the search bar.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

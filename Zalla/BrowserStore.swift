@@ -59,6 +59,8 @@ final class BrowserStore: ObservableObject {
         } catch {
             storageError = "Your saved library could not be read. \(error.localizedDescription)"
         }
+        // Brave Search is the new default. People who already finished setup keep the engine they had.
+        SearchEngine.keepExistingChoice()
         // Home shortcuts: fresh installs start empty; anyone who already has a saved list keeps it.
         if UserDefaults.standard.data(forKey: HomeShortcuts.storageKey) == nil {
             HomeShortcuts.save(HomeShortcuts.defaults)
@@ -292,7 +294,8 @@ final class BrowserStore: ObservableObject {
         )
         let defaults = UserDefaults.standard
         defaults.removeObject(forKey: "appearance")
-        defaults.removeObject(forKey: "searchEngine")
+        defaults.removeObject(forKey: SearchEngine.storageKey)
+        defaults.removeObject(forKey: SearchEngine.customTemplateKey)
         defaults.removeObject(forKey: "themeID")
         defaults.removeObject(forKey: "appIconPreference")
         defaults.removeObject(forKey: ToolbarStyle.storageKey)

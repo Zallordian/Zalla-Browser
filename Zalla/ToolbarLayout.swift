@@ -85,13 +85,13 @@ enum ToolbarEditTarget: String, CaseIterable, Identifiable {
         case .classic: return 6
         case .compact: return 4
         case .quickActionBar: return 2
-        case .quickActionFan: return 7
+        case .quickActionFan: return 6
         }
     }
 
-    /// Menu must stay reachable: it is required everywhere except the Quick Action bar slots,
-    /// because the Quick Action fan always carries it.
-    var requiresMenu: Bool { self != .quickActionBar }
+    /// Menu must stay reachable: it is required on every toolbar, including the Quick Action bar
+    /// beside Tabs. The Quick Action fan does not carry it.
+    var requiresMenu: Bool { self != .quickActionFan }
 
     var usesAddressPill: Bool { self == .compact }
 
@@ -123,7 +123,8 @@ struct ToolbarLayout: Equatable, Codable {
 
     static let defaultClassic: [ToolbarItemKind] = [.back, .forward, .share, .tabs, .menu]
     static let defaultCompact: [ToolbarItemKind] = [.back, .forward, .address, .share, .menu]
-    static let defaultQuickActionBar: [ToolbarItemKind] = [.tabs]
+    /// Menu sits beside Tabs, on the outer edge.
+    static let defaultQuickActionBar: [ToolbarItemKind] = [.tabs, .menu]
     static var defaultQuickActionFan: [ToolbarItemKind] {
         QuickActionItem.allCases.compactMap { ToolbarItemKind(rawValue: $0.rawValue) }
     }
@@ -156,11 +157,18 @@ struct ToolbarLayout: Equatable, Codable {
             guard let raw = try? container.decodeIfPresent([String].self, forKey: key) else { return fallback }
             return raw.compactMap { ToolbarItemKind(rawValue: $0) }
         }
+        let bar = list(.quickActionBar, Self.defaultQuickActionBar)
+        var fan = list(.quickActionFan, Self.defaultQuickActionFan)
+        // Layouts saved before Menu got its own button carried Menu in the fan and not in the bar.
+        // Move it: the bar gains Menu below, and the fan drops it.
+        if !bar.contains(.menu) {
+            fan.removeAll { $0 == .menu }
+        }
         self.init(
             classic: list(.classic, Self.defaultClassic),
             compact: list(.compact, Self.defaultCompact),
-            quickActionBar: list(.quickActionBar, Self.defaultQuickActionBar),
-            quickActionFan: list(.quickActionFan, Self.defaultQuickActionFan)
+            quickActionBar: bar,
+            quickActionFan: fan
         )
     }
 
@@ -295,5 +303,24 @@ struct ToolbarLayout: Equatable, Codable {
 
     func encoded() -> Data {
         (try? JSONEncoder().encode(self)) ?? Data()
+    }
+}
+
+/// How wide the search bar is inside its toolbar row. 1 is full width, which is the default.
+enum SearchBarWidth {
+    static let storageKey = "searchBarWidth"
+    static let full = 1.0
+    static let minimum = 0.6
+
+    static func clamped(_ value: Double) -> Double {
+        min(max(value, minimum), full)
+    }
+
+    static func isFull(_ value: Double) -> Bool {
+        value >= full - 0.001
+    }
+
+    static func percentText(_ value: Double) -> String {
+        "\(Int((clamped(value) * 100).rounded()))%"
     }
 }

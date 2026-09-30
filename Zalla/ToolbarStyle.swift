@@ -54,7 +54,7 @@ enum ChromeModeTips {
         "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
 
     static let quickActionMessage =
-        "Quick Action keeps one crimson button at the center of a see-through toolbar. Tap it to reveal Back, Forward, Reload, Tabs, New Tab, Share, and Menu. Tap the search bar on the left, or press and hold the button, to search or enter an address."
+        "Quick Action keeps one crimson button at the center of a see-through toolbar. Tap it to reveal Back, Forward, Reload, Tabs, New Tab, and Share. Menu sits beside Tabs. Tap the search bar on the left, or press and hold the button, to search or enter an address."
 
     static let holdRevealMessage =
         "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
@@ -68,7 +68,6 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
     case tabs
     case newTab
     case share
-    case menu
 
     var id: String { rawValue }
 
@@ -80,7 +79,6 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
         case .tabs: return "Tabs"
         case .newTab: return "New Tab"
         case .share: return "Share"
-        case .menu: return "Menu"
         }
     }
 
@@ -92,17 +90,23 @@ enum QuickActionItem: String, CaseIterable, Identifiable {
         case .tabs: return "square.on.square"
         case .newTab: return "plus"
         case .share: return "square.and.arrow.up"
-        case .menu: return "ellipsis"
         }
     }
 }
 
 /// Pure layout math for the Quick Action fan.
 enum QuickActionLayout {
-    /// Wide enough that seven buttons and their labels never touch, narrow enough for a 375pt screen.
-    static let radius: Double = 140
-    static let startAngle: Double = 165
-    static let endAngle: Double = 15
+    /// Across-the-screen radius of the arc. Wide enough that six buttons never touch, narrow enough for a 375pt screen.
+    static let radius: Double = 142
+    /// Up-and-down radius of the arc. The arc is a half ellipse, flatter than a circle.
+    static let verticalRadius: Double = 120
+    /// The whole arc starts this far from the Quick Action button, so it clears the toolbar row
+    /// (search pill, tabs button) instead of crossing it.
+    static let lift: Double = 80
+    /// Width of each round fan button, with its label inside.
+    static let buttonSize: Double = 62
+    static let startAngle: Double = 170
+    static let endAngle: Double = 10
 
     /// Fan angles in degrees, evenly spread from left (startAngle) to right (endAngle).
     static func angles(count: Int) -> [Double] {
@@ -119,7 +123,7 @@ enum QuickActionLayout {
         guard all.indices.contains(index) else { return .zero }
         let radians = all[index] * .pi / 180
         let dx = cos(radians) * radius
-        let dy = sin(radians) * radius
+        let dy = lift + sin(radians) * verticalRadius
         return CGSize(width: dx, height: placement == .bottom ? -dy : dy)
     }
 }

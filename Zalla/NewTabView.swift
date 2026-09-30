@@ -6,7 +6,8 @@ struct NewTabView: View {
     var onOpenLibrary: () -> Void
     var onOpenTabs: () -> Void = {}
 
-    @AppStorage("searchEngine") private var searchEngine = SearchEngine.duckDuckGo.rawValue
+    @AppStorage(SearchEngine.storageKey) private var searchEngine = SearchEngine.defaultEngine.rawValue
+    @AppStorage(SearchEngine.customTemplateKey) private var customSearchTemplate = ""
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
@@ -384,13 +385,7 @@ struct NewTabView: View {
                 .keyboardType(.webSearch)
                 .submitLabel(.go)
                 .focused($searchFocused)
-            Text(currentEngine.rawValue)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(theme.primary)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(theme.primary.opacity(0.12), in: Capsule())
-                .accessibilityLabel("Searching with \(currentEngine.rawValue)")
+            SearchEngineChip(theme: theme)
         }
         .padding(.horizontal, 18)
         .frame(minHeight: 52)
@@ -412,11 +407,11 @@ struct NewTabView: View {
     }
 
     private var currentEngine: SearchEngine {
-        SearchEngine(rawValue: searchEngine) ?? .duckDuckGo
+        SearchEngine(rawValue: searchEngine) ?? SearchEngine.defaultEngine
     }
 
     private func submitAddress() {
-        if let url = AddressResolver.resolve(address, engine: currentEngine) {
+        if let url = AddressResolver.resolve(address, engine: currentEngine, customTemplate: customSearchTemplate) {
             tab.load(url)
             searchFocused = false
         }

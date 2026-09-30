@@ -20,7 +20,7 @@ final class ToolbarStyleTests: XCTestCase {
     }
 
     func testQuickActionItemsOrderAndCopy() {
-        XCTAssertEqual(QuickActionItem.allCases, [.back, .forward, .reload, .tabs, .newTab, .share, .menu])
+        XCTAssertEqual(QuickActionItem.allCases, [.back, .forward, .reload, .tabs, .newTab, .share])
         XCTAssertEqual(QuickActionItem.newTab.title, "New Tab")
         XCTAssertEqual(QuickActionItem.reload.title, "Reload")
         XCTAssertEqual(QuickActionItem.reload.symbolName, "arrow.clockwise")
@@ -32,7 +32,7 @@ final class ToolbarStyleTests: XCTestCase {
 
     func testQuickActionLayoutAnglesSpreadLeftToRight() {
         let angles = QuickActionLayout.angles(count: QuickActionItem.allCases.count)
-        XCTAssertEqual(angles.count, 7)
+        XCTAssertEqual(angles.count, 6)
         XCTAssertEqual(angles.first ?? 0, QuickActionLayout.startAngle, accuracy: 0.001)
         XCTAssertEqual(angles.last ?? 0, QuickActionLayout.endAngle, accuracy: 0.001)
         XCTAssertEqual(QuickActionLayout.angles(count: 1), [90])
@@ -59,11 +59,23 @@ final class ToolbarStyleTests: XCTestCase {
         for index in 1..<count {
             let dx = offsets[index].width - offsets[index - 1].width
             let dy = offsets[index].height - offsets[index - 1].height
-            XCTAssertGreaterThan((dx * dx + dy * dy).squareRoot(), 56, "Fan buttons must not overlap")
+            XCTAssertGreaterThan((dx * dx + dy * dy).squareRoot(), QuickActionLayout.buttonSize, "Fan buttons must not overlap")
         }
-        // Outermost 52pt buttons stay on a 375pt wide screen when the fan opens from the center.
+        // Outermost buttons stay on a 375pt wide screen when the fan opens from the center.
         let widest = offsets.map { abs($0.width) }.max() ?? 0
-        XCTAssertLessThanOrEqual(widest + 26, 187.5)
+        XCTAssertLessThanOrEqual(widest + QuickActionLayout.buttonSize / 2, 187.5)
+    }
+
+    func testQuickActionFanClearsTheToolbarRow() {
+        let count = QuickActionItem.allCases.count
+        for placement in [AddressBarPlacement.bottom, AddressBarPlacement.top] {
+            for index in 0..<count {
+                let offset = QuickActionLayout.offset(index: index, count: count, placement: placement)
+                // Toolbar row controls are 54pt tall around the center, so the lowest fan button
+                // must start clear of that band.
+                XCTAssertGreaterThan(abs(offset.height) - QuickActionLayout.buttonSize / 2, 27 + 8)
+            }
+        }
     }
 
     func testChromePreviewLayoutReflectsEveryCombination() {

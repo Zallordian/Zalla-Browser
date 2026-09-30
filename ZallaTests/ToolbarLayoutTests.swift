@@ -8,8 +8,9 @@ final class ToolbarLayoutTests: XCTestCase {
         XCTAssertEqual(layout.compact, [.back, .forward, .address, .share, .menu])
         XCTAssertEqual(layout.compactLeading, [.back, .forward])
         XCTAssertEqual(layout.compactTrailing, [.share, .menu])
-        XCTAssertEqual(layout.quickActionBar, [.tabs])
-        XCTAssertEqual(layout.quickActionFan, [.back, .forward, .reload, .tabs, .newTab, .share, .menu])
+        XCTAssertEqual(layout.quickActionBar, [.tabs, .menu])
+        XCTAssertEqual(layout.quickActionFan, [.back, .forward, .reload, .tabs, .newTab, .share])
+        XCTAssertFalse(layout.quickActionFan.contains(.menu), "Menu has its own button beside Tabs")
         XCTAssertEqual(ToolbarLayout.decode(Data()), .default)
     }
 
@@ -17,8 +18,8 @@ final class ToolbarLayoutTests: XCTestCase {
         let layout = ToolbarLayout.default
         XCTAssertFalse(layout.canRemove(.menu, from: .classic))
         XCTAssertFalse(layout.canRemove(.menu, from: .compact))
-        XCTAssertFalse(layout.canRemove(.menu, from: .quickActionFan))
-        XCTAssertTrue(layout.canRemove(.menu, from: .quickActionBar))
+        XCTAssertTrue(layout.canRemove(.menu, from: .quickActionFan))
+        XCTAssertFalse(layout.canRemove(.menu, from: .quickActionBar))
         XCTAssertFalse(layout.canRemove(.address, from: .compact))
 
         var edited = layout
@@ -42,8 +43,12 @@ final class ToolbarLayoutTests: XCTestCase {
 
         XCTAssertFalse(layout.canAdd(to: .compact), "Compact is full by default")
         XCTAssertFalse(layout.canAdd(to: .quickActionFan), "The fan is full by default")
+        XCTAssertFalse(layout.canAdd(to: .quickActionBar), "Tabs and Menu fill the Quick Action bar")
+        layout.remove(atOffsets: IndexSet(integer: 0), from: .quickActionBar)
+        XCTAssertEqual(layout.quickActionBar, [.menu])
         XCTAssertTrue(layout.canAdd(to: .quickActionBar))
         layout.add(.newTab, to: .quickActionBar)
+        XCTAssertEqual(layout.quickActionBar, [.newTab, .menu])
         XCTAssertFalse(layout.canAdd(to: .quickActionBar))
 
         let tooMany: [ToolbarItemKind] = [.back, .forward, .reload, .share, .tabs, .newTab, .find, .menu]
@@ -65,9 +70,18 @@ final class ToolbarLayoutTests: XCTestCase {
         XCTAssertEqual(layout, .default)
     }
 
+    func testOlderQuickActionLayoutsMoveMenuOutOfTheFan() {
+        let old = Data(#"{"quickActionBar":["tabs"],"quickActionFan":["back","forward","reload","tabs","newTab","share","menu"]}"#.utf8)
+        let decoded = ToolbarLayout.decode(old)
+        XCTAssertEqual(decoded.quickActionBar, [.tabs, .menu])
+        XCTAssertEqual(decoded.quickActionFan, [.back, .forward, .reload, .tabs, .newTab, .share])
+    }
+
     func testPersistenceRoundTrip() {
         var layout = ToolbarLayout.default
+        layout.remove(atOffsets: IndexSet(integer: 0), from: .quickActionBar)
         layout.add(.find, to: .quickActionBar)
+        XCTAssertEqual(layout.quickActionBar, [.find, .menu])
         layout.remove(atOffsets: IndexSet(integer: 2), from: .classic)
         let restored = ToolbarLayout.decode(layout.encoded())
         XCTAssertEqual(restored, layout)
