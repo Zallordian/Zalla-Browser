@@ -532,6 +532,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: TabSleep.storageKey)
         defaults.removeObject(forKey: SwipeNavigation.storageKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
+        defaults.removeObject(forKey: SearchBarWidth.storageKey)
         defaults.removeObject(forKey: CookieBannerDismiss.storageKey)
         defaults.removeObject(forKey: ThemePacks.refreshAnimationKey)
         PrivacyReport.reset(in: defaults)
