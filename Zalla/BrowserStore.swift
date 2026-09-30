@@ -801,12 +801,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.allowsBackForwardNavigationGestures = SwipeNavigation.isEnabled
         // Swiping down on the page drags the keyboard away, like Safari.
         webView.scrollView.keyboardDismissMode = .interactive
-        // The web view stays see-through so the chrome material above it has live page pixels to blur.
-        // An opaque background here made the bars look like a frozen picture. The color under the page
-        // (overscroll and load gaps) is still solid, so there is no black flash.
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        webView.isOpaque = false
+        // Avoid black flash behind page chrome and during empty/transient loads. The web view stays opaque so
+        // pages that never set a background keep their normal white or dark canvas. The live blur behind the bars
+        // is handled by chromeScrim in BrowserView, which no longer masks or fades its material.
+        webView.backgroundColor = .systemBackground
+        webView.isOpaque = true
         webView.underPageBackgroundColor = .systemBackground
         observations = [
             webView.observe(\.estimatedProgress, options: [.new]) { [weak self] _, _ in self?.refresh() },
@@ -1540,7 +1539,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                         Task { @MainActor in self?.addToDashboard(link) }
                     }
                     let extra = UIMenu(title: "", options: .displayInline, children: [add])
-                    return UIMenu(title: "", children: suggested + [extra])
+                    var elements: [UIMenuElement] = suggested
+                    elements.append(extra)
+                    return UIMenu(title: "", children: elements)
                 })
                 return
             }

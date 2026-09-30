@@ -57,7 +57,9 @@ enum BookmarkHTML {
 
     private static func stripTags(_ value: String) -> String {
         decodeEntities(value.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression))
-            .replacingOccurrences(of: "\n", with: " ")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     private static func decodeEntities(_ value: String) -> String {

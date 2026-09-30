@@ -11,14 +11,16 @@ struct PrivacyReportView: View {
 
     private var host: String? { PrivacyReport.siteKey(tab.hasPage ? (tab.webView.url ?? tab.url)?.host : nil) }
 
+    private var blockingIsOn: Bool {
+        guard blocker.settings.isEnabled, let key = tab.contentBlockingHost else { return false }
+        return blocker.isBlockingOn(forHost: key)
+    }
+
     var body: some View {
         List {
             if let host {
                 Section {
-                    protectionRow(
-                        title: "Tracker and ad blocking",
-                        on: blocker.settings.isEnabled && blocker.isBlockingOn(forHost: host)
-                    )
+                    protectionRow(title: "Tracker and ad blocking", on: blockingIsOn)
                     protectionRow(title: "Secure connection", on: tab.hasOnlySecureContent)
                     countRow("Tracking tags cleaned from links", PrivacyReport.counts(forHost: host).linkCleaned)
                     countRow("Upgraded to HTTPS", PrivacyReport.counts(forHost: host).httpsUpgrade)

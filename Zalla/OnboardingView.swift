@@ -249,7 +249,7 @@ struct OnboardingView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Accent").font(.headline)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 56), spacing: 12)], spacing: 12) {
-                            ForEach(ZallaThemeID.allCases) { id in
+                            ForEach(ZallaThemeID.allCases.filter { !$0.requiresUnlock }) { id in
                                 let swatch = ZallaTheme.theme(for: id)
                                 let selected = themeID == id.rawValue
                                 Button {

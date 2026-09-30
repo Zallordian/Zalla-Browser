@@ -35,8 +35,10 @@ struct ThemeRefreshEffect: View {
         guard pack != nil else { return }
         running = false
         visible = true
-        withAnimation(.easeIn(duration: 0.9)) { running = true }
         Task { @MainActor in
+            // Let the glyph appear at its start position first, then animate it to the far side.
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            withAnimation(.easeIn(duration: 0.9)) { running = true }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             visible = false
             running = false
