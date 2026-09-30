@@ -170,4 +170,21 @@ final class IncomingLinkTests: XCTestCase {
         XCTAssertNil(IncomingLink.webURL(from: URL(string: "file:///etc/passwd")!))
         XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open")!))
     }
+
+    func testOnlyHTTPAndHTTPSTargetsWithAHostAreOpened() {
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=ftp://example.com/file")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=data:text/html,hi")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=file:///etc/hosts")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=https://")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?other=https://example.com")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "mailto:someone@example.com")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "tel:5551234")!))
+        XCTAssertEqual(IncomingLink.webURL(from: URL(string: "ZALLA://open?url=HTTPS://example.com/Path")!)?.host, "example.com")
+    }
+
+    func testEncodedTargetsAreDecodedOnce() {
+        let link = URL(string: "zalla://open?url=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1%26c%3D2")!
+        XCTAssertEqual(IncomingLink.webURL(from: link)?.absoluteString, "https://example.com/a?b=1&c=2")
+    }
 }
