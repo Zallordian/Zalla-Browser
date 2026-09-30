@@ -188,10 +188,12 @@ struct OnboardingView: View {
             VStack(spacing: 10) {
                 Text("Welcome to Zalla")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                Text("Built around you.")
+                Text("Private by default. Beautiful by design.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
-                Text("A private browser that keeps your library on this device. No Zalla account. No built-in analytics.")
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                Text("Your bookmarks and history stay on this device, and Zalla has no built-in analytics.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
@@ -311,7 +313,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 16) {
             header(
                 title: "Navigation",
-                subtitle: "Pick how your controls sit on screen. The preview updates as you choose."
+                subtitle: "Pick how your controls sit on screen."
             )
             .padding(.horizontal, 24)
 
@@ -411,13 +413,13 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Passwords", systemImage: "key.fill")
                         .font(.headline)
-                    Text("Zalla uses Apple Passwords and iCloud Keychain AutoFill. There is no separate Zalla vault. Turn on AutoFill so Safari and Zalla share the same saved passwords.")
+                    Text("Zalla works with Apple Passwords and iCloud Keychain AutoFill, and has no password vault of its own. Zalla does not appear in the Passwords list in Settings. To use your saved passwords here, turn on AutoFill Passwords in Settings under General, AutoFill & Passwords, then tap a login field in Zalla.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {
                         openPasswordSettings()
                     } label: {
-                        Text("Open password settings")
+                        Text("Open Settings")
                             .font(.subheadline.weight(.semibold))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -492,7 +494,7 @@ struct OnboardingView: View {
             VStack(spacing: 10) {
                 Text("Enjoy your stay")
                     .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                Text("Your tabs, bookmarks, and history stay on this device. Have a great browse.")
+                Text("Your tabs, bookmarks, and history stay on this device. Zalla also blocks common ads and trackers for you, and you can fine tune that in Settings. Have a great browse.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 28)
@@ -637,16 +639,9 @@ struct OnboardingView: View {
     }
 
     private func openPasswordSettings() {
-        let candidates = [
-            "App-prefs:PASSWORDS",
-            "App-prefs:Password",
-            UIApplication.openSettingsURLString
-        ]
-        for raw in candidates {
-            if let url = URL(string: raw), UIApplication.shared.canOpenURL(url) {
-                UIApplication.shared.open(url)
-                return
-            }
+        // Opens the Settings app. Zalla does not appear in the Passwords list itself.
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
         }
     }
 

@@ -16,7 +16,13 @@ struct NewTabView: View {
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
     @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
     @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
+    @AppStorage(HomeShortcuts.hideAddHintKey) private var hideAddHint = false
+    @AppStorage(NewTabBackground.storageKey) private var backgroundRaw = NewTabBackground.standard.storageValue
+    @AppStorage(NewTabPhotoStore.revisionKey) private var photoRevision = 0
+    @ObservedObject private var unlock = ZallaUnlock.shared
+    @Environment(\.colorScheme) private var systemColorScheme
 
+    @State private var showBackgroundPicker = false
     @State private var homePage = 0
     @State private var shortcuts: [HomeShortcut] = HomeShortcuts.load()
     @State private var address = ""
@@ -32,6 +38,19 @@ struct NewTabView: View {
         HomeWelcomeMode(rawValue: welcomeModeRaw) ?? .quotes
     }
 
+    /// The background actually drawn: packs fall back to the standard look without Zalla Unlock.
+    private var background: NewTabBackground {
+        _ = photoRevision
+        return NewTabBackground(storageValue: backgroundRaw)
+            .effective(unlocked: unlock.isUnlocked, hasPhoto: NewTabPhotoStore.exists)
+    }
+
+    /// Text on a dark or light background keeps its contrast; the standard look follows the system.
+    private var contentColorScheme: ColorScheme {
+        guard let dark = background.prefersDarkContent else { return systemColorScheme }
+        return dark ? .dark : .light
+    }
+
     var body: some View {
         Group {
             if isEditing {
@@ -40,19 +59,21 @@ struct NewTabView: View {
                 browseModeBody
             }
         }
+        .environment(\.colorScheme, contentColorScheme)
         .background {
-            Color(uiColor: .systemGroupedBackground)
-                .overlay(alignment: .top) {
-                    RadialGradient(
-                        colors: [theme.primary.opacity(washIntensity), .clear],
-                        center: .top,
-                        startRadius: 20,
-                        endRadius: 420
-                    )
-                }
-                .ignoresSafeArea()
+            NewTabBackgroundView(
+                background: background,
+                theme: theme,
+                washIntensity: washIntensity,
+                photo: background == .photo ? NewTabPhotoStore.image() : nil
+            )
         }
         .onAppear { shortcuts = HomeShortcuts.load() }
+        .sheet(isPresented: $showBackgroundPicker) {
+            NewTabBackgroundSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .sheet(item: $editingShortcut) { shortcut in
             NavigationStack {
                 ShortcutEditor(shortcut: shortcut) { updated in
@@ -79,7 +100,7 @@ struct NewTabView: View {
                 homeHero
                 searchField
                 if shortcuts.isEmpty {
-                    emptyShortcutsNudge
+                    emptyShortcutTile
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 14)], spacing: 16) {
                         ForEach(shortcuts) { shortcut in
@@ -108,7 +129,10 @@ struct NewTabView: View {
                 Spacer(minLength: 40)
             }
             .padding(24)
+            .contentShape(Rectangle())
+            .onTapGesture { searchFocused = false }
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Home slider
@@ -200,7 +224,7 @@ struct NewTabView: View {
                     .foregroundStyle(.primary)
             }
         case .quotes:
-            Text(HomeQuotes.quote())
+            Text(tab.newTabSaying)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
@@ -208,40 +232,49 @@ struct NewTabView: View {
         }
     }
 
-    private var emptyShortcutsNudge: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "link.badge.plus")
-                .font(.title)
-                .foregroundStyle(theme.primary)
-            Text("Pin your daily sites")
-                .font(.headline)
-            Text("Add the websites you open every day so they are one tap away. Search above still works anytime.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            Button {
-                editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
-            } label: {
-                Text("Add shortcut")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+    /// Fresh installs have no shortcuts: one empty, semi-transparent tile with a plus. The hint can be dismissed,
+    /// which leaves just the small tile.
+    private var emptyShortcutTile: some View {
+        Button {
+            editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
+        } label: {
+            VStack(spacing: hideAddHint ? 0 : 8) {
+                Image(systemName: "plus")
+                    .font(hideAddHint ? .title3.weight(.semibold) : .title2.weight(.semibold))
+                    .foregroundStyle(theme.primary)
+                if !hideAddHint {
+                    Text("Add a shortcut")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(theme.primary)
-            Button("Manage shortcuts") {
-                withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
+            .frame(width: hideAddHint ? 52 : 108, height: hideAddHint ? 52 : 92)
+            .background(
+                Color(uiColor: .secondarySystemGroupedBackground).opacity(0.45),
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(theme.primary.opacity(0.25), lineWidth: 1)
             }
-            .font(.subheadline.weight(.semibold))
+            .overlay(alignment: .topTrailing) {
+                if !hideAddHint {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { hideAddHint = true }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 32, minHeight: 32)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Hide the add shortcut hint")
+                }
+            }
         }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .padding(.horizontal, 18)
-        .background(
-            Color(uiColor: .secondarySystemGroupedBackground).opacity(0.65),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
-        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Add a shortcut")
     }
 
     private var editModeBody: some View {
@@ -312,6 +345,14 @@ struct NewTabView: View {
                     .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
             }
             Spacer()
+            Button {
+                showBackgroundPicker = true
+            } label: {
+                Image(systemName: "pencil")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .accessibilityLabel("Change new tab background")
             Menu {
                 Button {
                     editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")

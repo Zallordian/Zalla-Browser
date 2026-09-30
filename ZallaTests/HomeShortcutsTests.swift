@@ -2,24 +2,24 @@ import XCTest
 @testable import Zalla
 
 final class HomeShortcutsTests: XCTestCase {
-    func testDefaultsAreNonEmpty() {
-        XCTAssertGreaterThanOrEqual(HomeShortcuts.defaults.count, 4)
-        XCTAssertLessThanOrEqual(HomeShortcuts.defaults.count, 8)
-        for shortcut in HomeShortcuts.defaults {
-            XCTAssertFalse(shortcut.title.isEmpty)
-            XCTAssertNotNil(shortcut.url)
-            XCTAssertFalse(shortcut.symbolName.isEmpty)
-        }
+    func testFreshInstallHasNoDefaultShortcuts() {
+        XCTAssertTrue(HomeShortcuts.defaults.isEmpty)
+        let defaults = UserDefaults(suiteName: "zalla.homeShortcuts.fresh")!
+        defaults.removePersistentDomain(forName: "zalla.homeShortcuts.fresh")
+        XCTAssertTrue(HomeShortcuts.load(from: defaults).isEmpty)
     }
 
     func testCodableRoundTrip() throws {
-        let original = HomeShortcuts.defaults
+        let original = [
+            HomeShortcut(title: "Example", urlString: "https://example.com", symbolName: "globe"),
+            HomeShortcut(title: "Test", urlString: "https://test.example", symbolName: "star")
+        ]
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode([HomeShortcut].self, from: data)
         XCTAssertEqual(decoded, original)
     }
 
-    func testSeededIfEmptyUsesDefaults() {
+    func testSeededIfEmptyUsesDefaultsAndKeepsCustomLists() {
         XCTAssertEqual(HomeShortcuts.seededIfEmpty(nil), HomeShortcuts.defaults)
         XCTAssertEqual(HomeShortcuts.seededIfEmpty([]), HomeShortcuts.defaults)
         let custom = [HomeShortcut(title: "A", urlString: "https://a.test", symbolName: "globe")]
@@ -37,6 +37,7 @@ final class HomeShortcutsTests: XCTestCase {
         XCTAssertEqual(loaded, sample)
         HomeShortcuts.resetToDefaults(in: defaults)
         XCTAssertEqual(HomeShortcuts.load(from: defaults), HomeShortcuts.defaults)
+        XCTAssertTrue(HomeShortcuts.load(from: defaults).isEmpty)
         XCTAssertTrue(defaults.bool(forKey: HomeShortcuts.showLogoKey))
         XCTAssertTrue(defaults.bool(forKey: HomeShortcuts.showSliderKey))
         XCTAssertTrue(defaults.bool(forKey: HomeShortcuts.showRecentHistoryKey))

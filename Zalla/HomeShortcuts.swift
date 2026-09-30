@@ -23,6 +23,7 @@ enum HomeShortcuts {
     static let washIntensityKey = "homeWashIntensity"
     static let showLogoKey = "homeShowLogo"
     static let showSliderKey = "homeShowSlider"
+    static let hideAddHintKey = "homeHideAddShortcutHint"
 
     /// Curated SF Symbols for shortcut icons.
     static let curatedSymbols: [String] = [
@@ -52,14 +53,8 @@ enum HomeShortcuts {
         "gamecontroller"
     ]
 
-    static let defaults: [HomeShortcut] = [
-        HomeShortcut(title: "DuckDuckGo", urlString: "https://duckduckgo.com", symbolName: "magnifyingglass"),
-        HomeShortcut(title: "Wikipedia", urlString: "https://wikipedia.org", symbolName: "book"),
-        HomeShortcut(title: "Apple", urlString: "https://www.apple.com", symbolName: "apple.logo"),
-        HomeShortcut(title: "Proton Mail", urlString: "https://mail.proton.me", symbolName: "envelope"),
-        HomeShortcut(title: "GitHub", urlString: "https://github.com", symbolName: "chevron.left.forwardslash.chevron.right"),
-        HomeShortcut(title: "Maps", urlString: "https://maps.apple.com", symbolName: "map")
-    ]
+    /// Fresh installs and resets start with no shortcuts. Existing users keep the list they already have.
+    static let defaults: [HomeShortcut] = []
 
     static func load(from defaults: UserDefaults = .standard) -> [HomeShortcut] {
         guard let data = defaults.data(forKey: storageKey) else {
@@ -84,6 +79,7 @@ enum HomeShortcuts {
 
     static func resetToDefaults(in defaults: UserDefaults = .standard) {
         save(Self.defaults, to: defaults)
+        defaults.removeObject(forKey: hideAddHintKey)
         defaults.set(true, forKey: showRecentHistoryKey)
         defaults.set(0.35, forKey: washIntensityKey)
         defaults.set(true, forKey: showLogoKey)
@@ -92,7 +88,7 @@ enum HomeShortcuts {
         defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)
     }
 
-    /// Pure helper for tests: seed defaults when the stored list is empty or missing.
+    /// Pure helper for tests: the default (empty) list when nothing is stored, else the stored list.
     static func seededIfEmpty(_ existing: [HomeShortcut]?) -> [HomeShortcut] {
         guard let existing, !existing.isEmpty else { return Self.defaults }
         return existing

@@ -59,7 +59,7 @@ final class BrowserStore: ObservableObject {
         } catch {
             storageError = "Your saved library could not be read. \(error.localizedDescription)"
         }
-        // Seed home shortcuts on first launch if missing.
+        // Home shortcuts: fresh installs start empty; anyone who already has a saved list keeps it.
         if UserDefaults.standard.data(forKey: HomeShortcuts.storageKey) == nil {
             HomeShortcuts.save(HomeShortcuts.defaults)
         }
@@ -310,6 +310,9 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ChromeModeTips.quickActionSeenKey)
         defaults.set(false, forKey: "hasCompletedOnboarding")
         HomeShortcuts.resetToDefaults()
+        NewTabPhotoStore.remove()
+        defaults.removeObject(forKey: NewTabBackground.storageKey)
+        defaults.removeObject(forKey: NewTabPhotoStore.revisionKey)
         ContentBlocker.shared.resetSettings()
         if UIApplication.shared.supportsAlternateIcons {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -487,6 +490,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var isReaderActive = false
     @Published var readerAvailable = false
     @Published var hasOnlySecureContent = true
+    /// The saying shown on this tab's new tab page. Picked once per tab so it does not change while the page is open.
+    let newTabSaying = NewTabSayings.next()
     /// Set when HTTPS-Only Mode could not open a site securely; shows the in-app notice.
     @Published var httpsFallback: HTTPSFallback?
     /// Request Desktop Site for this tab. Applied to every navigation through WKWebpagePreferences.

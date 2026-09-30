@@ -301,21 +301,3 @@ enum HomeWelcomeMode: String, CaseIterable, Identifiable, Codable {
     static let storageKey = "homeWelcomeMode"
     static let userNameKey = "homeUserName"
 }
-
-enum HomeQuotes {
-    static let lines: [String] = [
-        "Built around you.",
-        "Browse at your own pace.",
-        "Your tabs, your rhythm.",
-        "Keep what matters close.",
-        "A quieter place on the web.",
-        "Start where you left off.",
-        "Simple tools, ready when you are."
-    ]
-
-    static func quote(for date: Date = Date()) -> String {
-        let calendar = Calendar.current
-        let day = calendar.ordinality(of: .day, in: .year, for: date) ?? 1
-        return lines[day % lines.count]
-    }
-}
