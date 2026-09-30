@@ -443,6 +443,8 @@ final class BrowserStore: ObservableObject {
         MediaPermissionSession.memory.removeAll()
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
+        PrivacyReport.clearHosts()
+        UserDefaults.standard.removeObject(forKey: DesktopSitePreference.storageKey)
         speaker.stop()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
@@ -467,6 +469,8 @@ final class BrowserStore: ObservableObject {
         MediaPermissionSession.memory.removeAll()
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
+        PrivacyReport.clearHosts()
+        UserDefaults.standard.removeObject(forKey: DesktopSitePreference.storageKey)
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
