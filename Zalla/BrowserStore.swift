@@ -1335,6 +1335,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private func decidePolicy(for navigationAction: WKNavigationAction, webView: WKWebView,
                               decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        // Going back or forward (including the edge swipe) leaves reader mode, so the address bar and history follow the page again.
+        if isReaderActive, navigationAction.navigationType == .backForward {
+            isReaderActive = false
+            readerOriginalURL = nil
+        }
         let scheme = url.scheme?.lowercased() ?? ""
         if scheme == "blob" || scheme == "data" {
             // JS-triggered blob/data downloads become WKDownload via the action path.
