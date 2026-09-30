@@ -60,6 +60,9 @@ enum HTTPSOnly {
                 return true
             case (169, 254), (192, 168):
                 return true
+            case (100, 64...127):
+                // Carrier-grade NAT range, which Tailscale and similar tools use.
+                return true
             case (172, 16...31):
                 return true
             default:
@@ -67,13 +70,27 @@ enum HTTPSOnly {
             }
         }
         if host.contains(":") {
-            if host == "::1" { return true }
+            if host == "::1" || host == "::" { return true }
+            if let mapped = mappedIPv4(host) { return isLocalOrPrivate(mapped) }
             let first = host.split(separator: ":", omittingEmptySubsequences: false).first ?? ""
             guard let group = UInt16(first, radix: 16) else { return false }
             // Unique local fc00::/7 and link-local fe80::/10.
             return (group & 0xFE00) == 0xFC00 || (group & 0xFFC0) == 0xFE80
         }
         return !host.contains(".")
+    }
+
+    /// The IPv4 address inside an IPv4-mapped IPv6 host such as ::ffff:10.0.0.1 or ::ffff:a00:1, else nil.
+    private static func mappedIPv4(_ host: String) -> String? {
+        let prefix = "::ffff:"
+        guard host.hasPrefix(prefix) else { return nil }
+        let rest = String(host.dropFirst(prefix.count))
+        if rest.contains(".") { return rest }
+        let groups = rest.split(separator: ":", omittingEmptySubsequences: false)
+        guard groups.count == 2,
+              let high = UInt16(groups[0], radix: 16),
+              let low = UInt16(groups[1], radix: 16) else { return nil }
+        return "\(high >> 8).\(high & 0xFF).\(low >> 8).\(low & 0xFF)"
     }
 
     private static func ipv4Octets(_ host: String) -> [Int]? {

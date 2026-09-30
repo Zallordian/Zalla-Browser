@@ -40,11 +40,23 @@ final class HTTPSOnlyTests: XCTestCase {
             "http://169.254.10.20/",
             "http://[::1]:8080/",
             "http://[fd12:3456::1]/",
-            "http://[fe80::1]/"
+            "http://[fe80::1]/",
+            "http://100.64.0.1/",
+            "http://100.127.255.254/",
+            "http://[::]/",
+            "http://[::ffff:127.0.0.1]/",
+            "http://[::ffff:10.1.2.3]/",
+            "http://[::ffff:c0a8:101]/"
         ]
         for string in local {
             XCTAssertNil(HTTPSOnly.upgradedURL(for: URL(string: string)!), string)
         }
+    }
+
+    func testSharedAddressRangeEndsAtItsEdges() {
+        XCTAssertNotNil(HTTPSOnly.upgradedURL(for: URL(string: "http://100.63.255.255/")!))
+        XCTAssertNotNil(HTTPSOnly.upgradedURL(for: URL(string: "http://100.128.0.1/")!))
+        XCTAssertNotNil(HTTPSOnly.upgradedURL(for: URL(string: "http://[::ffff:8.8.8.8]/")!))
     }
 
     func testUpgradesPublicIPs() {
