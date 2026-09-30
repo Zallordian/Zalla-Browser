@@ -77,11 +77,22 @@ final class HTTPSOnlyTests: XCTestCase {
     }
 
     func testNoticeCopy() {
-        XCTAssertEqual(HTTPSOnly.goBackTitle, "Go Back")
-        XCTAssertEqual(HTTPSOnly.continueTitle, "Continue to Site")
-        XCTAssertTrue(HTTPSOnly.noticeMessage(host: "example.com").hasPrefix("example.com"))
+        XCTAssertEqual(HTTPSOnly.noticeTitle, "This site doesn't use encryption.")
+        XCTAssertEqual(HTTPSOnly.goBackTitle, "Take me back")
+        XCTAssertEqual(HTTPSOnly.continueTitle, "Continue anyway")
+        XCTAssertTrue(HTTPSOnly.noticeMessage.hasPrefix("Anything you type here"))
         let dash = String(UnicodeScalar(0x2014)!)
         XCTAssertFalse(HTTPSOnly.noticeTitle.contains(dash))
-        XCTAssertFalse(HTTPSOnly.noticeMessage(host: "a.test").contains(dash))
+        XCTAssertFalse(HTTPSOnly.noticeMessage.contains(dash))
+    }
+
+    func testOnByDefaultUnlessTurnedOff() {
+        let defaults = UserDefaults(suiteName: "zalla.https.default")!
+        defaults.removePersistentDomain(forName: "zalla.https.default")
+        XCTAssertTrue(HTTPSOnly.enabled(in: defaults), "Nothing stored means on")
+        defaults.set(false, forKey: HTTPSOnly.storageKey)
+        XCTAssertFalse(HTTPSOnly.enabled(in: defaults), "A saved choice wins")
+        defaults.set(true, forKey: HTTPSOnly.storageKey)
+        XCTAssertTrue(HTTPSOnly.enabled(in: defaults))
     }
 }

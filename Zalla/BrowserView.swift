@@ -2218,7 +2218,7 @@ private struct SettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
-    @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = false
+    @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
     @State private var confirmClear = false
     @State private var confirmReset = false

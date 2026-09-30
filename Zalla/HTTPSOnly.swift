@@ -5,17 +5,19 @@ import Foundation
 enum HTTPSOnly {
     static let storageKey = "httpsOnlyMode"
 
+    /// On unless you turned it off. People who never touched the switch get it too.
     static var isEnabled: Bool {
-        UserDefaults.standard.bool(forKey: storageKey)
+        enabled(in: .standard)
     }
 
-    static let noticeTitle = "This site doesn't support a secure connection"
-    static let goBackTitle = "Go Back"
-    static let continueTitle = "Continue to Site"
-
-    static func noticeMessage(host: String) -> String {
-        "\(host) could not be opened over HTTPS. If you continue, pages and anything you send on this site, like passwords or messages, are not encrypted and could be seen by others on the network."
+    static func enabled(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: storageKey) as? Bool ?? true
     }
+
+    static let noticeTitle = "This site doesn't use encryption."
+    static let noticeMessage = "Anything you type here could be read by others on the network. Probably fine for reading recipes. Less fine for passwords."
+    static let goBackTitle = "Take me back"
+    static let continueTitle = "Continue anyway"
 
     /// The https version of `url`, or nil when it should load as is: not http, a local or private
     /// network address, or a host you chose to open over http this session.

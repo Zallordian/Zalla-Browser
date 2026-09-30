@@ -98,7 +98,7 @@ enum SafetyOverview {
     /// Builds the list from the current settings. Pure so it can be tested with a scratch UserDefaults.
     static func items(unlocked: Bool, defaults: UserDefaults = .standard) -> [SafetyItem] {
         let blocking = blockingIsOn(defaults)
-        let httpsOnly = defaults.bool(forKey: HTTPSOnly.storageKey)
+        let httpsOnly = HTTPSOnly.enabled(in: defaults)
         let proxy = ProxySettings.stored(in: defaults)
         let faceID = PrivateTabLock.isRequired(unlocked: unlocked, defaults: defaults)
         let schedule = unlocked ? AutoClear.schedule(defaults) : .off
