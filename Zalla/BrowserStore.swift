@@ -37,6 +37,8 @@ final class BrowserStore: ObservableObject {
     /// Off while restoring or clearing, so half-built tab lists never overwrite the saved session.
     private var sessionSavingEnabled = false
     private var contentRulesObserver: NSObjectProtocol?
+    private var scriptsObserver: NSObjectProtocol?
+    private var proxyObserver: NSObjectProtocol?
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
 
@@ -65,6 +67,9 @@ final class BrowserStore: ObservableObject {
         if UserDefaults.standard.data(forKey: HomeShortcuts.storageKey) == nil {
             HomeShortcuts.save(HomeShortcuts.defaults)
         }
+        // Encrypted DNS for Zalla's own requests and the optional proxy are set before any tab loads.
+        ShieldRuntime.applyEncryptedDNS()
+        refreshProxy()
         if !restoreSession() {
             addTab()
         }
@@ -78,6 +83,24 @@ final class BrowserStore: ObservableObject {
             }
         }
         ContentBlocker.shared.start()
+        // Privacy Shield, location, and site CSS choices reach a tab's next page load.
+        scriptsObserver = NotificationCenter.default.addObserver(
+            forName: .zallaScriptsChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.tabs.forEach { $0.applyPageScripts(for: $0.webView.url) }
+            }
+        }
+        proxyObserver = NotificationCenter.default.addObserver(
+            forName: .zallaProxyChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshProxy() }
+        }
+    }
+
+    /// Sends web traffic through the user's proxy (or stops doing so) for normal and private tabs.
+    func refreshProxy() {
+        ShieldRuntime.refreshProxy(privateStores: tabs.filter(\.isPrivate).map { $0.webView.configuration.websiteDataStore })
     }
 
     @discardableResult
@@ -317,6 +340,9 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: NewTabBackground.storageKey)
         defaults.removeObject(forKey: NewTabPhotoStore.revisionKey)
         ContentBlocker.shared.resetSettings()
+        PrivacyShield.resetSettings()
+        LocationSettings.clear()
+        SiteCSS.clearAll()
         if UIApplication.shared.supportsAlternateIcons {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 UIApplication.shared.setAlternateIconName(nil) { _ in
@@ -524,6 +550,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var lastSnapshotAt: Date?
     /// The http address HTTPS-Only Mode upgraded, until the https load commits or fails.
     private var pendingHTTPSUpgrade: URL?
+    /// The last address whose tracking tags were removed, so a site that adds them back cannot cause a loop.
+    private var lastStrippedSource: URL?
     /// Zoom levels chosen in a private tab. Never written to disk.
     private var privatePageZoom: [String: Double] = [:]
 
@@ -539,11 +567,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         } else {
             configuration = WKWebViewConfiguration()
             configuration.websiteDataStore = isPrivate ? .nonPersistent() : .default()
+            if isPrivate {
+                ShieldRuntime.applyProxy(toNewStore: configuration.websiteDataStore)
+            }
             // Play video in the page (needed for camera previews and calls) instead of forcing full screen.
             configuration.allowsInlineMediaPlayback = true
             let controller = WKUserContentController()
-            let script = WKUserScript(source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
-            controller.addUserScript(script)
             configuration.userContentController = controller
             newController = controller
         }
@@ -552,6 +581,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         if let newController {
             scriptHandlerProxy.delegate = self
             newController.add(scriptHandlerProxy, name: "zallaImage")
+        }
+        if newController != nil {
+            applyPageScripts(for: nil)
         }
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -570,6 +602,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             webView.observe(\.canGoForward, options: [.new]) { [weak self] _, _ in self?.refresh() },
             webView.observe(\.hasOnlySecureContent, options: [.new]) { [weak self] _, _ in self?.refresh() }
         ]
+    }
+
+    /// Installs Zalla's scripts for the page about to load: the image export hook always, plus Privacy Shield,
+    /// approximate location, and site CSS from the current settings. Popups share their opener's controller.
+    func applyPageScripts(for url: URL?) {
+        let controller = webView.configuration.userContentController
+        controller.removeAllUserScripts()
+        controller.addUserScript(WKUserScript(
+            source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false
+        ))
+        for spec in PageScripts.plan(for: url, unlocked: ZallaUnlock.shared.isUnlocked) {
+            controller.addUserScript(WKUserScript(
+                source: spec.source,
+                injectionTime: spec.atDocumentStart ? .atDocumentStart : .atDocumentEnd,
+                forMainFrameOnly: spec.mainFrameOnly
+            ))
+        }
     }
 
     private static let imageLongPressScript = """
@@ -885,6 +934,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         pendingHTTPSUpgrade = nil
+        lastStrippedSource = nil
         applyStoredPageZoom()
     }
 
@@ -956,6 +1006,19 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             return
         }
         if ["http", "https", "about"].contains(scheme) {
+            if PrivacyShield.stripLinks(), scheme != "about",
+               navigationAction.targetFrame?.isMainFrame == true,
+               navigationAction.navigationType == .linkActivated || navigationAction.navigationType == .other,
+               (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET",
+               lastStrippedSource != url,
+               let cleanURL = TrackingParameters.cleaned(url) {
+                // Load the same page without tracking tags. If a site sends the tags straight back,
+                // the second time is let through so it cannot loop.
+                lastStrippedSource = url
+                decisionHandler(.cancel)
+                webView.load(URLRequest(url: cleanURL))
+                return
+            }
             if scheme == "http", let original = pendingHTTPSUpgrade,
                navigationAction.navigationType == .other,
                isHTTPSOnlyCandidate(navigationAction),
@@ -978,6 +1041,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             } else {
                 if navigationAction.targetFrame?.isMainFrame == true {
                     applyContentBlocking(for: url)
+                    applyPageScripts(for: url)
                 }
                 // New-window actions are allowed so WebKit asks createWebViewWith for a child tab.
                 decisionHandler(.allow)

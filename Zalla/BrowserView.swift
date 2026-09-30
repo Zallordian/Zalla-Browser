@@ -1473,6 +1473,7 @@ private struct BrowserMenuSheet: View {
                 if let tab = browser.selected, tab.hasPage {
                     PageZoomControl(tab: tab)
                     SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
+                    SiteToolsMenuRows(tab: tab)
                 }
                 Button {
                     if let tab = browser.selected {
@@ -2257,13 +2258,19 @@ private struct SettingsView: View {
                 NavigationLink("Content Blocking") {
                     ContentBlockingView()
                 }
+                NavigationLink("Privacy Shield") {
+                    PrivacyShieldView()
+                }
+                NavigationLink("Location") {
+                    LocationSettingsView()
+                }
                 Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("Content Blocking stops trackers and common ads on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {

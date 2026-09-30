@@ -90,7 +90,8 @@ enum AddressResolver {
             return url
         }
 
-        return searchURL(for: text, engine: engine, customTemplate: customTemplate)
+        // Searches that are clearly local get the saved city when that setting is on.
+        return searchURL(for: LocalSearch.augmentedForCurrentSettings(text), engine: engine, customTemplate: customTemplate)
     }
 
     /// Builds a search-results URL for the chosen engine (always in-app).
