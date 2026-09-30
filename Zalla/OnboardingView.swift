@@ -654,7 +654,10 @@ struct OnboardingView: View {
             let accessed = url.startAccessingSecurityScopedResource()
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             do {
-                let text = try String(contentsOf: url, encoding: .utf8)
+                guard let text = BookmarkHTML.text(from: try Data(contentsOf: url)) else {
+                    importMessage = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
+                    return
+                }
                 let pages = BookmarkHTML.parse(text)
                 let added = browser.importBookmarks(pages)
                 importMessage = added == 0

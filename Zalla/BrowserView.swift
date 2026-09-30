@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import QuickLook
 import UniformTypeIdentifiers
 import WebKit
 
@@ -1521,6 +1522,11 @@ private struct BrowserMenuSheet: View {
                     PageZoomControl(tab: tab)
                     SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
                     SiteToolsMenuRows(tab: tab)
+                    NavigationLink {
+                        PrivacyReportView(tab: tab)
+                    } label: {
+                        Label("Privacy report", systemImage: "checklist")
+                    }
                 }
                 Button {
                     if let tab = browser.selected {
@@ -2006,7 +2012,7 @@ private struct LibraryView: View {
                 Section {
                     Button {
                         showImporter = true
-                    } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
+                    } label: { Label("Import bookmarks from Safari or Chrome", systemImage: "square.and.arrow.down") }
                     Button {
                         exportBookmarks()
                     } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
@@ -2105,10 +2111,13 @@ private struct LibraryView: View {
             let accessed = url.startAccessingSecurityScopedResource()
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             do {
-                let text = try String(contentsOf: url, encoding: .utf8)
+                guard let text = BookmarkHTML.text(from: try Data(contentsOf: url)) else {
+                    message = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
+                    return
+                }
                 let added = browser.importBookmarks(BookmarkHTML.parse(text))
                 message = added == 0
-                    ? "No new bookmarks were found in that file."
+                    ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
                     : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
             } catch {
                 message = error.localizedDescription
@@ -2122,16 +2131,34 @@ private struct DownloadsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
     @State private var showShare = false
+    @State private var previewURL: URL?
     @State private var confirmClear = false
 
     var body: some View {
         List {
             if browser.downloads.isEmpty {
-                Text("No downloads yet").foregroundStyle(.secondary)
+                VStack(spacing: 8) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    Text("Nothing downloaded yet.")
+                        .font(.headline)
+                    Text("Files you save from the web land here, ready to open or share.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+                .listRowBackground(Color.clear)
             }
             ForEach(browser.downloads) { record in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
+                        Image(systemName: record.symbolName)
+                            .foregroundStyle(.tint)
+                            .accessibilityHidden(true)
                         Text(record.filename).font(.subheadline.weight(.semibold)).lineLimit(1)
                         if record.isPrivate {
                             Text("Private")
@@ -2141,6 +2168,10 @@ private struct DownloadsView: View {
                                 .background(Color.primary.opacity(0.12), in: Capsule())
                         }
                         Spacer()
+                        if record.state == .downloading {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
                         Text(stateLabel(record.state))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2162,8 +2193,7 @@ private struct DownloadsView: View {
                     if record.state == .completed, let fileURL = record.localFileURL {
                         HStack {
                             Button("Open") {
-                                shareURL = fileURL
-                                showShare = true
+                                previewURL = fileURL
                             }
                             Button("Share") {
                                 shareURL = fileURL
@@ -2176,6 +2206,11 @@ private struct DownloadsView: View {
                         .font(.subheadline.weight(.semibold))
                         .buttonStyle(.borderless)
                     } else if record.state == .failed {
+                        if let reason = record.errorMessage, !reason.isEmpty {
+                            Text(reason)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Button("Delete", role: .destructive) {
                             browser.removeDownload(record)
                         }
@@ -2203,6 +2238,7 @@ private struct DownloadsView: View {
                 ActivityShareSheet(items: [shareURL])
             }
         }
+        .quickLookPreview($previewURL)
         .confirmationDialog("Clear all downloads?", isPresented: $confirmClear, titleVisibility: .visible) {
             Button("Clear all", role: .destructive) { browser.clearAllDownloads() }
         }
@@ -2211,8 +2247,8 @@ private struct DownloadsView: View {
     private func stateLabel(_ state: DownloadState) -> String {
         switch state {
         case .downloading: return "Downloading"
-        case .completed: return "Completed"
-        case .failed: return "Failed"
+        case .completed: return "Done"
+        case .failed: return "Did not finish"
         }
     }
 }
@@ -2283,6 +2319,7 @@ private struct SettingsView: View {
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
     @AppStorage(SwipeNavigation.storageKey) private var swipeNavigation = true
+    @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -2412,7 +2449,7 @@ private struct SettingsView: View {
                 SearchEngineSettingsRows()
                 Button {
                     showImporter = true
-                } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
+                } label: { Label("Import bookmarks from Safari or Chrome", systemImage: "square.and.arrow.down") }
                 Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
                 Toggle("Swipe from edges to go back", isOn: $swipeNavigation)
                     .onChange(of: swipeNavigation) { _, newValue in
@@ -2453,6 +2490,12 @@ private struct SettingsView: View {
                 NavigationLink("Privacy Shield") {
                     PrivacyShieldView()
                 }
+                if let tab = browser.selected {
+                    NavigationLink("Privacy report") {
+                        PrivacyReportView(tab: tab)
+                    }
+                }
+                Toggle("Close cookie banners", isOn: $cookieBanners)
                 NavigationLink("Location") {
                     LocationSettingsView()
                 }
@@ -2463,7 +2506,7 @@ private struct SettingsView: View {
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Face ID for private tabs and Auto-clear are part of Zalla Unlock. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Face ID for private tabs and Auto-clear are part of Zalla Unlock. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {
@@ -2759,10 +2802,14 @@ private struct SettingsView: View {
             let accessed = url.startAccessingSecurityScopedResource()
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             do {
-                let text = try String(contentsOf: url, encoding: .utf8)
+                let data = try Data(contentsOf: url)
+                guard let text = BookmarkHTML.text(from: data) else {
+                    bookmarkMessage = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
+                    return
+                }
                 let added = browser.importBookmarks(BookmarkHTML.parse(text))
                 bookmarkMessage = added == 0
-                    ? "No new bookmarks were found in that file."
+                    ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
                     : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
             } catch {
                 bookmarkMessage = error.localizedDescription

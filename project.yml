@@ -27,6 +27,10 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
+        CFBundleURLTypes:
+          - CFBundleURLName: com.zalla.browser.open
+            CFBundleURLSchemes:
+              - zalla
         NSAppTransportSecurity:
           NSAllowsArbitraryLoadsInWebContent: true
         NSPhotoLibraryAddUsageDescription: Zalla saves exported images to Photos when you choose Save to Photos.

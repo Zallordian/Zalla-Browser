@@ -165,6 +165,16 @@ final class BrowserStore: ObservableObject {
         addTab(isPrivate: true, url: url)
     }
 
+    /// Opens an address another app sent to Zalla. It reuses a blank new tab, otherwise starts a fresh one.
+    func openIncoming(_ url: URL) {
+        guard let target = IncomingLink.webURL(from: url) else { return }
+        if let current = selected, !current.hasPage, !current.isPrivate {
+            current.load(target)
+        } else {
+            addTab(url: target)
+        }
+    }
+
     /// Escape hatch on the lock screen: close every private tab without unlocking them.
     func closePrivateTabs() {
         speaker.stop()
@@ -520,6 +530,11 @@ final class BrowserStore: ObservableObject {
         SiteCSS.clearAll()
         defaults.removeObject(forKey: PrivateTabLock.storageKey)
         defaults.removeObject(forKey: TabSleep.storageKey)
+        defaults.removeObject(forKey: SwipeNavigation.storageKey)
+        defaults.removeObject(forKey: DesktopSitePreference.storageKey)
+        defaults.removeObject(forKey: CookieBannerDismiss.storageKey)
+        defaults.removeObject(forKey: ThemePacks.refreshAnimationKey)
+        PrivacyReport.reset(in: defaults)
         AutoClear.resetSettings()
         groups = []
         TabGroupStore.save([])
@@ -775,6 +790,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         if let newController {
             scriptHandlerProxy.delegate = self
             newController.add(scriptHandlerProxy, name: "zallaImage")
+            newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
         }
         if newController != nil {
             applyPageScripts(for: nil)
@@ -811,6 +827,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         controller.addUserScript(WKUserScript(
             source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false
         ))
+        if !isPrivate, CookieBannerDismiss.isEnabled, ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
+            controller.addUserScript(WKUserScript(
+                source: CookieBannerDismiss.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
+            ))
+        }
         for spec in PageScripts.plan(for: url, unlocked: ZallaUnlock.shared.isUnlocked) {
             controller.addUserScript(WKUserScript(
                 source: spec.source,
@@ -1187,6 +1208,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == CookieBannerDismiss.messageName {
+            if !isPrivate { PrivacyReport.record(.cookieBannerDismissed, host: webView.url?.host) }
+            return
+        }
         guard message.name == "zallaImage",
               let body = message.body as? [String: Any],
               let src = body["src"] as? String,
@@ -1322,6 +1347,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 // Load the same page without tracking tags. If a site sends the tags straight back,
                 // the second time is let through so it cannot loop.
                 lastStrippedSource = url
+                if !isPrivate { PrivacyReport.record(.linkCleaned, host: cleanURL.host) }
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: cleanURL))
                 return
@@ -1339,6 +1365,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                let secureURL = HTTPSOnly.upgradedURL(for: url, exceptions: HTTPSOnlySession.exceptions) {
                 decisionHandler(.cancel)
                 pendingHTTPSUpgrade = url
+                if !isPrivate { PrivacyReport.record(.httpsUpgrade, host: secureURL.host) }
                 webView.load(URLRequest(url: secureURL))
                 return
             }
@@ -1529,6 +1556,21 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         let shortcut = HomeShortcut(title: title, urlString: normalized, symbolName: known?.symbolName ?? "globe")
         let added = HomeShortcuts.add(shortcut)
         showToast(added ? "Added to your dashboard." : "Already on your dashboard, or it is full.")
+    }
+
+    /// Sites this page reached out to besides its own, measured by the page itself after blocking.
+    /// Requests the content blocker stopped never show up here, so the real number of attempts is higher.
+    func thirdPartyHostsOnPage() async -> [String] {
+        guard hasPage, let pageHost = webView.url?.host else { return [] }
+        let script = "JSON.stringify(performance.getEntriesByType('resource').map(function(e){return e.name;}).slice(0, 800))"
+        do {
+            let value = try await webView.evaluateJavaScript(script)
+            guard let text = value as? String, let data = text.data(using: .utf8),
+                  let names = try? JSONDecoder().decode([String].self, from: data) else { return [] }
+            return PrivacyReport.thirdPartyHosts(pageHost: pageHost, resourceURLs: names)
+        } catch {
+            return []
+        }
     }
 
     /// Reload or stop, from any reload button.

@@ -37,3 +37,22 @@ enum DesktopSitePreference {
         defaults.set(current.sorted(), forKey: storageKey)
     }
 }
+
+/// Turns an address handed to Zalla by another app into a page to open.
+enum IncomingLink {
+    /// Web addresses open as they are. `zalla://open?url=<address>` (and `zalla-open`) opens the address inside it.
+    static func webURL(from url: URL) -> URL? {
+        let scheme = url.scheme?.lowercased() ?? ""
+        if scheme == "http" || scheme == "https" {
+            return url.host == nil ? nil : url
+        }
+        guard scheme == "zalla",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let raw = components.queryItems?.first(where: { $0.name == "url" })?.value,
+              let target = URL(string: raw),
+              let targetScheme = target.scheme?.lowercased(),
+              targetScheme == "http" || targetScheme == "https",
+              target.host != nil else { return nil }
+        return target
+    }
+}

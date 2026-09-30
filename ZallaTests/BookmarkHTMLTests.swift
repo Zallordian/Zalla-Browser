@@ -30,3 +30,18 @@ final class BookmarkHTMLTests: XCTestCase {
         XCTAssertEqual(parsed.map(\.url), bookmarks.map(\.url))
     }
 }
+
+final class BookmarkImportTests: XCTestCase {
+    func testSingleQuotesEntitiesAndMultilineTitles() {
+        let html = "<DL><DT><A ADD_DATE=\"1\" HREF='https://example.com/?a=1&amp;b=2'>Tom &amp;\n Jerry</A></DL>"
+        let pages = BookmarkHTML.parse(html)
+        XCTAssertEqual(pages.count, 1)
+        XCTAssertEqual(pages[0].url.absoluteString, "https://example.com/?a=1&b=2")
+        XCTAssertEqual(pages[0].title, "Tom & Jerry")
+    }
+
+    func testTextDecodingFallsBack() {
+        XCTAssertEqual(BookmarkHTML.text(from: Data("hi".utf8)), "hi")
+        XCTAssertNotNil(BookmarkHTML.text(from: Data([0xE9, 0x41])))
+    }
+}

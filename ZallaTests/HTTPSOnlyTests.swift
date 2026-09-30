@@ -148,3 +148,13 @@ final class BrowserBehaviorTests: XCTestCase {
         XCTAssertFalse(DesktopSitePreference.isDesktop(url, in: defaults))
     }
 }
+
+final class IncomingLinkTests: XCTestCase {
+    func testWebAndZallaLinks() {
+        XCTAssertEqual(IncomingLink.webURL(from: URL(string: "https://example.com/a")!)?.absoluteString, "https://example.com/a")
+        XCTAssertEqual(IncomingLink.webURL(from: URL(string: "zalla://open?url=https://example.org/x")!)?.absoluteString, "https://example.org/x")
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open?url=javascript:alert(1)")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "file:///etc/passwd")!))
+        XCTAssertNil(IncomingLink.webURL(from: URL(string: "zalla://open")!))
+    }
+}

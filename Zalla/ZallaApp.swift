@@ -29,6 +29,9 @@ struct ZallaApp: App {
                 }
             }
             .tint(theme.primary)
+            .onOpenURL { url in
+                browser.openIncoming(url)
+            }
             .overlay {
                 if scenePhase != .active {
                     ZStack {

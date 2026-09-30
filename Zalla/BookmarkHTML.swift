@@ -4,15 +4,18 @@ enum BookmarkHTML {
     /// Parse Netscape Bookmark File Format (Safari / Chrome / Firefox exports).
     static func parse(_ html: String) -> [SavedPage] {
         var pages: [SavedPage] = []
-        let pattern = #"(?i)<a\s+[^>]*href\s*=\s*"([^"]+)"[^>]*>(.*?)</a>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+        // Double or single quoted addresses, titles that span lines, and any attribute order.
+        let pattern = #"<a\s+[^>]*?href\s*=\s*(?:"([^"]+)"|'([^']+)')[^>]*>(.*?)</a>"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else { return [] }
 
         let ns = html as NSString
         let full = NSRange(location: 0, length: ns.length)
         regex.enumerateMatches(in: html, options: [], range: full) { match, _, _ in
-            guard let match, match.numberOfRanges >= 3 else { return }
-            let href = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
-            let titleHTML = ns.substring(with: match.range(at: 2))
+            guard let match, match.numberOfRanges >= 4 else { return }
+            let hrefRange = match.range(at: 1).location != NSNotFound ? match.range(at: 1) : match.range(at: 2)
+            guard hrefRange.location != NSNotFound else { return }
+            let href = decodeEntities(ns.substring(with: hrefRange)).trimmingCharacters(in: .whitespacesAndNewlines)
+            let titleHTML = ns.substring(with: match.range(at: 3))
             let title = stripTags(titleHTML).trimmingCharacters(in: .whitespacesAndNewlines)
             guard let url = URL(string: href),
                   let scheme = url.scheme?.lowercased(),
@@ -53,12 +56,26 @@ enum BookmarkHTML {
     }
 
     private static func stripTags(_ value: String) -> String {
-        value.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: "&amp;", with: "&")
+        decodeEntities(value.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression))
+            .replacingOccurrences(of: "\n", with: " ")
+    }
+
+    private static func decodeEntities(_ value: String) -> String {
+        value
             .replacingOccurrences(of: "&lt;", with: "<")
             .replacingOccurrences(of: "&gt;", with: ">")
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&#x27;", with: "'")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+            .replacingOccurrences(of: "&amp;", with: "&")
+    }
+
+    /// Reads exported bookmark file bytes. Browsers save UTF-8, but older exports can be Latin-1 or UTF-16.
+    static func text(from data: Data) -> String? {
+        String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .utf16)
+            ?? String(data: data, encoding: .isoLatin1)
     }
 
     private static func escape(_ value: String) -> String {
