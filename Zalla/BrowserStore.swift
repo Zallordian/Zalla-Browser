@@ -766,6 +766,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private var pendingHTTPSUpgrade: URL?
     /// The last address whose tracking tags were removed, so a site that adds them back cannot cause a loop.
     private var lastStrippedSource: URL?
+    /// Tag strips since the last committed page, so a site that keeps adding fresh tags cannot loop forever.
+    private var stripCount = 0
     /// Zoom levels chosen in a private tab. Never written to disk.
     private var privatePageZoom: [String: Double] = [:]
 
@@ -1245,6 +1247,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         pendingHTTPSUpgrade = nil
         lastStrippedSource = nil
+        stripCount = 0
         applyStoredPageZoom()
     }
 
@@ -1353,10 +1356,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                navigationAction.navigationType == .linkActivated || navigationAction.navigationType == .other,
                (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET",
                lastStrippedSource != url,
+               stripCount < 3,
                let cleanURL = TrackingParameters.cleaned(url) {
                 // Load the same page without tracking tags. If a site sends the tags straight back,
                 // the second time is let through so it cannot loop.
                 lastStrippedSource = url
+                stripCount += 1
                 if !isPrivate { PrivacyReport.record(.linkCleaned, host: cleanURL.host) }
                 decisionHandler(.cancel)
                 webView.load(URLRequest(url: cleanURL))
