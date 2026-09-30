@@ -109,7 +109,8 @@ enum HTTPSOnly {
     }
 
     /// Failures that mean the site has no working https version: TLS and certificate errors,
-    /// or the secure port not answering.
+    /// or the secure port refusing the connection. A timeout is not one of them: a slow site or a
+    /// weak signal gets the normal error page, not a claim that the site lacks encryption.
     static let upgradeFailureCodes: Set<Int> = [
         NSURLErrorSecureConnectionFailed,
         NSURLErrorServerCertificateHasBadDate,
@@ -119,7 +120,6 @@ enum HTTPSOnly {
         NSURLErrorClientCertificateRejected,
         NSURLErrorClientCertificateRequired,
         NSURLErrorCannotConnectToHost,
-        NSURLErrorTimedOut,
         NSURLErrorNetworkConnectionLost,
         NSURLErrorBadServerResponse
     ]

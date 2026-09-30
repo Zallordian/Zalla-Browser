@@ -82,6 +82,7 @@ final class HTTPSOnlyTests: XCTestCase {
         XCTAssertTrue(HTTPSOnly.isUpgradeFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorServerCertificateUntrusted)))
         XCTAssertTrue(HTTPSOnly.isUpgradeFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost)))
         XCTAssertFalse(HTTPSOnly.isUpgradeFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)))
+        XCTAssertFalse(HTTPSOnly.isUpgradeFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)))
         XCTAssertFalse(HTTPSOnly.isUpgradeFailure(NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)))
         XCTAssertTrue(HTTPSOnly.isInterruption(NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled)))
         XCTAssertTrue(HTTPSOnly.isInterruption(NSError(domain: "WebKitErrorDomain", code: 102)))

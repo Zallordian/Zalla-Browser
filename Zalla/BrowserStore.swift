@@ -1245,6 +1245,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // Count an upgrade only once the secure page has actually loaded, never when it was merely attempted.
+        if let upgraded = pendingHTTPSUpgrade, !isPrivate,
+           webView.url?.scheme?.lowercased() == "https",
+           PrivacyReport.siteKey(webView.url?.host) == PrivacyReport.siteKey(upgraded.host) {
+            PrivacyReport.record(.httpsUpgrade, host: webView.url?.host)
+        }
         pendingHTTPSUpgrade = nil
         lastStrippedSource = nil
         stripCount = 0
@@ -1380,7 +1386,6 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                let secureURL = HTTPSOnly.upgradedURL(for: url, exceptions: HTTPSOnlySession.exceptions) {
                 decisionHandler(.cancel)
                 pendingHTTPSUpgrade = url
-                if !isPrivate { PrivacyReport.record(.httpsUpgrade, host: secureURL.host) }
                 webView.load(URLRequest(url: secureURL))
                 return
             }
