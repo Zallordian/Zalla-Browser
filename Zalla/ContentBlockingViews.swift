@@ -418,6 +418,12 @@ struct ZallaUnlockSheet: View {
                     }
                     Label("Hide Element on any site", systemImage: "eye.slash.circle")
                     Label("Custom block and allow rules", systemImage: "list.bullet.rectangle")
+                    Label("Face ID for private tabs", systemImage: "faceid")
+                    Label("Tab groups", systemImage: "rectangle.stack")
+                    Label("Listen to page", systemImage: "speaker.wave.2")
+                    Label("Per-site CSS", systemImage: "paintbrush")
+                    Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
+                    Label("Background packs for new tabs", systemImage: "photo.on.rectangle.angled")
                 }
                 Section {
                     UnlockPurchaseRow(unlock: unlock)
@@ -445,7 +451,7 @@ struct ZallaUnlockSheet: View {
         case .failed(let message), .message(let message):
             return message
         case .idle, .purchasing, .restoring:
-            return "Blocking trackers and common ads stays free. Payments are handled by Apple."
+            return "Blocking trackers and common ads, Privacy Shield, and image export stay free. Payments are handled by Apple."
         }
     }
 }

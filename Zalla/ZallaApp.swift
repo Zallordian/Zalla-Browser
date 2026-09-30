@@ -44,11 +44,19 @@ struct ZallaApp: App {
                 TipTransactionObserver.start()
                 // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.
                 await ZallaUnlock.shared.refreshEntitlements()
+                await browser.runAutoClearIfDue()
             }
             .onChange(of: scenePhase) { _, phase in
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
                 if phase != .active {
                     browser.saveSession()
+                }
+                // Only .background, not .inactive: the Face ID sheet itself makes the app inactive.
+                if phase == .background {
+                    browser.lockPrivateTabsIfNeeded()
+                }
+                if phase == .active {
+                    Task { await browser.runAutoClearIfDue() }
                 }
             }
         }

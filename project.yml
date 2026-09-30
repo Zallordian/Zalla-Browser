@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "12"
+    CURRENT_PROJECT_VERSION: "13"
 targets:
   Zalla:
     type: application
@@ -31,6 +31,7 @@ targets:
           NSAllowsArbitraryLoadsInWebContent: true
         NSPhotoLibraryAddUsageDescription: Zalla saves exported images to Photos when you choose Save to Photos.
         NSCameraUsageDescription: Zalla uses the camera only when a website you are visiting asks for it and you allow it.
+        NSFaceIDUsageDescription: Zalla uses Face ID only to unlock your private tabs, if you turn that on in Settings.
         NSMicrophoneUsageDescription: Zalla uses the microphone only when a website you are visiting asks for it and you allow it.
         CFBundleIcons:
           CFBundlePrimaryIcon:

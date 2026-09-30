@@ -44,6 +44,11 @@ struct BrowserView: View {
             .presentationDetents(detents(for: item))
             .presentationDragIndicator(.visible)
         }
+        .overlay {
+            if browser.privateLocked, browser.selected?.isPrivate == true {
+                PrivateLockView(browser: browser)
+            }
+        }
         .sheet(item: $browser.imageExport) { request in
             ImageExportSheet(request: request)
                 .presentationDetents([.medium, .large])
@@ -1249,8 +1254,8 @@ private struct TabContent: View {
             sheet = nil
         } label: { Label("New Tab", systemImage: "plus") }
         Button {
-            browser.addTab(isPrivate: true)
             sheet = nil
+            Task { await browser.openPrivateTab() }
         } label: { Label("New Private Tab", systemImage: "eye.slash") }
         Divider()
         Button { sheet = .library } label: { Label("Bookmarks", systemImage: "book") }
@@ -1447,8 +1452,8 @@ private struct BrowserMenuSheet: View {
                     dismiss()
                 } label: { Label("New tab", systemImage: "plus") }
                 Button {
-                    browser.addTab(isPrivate: true)
                     dismiss()
+                    Task { await browser.openPrivateTab() }
                 } label: { Label("New private tab", systemImage: "eye.slash") }
                 Button {
                     browser.selected?.findOnPage()
@@ -1487,6 +1492,9 @@ private struct BrowserMenuSheet: View {
                     )
                 }
                 .disabled(!(browser.selected?.hasPage ?? false))
+                if let tab = browser.selected {
+                    ListenMenuRows(tab: tab, speaker: browser.speaker, onDone: { dismiss() })
+                }
                 Button {
                     if let tab = browser.selected { browser.bookmark(tab) }
                     dismiss()
@@ -1635,15 +1643,40 @@ private struct TabsView: View {
     @State private var confirmCloseAll = false
     @State private var undoClose: (title: String, url: URL?, isPrivate: Bool)?
     @State private var showUndoClose = false
+    @ObservedObject private var unlock = ZallaUnlock.shared
+    /// Group chosen in the chip bar; nil shows every tab.
+    @State private var groupFilter: UUID?
+    @State private var showGroupEditor = false
+    @State private var editingGroup: TabGroup?
+    /// Tab waiting to join a group that is being created from its menu.
+    @State private var tabForNewGroup: BrowserTab?
+    @State private var showUpsell = false
 
     private let columns = [GridItem(.adaptive(minimum: 156), spacing: 16)]
 
+    /// Tabs shown in the grid: hides private tabs while they are locked, and applies the group filter.
+    private var visibleTabs: [BrowserTab] {
+        browser.tabs.filter { tab in
+            if tab.isPrivate, browser.privateLocked { return false }
+            guard unlock.isUnlocked, let groupFilter else { return true }
+            return tab.groupID == groupFilter
+        }
+    }
+
     var body: some View {
         ScrollView {
+            groupBar
             LazyVGrid(columns: columns, spacing: 18) {
-                ForEach(browser.tabs) { tab in
+                ForEach(visibleTabs) { tab in
                     TabPreviewCard(
                         tab: tab,
+                        browser: browser,
+                        showsGroups: unlock.isUnlocked,
+                        onNewGroup: {
+                            tabForNewGroup = tab
+                            editingGroup = nil
+                            showGroupEditor = true
+                        },
                         selected: tab.id == browser.selectedID,
                         select: {
                             browser.selectTab(tab)
@@ -1662,6 +1695,13 @@ private struct TabsView: View {
             .padding(.vertical, 18)
             .animation(.easeInOut(duration: 0.2), value: browser.tabs.map(\.id))
         }
+        .sheet(isPresented: $showGroupEditor) {
+            TabGroupEditor(browser: browser, group: editingGroup, onCreated: { created in
+                if let tab = tabForNewGroup { browser.assign(tab, to: created) }
+                tabForNewGroup = nil
+            })
+        }
+        .sheet(isPresented: $showUpsell) { ZallaUnlockSheet() }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Your tabs")
         .safeAreaInset(edge: .bottom) {
@@ -1671,7 +1711,12 @@ private struct TabsView: View {
                         .font(.subheadline)
                     Spacer()
                     Button("Undo") {
-                        browser.addTab(isPrivate: undoClose.isPrivate, url: undoClose.url)
+                        if undoClose.isPrivate {
+                            let url = undoClose.url
+                            Task { await browser.openPrivateTab(url: url) }
+                        } else {
+                            browser.addTab(url: undoClose.url)
+                        }
                         showUndoClose = false
                         self.undoClose = nil
                     }
@@ -1690,8 +1735,17 @@ private struct TabsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Menu("New tab", systemImage: "plus") {
-                    Button("Regular tab") { browser.addTab(); dismiss() }
-                    Button("Private tab") { browser.addTab(isPrivate: true); dismiss() }
+                    Button("Regular tab") {
+                        let tab = browser.addTab()
+                        if unlock.isUnlocked, let group = browser.groups.first(where: { $0.id == groupFilter }) {
+                            browser.assign(tab, to: group)
+                        }
+                        dismiss()
+                    }
+                    Button("Private tab") {
+                        dismiss()
+                        Task { await browser.openPrivateTab() }
+                    }
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -1715,8 +1769,50 @@ private struct TabsView: View {
     }
 }
 
+private extension TabsView {
+    /// Group chips for Zalla Unlock. Without it, one quiet row explains the feature.
+    @ViewBuilder var groupBar: some View {
+        if unlock.isUnlocked {
+            TabGroupBar(
+                browser: browser,
+                filter: $groupFilter,
+                onNewGroup: {
+                    tabForNewGroup = nil
+                    editingGroup = nil
+                    showGroupEditor = true
+                },
+                onEdit: { group in
+                    editingGroup = group
+                    showGroupEditor = true
+                }
+            )
+            .padding(.top, 10)
+            .onChange(of: browser.groups) { _, groups in
+                if let groupFilter, !groups.contains(where: { $0.id == groupFilter }) { self.groupFilter = nil }
+            }
+        } else {
+            Button {
+                showUpsell = true
+            } label: {
+                Label("Tab groups", systemImage: "lock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.primary.opacity(0.08), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+        }
+    }
+}
+
 private struct TabPreviewCard: View {
     @ObservedObject var tab: BrowserTab
+    @ObservedObject var browser: BrowserStore
+    let showsGroups: Bool
+    let onNewGroup: () -> Void
     let selected: Bool
     let select: () -> Void
     let close: () -> Void
@@ -1763,6 +1859,16 @@ private struct TabPreviewCard: View {
                             .padding(.vertical, 2)
                             .background(Color.primary.opacity(0.12), in: Capsule())
                     }
+                    if tab.isSleeping {
+                        Image(systemName: "moon.zzz.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel("Sleeping")
+                    }
+                    if showsGroups, let group = browser.group(for: tab) {
+                        Circle().fill(group.color.color).frame(width: 9, height: 9)
+                            .accessibilityLabel("Group \(group.name)")
+                    }
                 }
                 Text(tab.url?.host ?? "Built around you.")
                     .font(.caption)
@@ -1789,6 +1895,9 @@ private struct TabPreviewCard: View {
                 }
         )
         .contextMenu {
+            if showsGroups {
+                TabGroupMenu(browser: browser, tab: tab, onNewGroup: onNewGroup)
+            }
             Button(role: .destructive, action: close) {
                 Label("Close Tab", systemImage: "xmark")
             }
@@ -2110,6 +2219,7 @@ private struct SettingsView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = false
+    @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -2233,12 +2343,15 @@ private struct SettingsView: View {
                 Button {
                     showImporter = true
                 } label: { Label("Import HTML bookmarks", systemImage: "square.and.arrow.down") }
+                Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
                 Button {
                     exportBookmarks()
                 } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
                 .disabled(browser.bookmarks.isEmpty)
             } header: {
                 Text("Browsing")
+            } footer: {
+                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them.")
             }
 
             Section("Tools") {
@@ -2265,12 +2378,13 @@ private struct SettingsView: View {
                     LocationSettingsView()
                 }
                 Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
+                PremiumPrivacyRows()
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
             } header: { Text("Privacy") } footer: {
-                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Face ID for private tabs and Auto-clear are part of Zalla Unlock. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
             }
 
             Section("Our promise") {
@@ -2311,7 +2425,7 @@ private struct SettingsView: View {
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing and blocking of trackers and common ads are free. Zalla Unlock is an optional one time purchase for extra blocking tools. Image export is free.")
+                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, and background packs.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

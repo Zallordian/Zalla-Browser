@@ -48,12 +48,12 @@
       "type": "Consumable"
     },
     {
-      "displayPrice": "2.99",
+      "displayPrice": "1.99",
       "familyShareable": true,
       "internalID": "6740000004",
       "localizations": [
         {
-          "description": "Stronger blocking, ad space hiding, cookie banner blocking, and custom rules.",
+          "description": "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, and background packs.",
           "displayName": "Zalla Unlock",
           "locale": "en_US"
         }

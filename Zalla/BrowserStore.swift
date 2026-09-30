@@ -21,10 +21,24 @@ final class BrowserStore: ObservableObject {
     }
     @Published var selectedID: UUID? {
         didSet {
+            if let old = oldValue, old != selectedID {
+                tabs.first { $0.id == old }?.lastActiveAt = Date()
+            }
+            selected?.lastActiveAt = Date()
             selected?.restoreIfNeeded()
+            if speaker.isActive, speaker.tabID != selectedID { speaker.stop() }
             scheduleSessionSave()
         }
     }
+    /// Tab groups (Zalla Unlock). Membership is stored on each tab and saved with the session.
+    @Published private(set) var groups: [TabGroup] = TabGroupStore.load()
+    /// True while private tabs are hidden behind Face ID. Starts locked when the lock is on.
+    @Published private(set) var privateLocked = false
+    /// Reads the current page aloud (Zalla Unlock).
+    let speaker = PageSpeaker()
+    private var autoClearRanThisLaunch = false
+    private var sleepTimer: Timer?
+    private var memoryObserver: NSObjectProtocol?
     @Published private(set) var bookmarks: [SavedPage] = []
     @Published private(set) var history: [SavedPage] = []
     @Published private(set) var downloads: [DownloadRecord] = []
@@ -70,6 +84,7 @@ final class BrowserStore: ObservableObject {
         // Encrypted DNS for Zalla's own requests and the optional proxy are set before any tab loads.
         ShieldRuntime.applyEncryptedDNS()
         refreshProxy()
+        privateLocked = PrivateTabLock.isRequired(unlocked: ZallaUnlock.shared.isUnlocked)
         if !restoreSession() {
             addTab()
         }
@@ -96,6 +111,133 @@ final class BrowserStore: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.refreshProxy() }
         }
+        // Tabs left alone for a while, or all background tabs when iOS is short on memory, go to sleep.
+        memoryObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.sleepBackgroundTabs(idleFor: 0) }
+        }
+        sleepTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                if TabSleep.isEnabled() { self?.sleepBackgroundTabs(idleFor: TabSleep.idleSeconds) }
+            }
+        }
+    }
+
+    // MARK: - Tab sleeping
+
+    /// Puts tabs that are not on screen to sleep. Their page, scroll position, and history come back when opened.
+    func sleepBackgroundTabs(idleFor seconds: TimeInterval) {
+        let now = Date()
+        for tab in tabs where tab.id != selectedID && now.timeIntervalSince(tab.lastActiveAt) >= seconds {
+            tab.sleep()
+        }
+    }
+
+    // MARK: - Private tab lock (Zalla Unlock)
+
+    /// Locks private tabs when Zalla goes to the background, if the Face ID lock is on.
+    func lockPrivateTabsIfNeeded() {
+        if PrivateTabLock.isRequired(unlocked: ZallaUnlock.shared.isUnlocked) {
+            privateLocked = true
+            if let id = speaker.tabID, tabs.first(where: { $0.id == id })?.isPrivate == true { speaker.stop() }
+        }
+    }
+
+    /// Face ID (or passcode) check. Returns true when private tabs may be shown.
+    @discardableResult
+    func unlockPrivateTabs() async -> Bool {
+        guard privateLocked else { return true }
+        guard PrivateTabLock.isRequired(unlocked: ZallaUnlock.shared.isUnlocked) else {
+            privateLocked = false
+            return true
+        }
+        guard await PrivateTabLock.authenticate(reason: "Unlock your private tabs") else { return false }
+        privateLocked = false
+        return true
+    }
+
+    /// Opens a private tab, asking for Face ID first when the lock is on.
+    func openPrivateTab(url: URL? = nil) async {
+        guard await unlockPrivateTabs() else { return }
+        addTab(isPrivate: true, url: url)
+    }
+
+    /// Escape hatch on the lock screen: close every private tab without unlocking them.
+    func closePrivateTabs() {
+        speaker.stop()
+        tabs.filter(\.isPrivate).forEach { $0.webView.stopLoading() }
+        tabs.removeAll { $0.isPrivate }
+        if tabs.isEmpty {
+            addTab()
+        } else if selected == nil {
+            selectedID = tabs.last?.id
+        }
+    }
+
+    // MARK: - Scheduled auto-clear (Zalla Unlock)
+
+    /// Clears history and website data when the schedule says it is time. Safe to call often.
+    func runAutoClearIfDue() async {
+        guard ZallaUnlock.shared.isUnlocked, !clearingData else { return }
+        let due = AutoClear.isDue(
+            schedule: AutoClear.schedule(),
+            lastRun: AutoClear.lastRun(),
+            now: Date(),
+            ranThisLaunch: autoClearRanThisLaunch
+        )
+        if AutoClear.schedule().interval != nil, AutoClear.lastRun() == nil {
+            // First time with an interval schedule: start counting now instead of clearing right away.
+            AutoClear.recordRun()
+            return
+        }
+        guard due else { return }
+        autoClearRanThisLaunch = true
+        AutoClear.recordRun()
+        if AutoClear.clearsHistory() { clearHistory() }
+        if AutoClear.clearsSiteData() {
+            await WKWebsiteDataStore.default().removeData(
+                ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
+            )
+        }
+    }
+
+    // MARK: - Tab groups (Zalla Unlock)
+
+    @discardableResult
+    func createGroup(name: String, color: TabGroupColor) -> TabGroup? {
+        guard let cleaned = TabGroupStore.cleanedName(name), groups.count < TabGroupStore.maxGroups else { return nil }
+        let group = TabGroup(name: cleaned, color: color)
+        groups.append(group)
+        TabGroupStore.save(groups)
+        return group
+    }
+
+    func updateGroup(_ group: TabGroup, name: String, color: TabGroupColor) {
+        guard let index = groups.firstIndex(where: { $0.id == group.id }),
+              let cleaned = TabGroupStore.cleanedName(name) else { return }
+        groups[index].name = cleaned
+        groups[index].color = color
+        TabGroupStore.save(groups)
+    }
+
+    /// Deleting a group keeps its tabs; they just stop belonging to a group.
+    func deleteGroup(_ group: TabGroup) {
+        groups.removeAll { $0.id == group.id }
+        TabGroupStore.save(groups)
+        for tab in tabs where tab.groupID == group.id { tab.groupID = nil }
+        scheduleSessionSave()
+    }
+
+    func assign(_ tab: BrowserTab, to group: TabGroup?) {
+        guard !tab.isPrivate else { return }
+        tab.groupID = group?.id
+        scheduleSessionSave()
+    }
+
+    func group(for tab: BrowserTab) -> TabGroup? {
+        guard let id = tab.groupID else { return nil }
+        return groups.first { $0.id == id }
     }
 
     /// Sends web traffic through the user's proxy (or stops doing so) for normal and private tabs.
@@ -215,6 +357,7 @@ final class BrowserStore: ObservableObject {
     }
 
     func close(_ tab: BrowserTab) {
+        if speaker.tabID == tab.id { speaker.stop() }
         tab.capturePreview()
         tab.webView.stopLoading()
         tabs.removeAll { $0.id == tab.id }
@@ -303,6 +446,7 @@ final class BrowserStore: ObservableObject {
         MediaPermissionSession.memory.removeAll()
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
+        speaker.stop()
         tabs.forEach { $0.webView.stopLoading() }
         tabs.removeAll()
         selectedID = nil
@@ -343,6 +487,11 @@ final class BrowserStore: ObservableObject {
         PrivacyShield.resetSettings()
         LocationSettings.clear()
         SiteCSS.clearAll()
+        defaults.removeObject(forKey: PrivateTabLock.storageKey)
+        AutoClear.resetSettings()
+        groups = []
+        TabGroupStore.save([])
+        privateLocked = false
         if UIApplication.shared.supportsAlternateIcons {
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 UIApplication.shared.setAlternateIconName(nil) { _ in
@@ -518,6 +667,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var previewImage: UIImage?
     @Published var isReaderActive = false
     @Published var readerAvailable = false
+    /// Tab group this tab belongs to (Zalla Unlock). Never set on private tabs.
+    @Published var groupID: UUID?
+    /// True while the page is unloaded to save memory. It reloads the moment the tab is opened.
+    @Published private(set) var isSleeping = false
+    /// Last time this tab was on screen, used to decide when it has been idle long enough to sleep.
+    var lastActiveAt = Date()
     @Published var hasOnlySecureContent = true
     /// The saying shown on this tab's new tab page. Picked once per tab so it does not change while the page is open.
     let newTabSaying = NewTabSayings.next()
@@ -650,7 +805,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     """
 
     private func refresh() {
-        if !isReaderActive, httpsFallback == nil {
+        // A tab waiting to be restored or woken keeps showing its saved title and address.
+        if !isReaderActive, httpsFallback == nil, pendingRestore == nil {
             title = webView.title ?? webView.url?.host ?? "New tab"
             url = webView.url
         }
@@ -769,15 +925,51 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func prepareRestore(from entry: TabSessionEntry) {
         guard TabSession.isRestorable(entry.url) else { return }
         pendingRestore = entry
+        groupID = entry.groupID
         title = entry.title
         url = entry.url
         hasPage = true
+    }
+
+    /// Unloads the page to free memory while keeping the tab, its title, address, and history.
+    /// Skips tabs that are private, still loading, playing media, or using the camera or microphone.
+    func sleep() {
+        guard !isPrivate, hasPage, !isSleeping, pendingRestore == nil, !isReaderActive, !isLoading,
+              httpsFallback == nil, !isPickingElement,
+              let current = webView.url, TabSession.isRestorable(current),
+              webView.cameraCaptureState == .none,
+              webView.microphoneCaptureState == .none else { return }
+        if previewImage == nil { capturePreview() }
+        let stamp = lastActiveAt
+        webView.requestMediaPlaybackState { [weak self] mediaState in
+            Task { @MainActor in
+                guard let self, mediaState != .playing else { return }
+                // The person may have opened the tab while the media check was running.
+                guard self.lastActiveAt == stamp else { return }
+                self.finishSleeping(at: current)
+            }
+        }
+    }
+
+    private func finishSleeping(at current: URL) {
+        guard pendingRestore == nil, !isSleeping, !isLoading, webView.url == current else { return }
+        let state = webView.interactionState as? Data
+        pendingRestore = TabSessionEntry(
+            url: current,
+            title: title,
+            interactionState: (state?.count ?? 0) > TabSession.maxInteractionStateBytes ? nil : state,
+            groupID: groupID
+        )
+        isSleeping = true
+        webView.stopLoading()
+        webView.load(URLRequest(url: URL(string: "about:blank")!))
     }
 
     /// Loads a restored tab the first time it is shown: back/forward state when available, else the URL.
     func restoreIfNeeded() {
         guard let entry = pendingRestore else { return }
         pendingRestore = nil
+        isSleeping = false
         errorMessage = nil
         if let state = entry.interactionState {
             webView.interactionState = state
@@ -794,7 +986,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 url: pendingRestore.url,
                 title: pendingRestore.title,
                 isSelected: isSelected,
-                interactionState: pendingRestore.interactionState
+                interactionState: pendingRestore.interactionState,
+                groupID: isPrivate ? nil : groupID
             )
         }
         // Reader pages are local HTML, so save only the original URL for them.
@@ -804,7 +997,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             url: hasPage ? url : nil,
             title: title,
             isSelected: isSelected,
-            interactionState: state
+            interactionState: state,
+            groupID: isPrivate ? nil : groupID
         )
     }
 
@@ -887,6 +1081,26 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         }
     }
 
+    /// Reads the page text (the same extraction Reader mode uses) and hands it to the speaker.
+    func listen(using speaker: PageSpeaker) {
+        guard hasPage, pendingRestore == nil else { return }
+        webView.evaluateJavaScript(ReaderMode.extractScript) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+                if error != nil {
+                    self.errorMessage = ReaderMode.ExtractFailure.scriptError.userMessage
+                    return
+                }
+                switch ReaderMode.parseResult(result) {
+                case .failure:
+                    self.errorMessage = "There is no text on this page to read aloud."
+                case .success(let article):
+                    speaker.start(tabID: self.id, title: article.title, paragraphs: article.paragraphs.compactMap { $0["text"] })
+                }
+            }
+        }
+    }
+
     func exitReaderMode() {
         guard isReaderActive else { return }
         isReaderActive = false
@@ -939,6 +1153,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        // The blank page a sleeping tab shows is not worth a preview, a history entry, or a session save.
+        guard pendingRestore == nil else { return }
         refresh()
         if !isReaderActive {
             readerAvailable = hasPage

@@ -6,6 +6,8 @@ struct TabSessionEntry: Codable, Equatable {
     var title: String
     /// Opaque WKWebView back/forward state (iOS 15+). Optional; the URL is the fallback.
     var interactionState: Data?
+    /// Tab group this tab belonged to (Zalla Unlock). Missing in sessions saved before groups existed.
+    var groupID: UUID? = nil
 }
 
 /// Saved set of normal tabs plus which one was selected.
@@ -34,6 +36,7 @@ enum TabSession {
         var title: String
         var isSelected: Bool
         var interactionState: Data?
+        var groupID: UUID? = nil
     }
 
     static var fileURL: URL {
@@ -55,7 +58,7 @@ enum TabSession {
             var state = source.interactionState
             if let data = state, data.count > maxInteractionStateBytes { state = nil }
             let title = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            snapshot.tabs.append(TabSessionEntry(url: url, title: title.isEmpty ? (url.host ?? url.absoluteString) : title, interactionState: state))
+            snapshot.tabs.append(TabSessionEntry(url: url, title: title.isEmpty ? (url.host ?? url.absoluteString) : title, interactionState: state, groupID: source.groupID))
             if source.isSelected { snapshot.selectedIndex = snapshot.tabs.count - 1 }
         }
         return snapshot
