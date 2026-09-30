@@ -180,6 +180,20 @@ private struct TabContent: View {
 
             chromeLayer
 
+            if let toast = tab.toast {
+                Text(toast)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                    .padding(.top, topChromeHeight + 56)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
+                    .zIndex(6)
+            }
+
             if holdKind != nil, !holdItems.isEmpty {
                 holdRevealOverlay
             }
@@ -499,34 +513,29 @@ private struct TabContent: View {
         .background { chromeScrim(edge: .bottom) }
     }
 
-    /// Soft translucent shade behind floating chrome: clear on the page side, deepening toward the
-    /// screen edge and running full-bleed into the safe area. Dark mode fades to black; light mode
-    /// fades to white. A masked ultra-thin material adds a light blur so controls stay legible over
-    /// busy pages without a solid band. `extent` lets the fade start a little beyond the controls.
-    private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 28) -> some View {
+    /// Live translucent band behind the chrome. It is one plain, unmasked material running full-bleed into
+    /// the safe area, so the page keeps scrolling visibly underneath and the blur keeps updating.
+    /// Earlier builds masked the material with a gradient and faded its opacity. Both force the system to
+    /// render the blur in a separate pass that no longer follows the page, which made the bar look like a
+    /// frozen picture. A light color wash (color only, no blur) keeps controls legible, and a hairline
+    /// marks the edge. `extent` lets the band start a little beyond the controls.
+    private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 0) -> some View {
         let isDark = colorScheme == .dark
-        let shade: Color = isDark ? .black : .white
         let towardEdge = edge == .bottom
-        let fade = LinearGradient(
-            stops: [
-                .init(color: shade.opacity(0), location: 0),
-                .init(color: shade.opacity(isDark ? 0.34 : 0.45), location: 0.45),
-                .init(color: shade.opacity(isDark ? 0.58 : 0.72), location: 1)
+        let wash = LinearGradient(
+            colors: [
+                (isDark ? Color.black : Color.white).opacity(isDark ? 0.10 : 0.16),
+                (isDark ? Color.black : Color.white).opacity(isDark ? 0.24 : 0.34)
             ],
             startPoint: towardEdge ? .top : .bottom,
             endPoint: towardEdge ? .bottom : .top
         )
-        let blurMask = LinearGradient(
-            colors: [.clear, .black.opacity(0.85), .black],
-            startPoint: towardEdge ? .top : .bottom,
-            endPoint: towardEdge ? .bottom : .top
-        )
-        return ZStack {
+        return ZStack(alignment: towardEdge ? .top : .bottom) {
+            Rectangle().fill(.thinMaterial)
+            wash
             Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask { blurMask }
-                .opacity(isDark ? 0.55 : 0.7)
-            fade
+                .fill(Color.primary.opacity(0.10))
+                .frame(height: 0.5)
         }
         .padding(towardEdge ? .top : .bottom, -extent)
         .ignoresSafeArea(.container, edges: towardEdge ? .bottom : .top)

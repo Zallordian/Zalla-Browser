@@ -29,6 +29,7 @@ struct NewTabView: View {
     @State private var address = ""
     @State private var isEditing = false
     @State private var editingShortcut: HomeShortcut?
+    @State private var showAddShortcut = false
     @FocusState private var searchFocused: Bool
 
     private var theme: ZallaTheme {
@@ -72,6 +73,11 @@ struct NewTabView: View {
         .onAppear { shortcuts = HomeShortcuts.load() }
         .sheet(isPresented: $showBackgroundPicker) {
             NewTabBackgroundSheet()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showAddShortcut) {
+            AddShortcutSheet(browser: browser, shortcuts: $shortcuts)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -123,6 +129,7 @@ struct NewTabView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        addMoreTile
                     }
                 }
                 Button("View library") { onOpenLibrary() }
@@ -237,7 +244,7 @@ struct NewTabView: View {
     /// which leaves just the small tile.
     private var emptyShortcutTile: some View {
         Button {
-            editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
+            showAddShortcut = true
         } label: {
             VStack(spacing: hideAddHint ? 0 : 8) {
                 Image(systemName: "plus")
@@ -275,6 +282,34 @@ struct NewTabView: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .accessibilityLabel("Add a shortcut")
+    }
+
+    /// A quiet plus at the end of the grid, so adding another shortcut never needs the menu.
+    private var addMoreTile: some View {
+        Button {
+            showAddShortcut = true
+        } label: {
+            VStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(theme.primary)
+                    .frame(width: 52, height: 52)
+                    .background(
+                        Color(uiColor: .secondarySystemGroupedBackground).opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(theme.primary.opacity(0.25), lineWidth: 1)
+                    }
+                Text("Add")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
         .accessibilityLabel("Add a shortcut")
     }
 
@@ -320,7 +355,7 @@ struct NewTabView: View {
                 .onDelete(perform: deleteShortcuts)
 
                 Button {
-                    editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
+                    showAddShortcut = true
                 } label: {
                     Label("Add shortcut", systemImage: "plus")
                 }
@@ -346,32 +381,40 @@ struct NewTabView: View {
                     .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
             }
             Spacer()
+            editMenu
+        }
+        .padding(.top, 12)
+    }
+
+    /// The one control in the corner. It sits on a material circle with a soft shadow so it reads on
+    /// light, dark, and photo wallpapers alike. The menu holds the background picker and the shortcut editor.
+    private var editMenu: some View {
+        Menu {
             Button {
                 showBackgroundPicker = true
             } label: {
-                Image(systemName: "pencil")
-                    .font(.subheadline.weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
+                Label("Background", systemImage: "photo.on.rectangle.angled")
             }
-            .accessibilityLabel("Change new tab background")
-            Menu {
-                Button {
-                    editingShortcut = HomeShortcut(title: "", urlString: "https://", symbolName: "globe")
-                } label: {
-                    Label("Add shortcut", systemImage: "plus")
-                }
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
-                } label: {
-                    Label("Edit shortcuts", systemImage: "pencil")
-                }
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
             } label: {
-                Text("Shortcuts")
-                    .font(.subheadline.weight(.semibold))
+                Label("Shortcuts", systemImage: "square.grid.2x2")
             }
-            .accessibilityLabel("Shortcuts menu")
+        } label: {
+            Image(systemName: "pencil")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.primary)
+                .frame(width: 40, height: 40)
+                .background(.regularMaterial, in: Circle())
+                .background(Circle().fill(Color.black.opacity(0.28)))
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
+                .shadow(color: .black.opacity(0.28), radius: 6, y: 2)
+                .environment(\.colorScheme, .dark)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .padding(.top, 12)
+        .accessibilityLabel("Edit new tab")
+        .accessibilityHint("Change the background or edit shortcuts")
     }
 
     private var searchField: some View {

@@ -149,3 +149,55 @@ enum HomeWidgets {
         return AddressDisplay.friendlyHost(from: page.url) ?? page.url.absoluteString
     }
 }
+
+/// Adding and checking shortcuts. Pure helpers so the rules can be tested without a screen.
+extension HomeShortcuts {
+    /// The most shortcuts the new tab page keeps. Plenty, and it stops runaway lists.
+    static let maxShortcuts = 48
+
+    /// A web address from what someone typed: https is added when missing, and it needs a real host.
+    /// Returns nil when it cannot be opened as a website.
+    static func normalizedURLString(_ raw: String) -> String? {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !text.contains(where: { $0.isWhitespace }) else { return nil }
+        if !text.contains("://") { text = "https://" + text }
+        guard let url = URL(string: text),
+              let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
+              let host = HTTPSOnly.normalizedHost(url.host),
+              host.contains(".") || HTTPSOnly.isLocalOrPrivate(host) else { return nil }
+        return url.absoluteString
+    }
+
+    /// A shortcut from typed title and address, or nil when either is unusable.
+    static func makeShortcut(title: String, urlString: String, symbolName: String = "globe") -> HomeShortcut? {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty, let normalized = normalizedURLString(urlString) else { return nil }
+        return HomeShortcut(title: cleanTitle, urlString: normalized, symbolName: symbolName)
+    }
+
+    /// Key used to spot the same site added twice: no scheme, no www, no trailing slash, any case.
+    static func duplicateKey(_ urlString: String) -> String {
+        var key = urlString.lowercased()
+        for prefix in ["https://", "http://"] where key.hasPrefix(prefix) {
+            key.removeFirst(prefix.count)
+        }
+        if key.hasPrefix("www.") { key.removeFirst(4) }
+        while key.hasSuffix("/") { key.removeLast() }
+        return key
+    }
+
+    static func contains(_ list: [HomeShortcut], urlString: String) -> Bool {
+        let key = duplicateKey(urlString)
+        return list.contains { duplicateKey($0.urlString) == key }
+    }
+
+    /// Adds a shortcut to the saved list. False when it is already there or the list is full.
+    @discardableResult
+    static func add(_ shortcut: HomeShortcut, in defaults: UserDefaults = .standard) -> Bool {
+        var list = load(from: defaults)
+        guard list.count < maxShortcuts, !contains(list, urlString: shortcut.urlString) else { return false }
+        list.append(shortcut)
+        save(list, to: defaults)
+        return true
+    }
+}

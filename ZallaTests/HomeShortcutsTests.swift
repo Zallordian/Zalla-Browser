@@ -106,3 +106,59 @@ final class HomeShortcutsTests: XCTestCase {
         XCTAssertEqual(HomeWidgets.displayTitle(for: untitled), "example.com")
     }
 }
+
+final class HomeShortcutAddingTests: XCTestCase {
+    func testNormalizedURLAddsHttpsAndRejectsJunk() {
+        XCTAssertEqual(HomeShortcuts.normalizedURLString("example.com"), "https://example.com")
+        XCTAssertEqual(HomeShortcuts.normalizedURLString("  http://example.com/a "), "http://example.com/a")
+        XCTAssertNil(HomeShortcuts.normalizedURLString(""))
+        XCTAssertNil(HomeShortcuts.normalizedURLString("two words"))
+        XCTAssertNil(HomeShortcuts.normalizedURLString("javascript:alert(1)"))
+        XCTAssertNil(HomeShortcuts.normalizedURLString("nodots"))
+    }
+
+    func testDuplicatesIgnoreSchemeWwwCaseAndSlash() {
+        let list = [HomeShortcut(title: "A", urlString: "https://www.Example.com/", symbolName: "globe")]
+        XCTAssertTrue(HomeShortcuts.contains(list, urlString: "http://example.com"))
+        XCTAssertFalse(HomeShortcuts.contains(list, urlString: "https://example.org"))
+    }
+
+    func testAddSkipsDuplicatesAndRespectsTheCap() {
+        let defaults = UserDefaults(suiteName: "zalla.homeShortcuts.add")!
+        defaults.removePersistentDomain(forName: "zalla.homeShortcuts.add")
+        let first = HomeShortcut(title: "A", urlString: "https://a.example", symbolName: "globe")
+        XCTAssertTrue(HomeShortcuts.add(first, in: defaults))
+        XCTAssertFalse(HomeShortcuts.add(first, in: defaults))
+        XCTAssertEqual(HomeShortcuts.load(from: defaults).count, 1)
+    }
+
+    func testMakeShortcutNeedsTitleAndAddress() {
+        XCTAssertNil(HomeShortcuts.makeShortcut(title: "", urlString: "example.com"))
+        XCTAssertNil(HomeShortcuts.makeShortcut(title: "X", urlString: "nope"))
+        XCTAssertEqual(HomeShortcuts.makeShortcut(title: "X", urlString: "example.com")?.urlString, "https://example.com")
+    }
+}
+
+final class PopularSitesTests: XCTestCase {
+    func testListIsBigUniqueAndUsable() {
+        XCTAssertGreaterThanOrEqual(PopularSites.all.count, 80)
+        XCTAssertEqual(Set(PopularSites.all.map(\.domain)).count, PopularSites.all.count)
+        for site in PopularSites.all {
+            XCTAssertNotNil(HomeShortcuts.normalizedURLString(site.urlString), site.domain)
+            XCTAssertFalse(site.name.isEmpty)
+            XCTAssertFalse(site.name.contains("\u{2014}"))
+        }
+    }
+
+    func testSearchMatchesNameAndDomain() {
+        XCTAssertEqual(PopularSites.matching("").count, PopularSites.all.count)
+        XCTAssertTrue(PopularSites.matching("wiki").contains { $0.domain.contains("wikipedia") })
+        XCTAssertTrue(PopularSites.matching("zzzzqqq").isEmpty)
+    }
+
+    func testHostLookupIgnoresWww() {
+        let first = PopularSites.all[0]
+        XCTAssertEqual(PopularSites.site(forHost: "www." + first.domain)?.domain, first.domain)
+        XCTAssertNil(PopularSites.site(forHost: nil))
+    }
+}

@@ -685,6 +685,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageZoom = PageZoom.defaultLevel
     /// True while Hide Element waits for a tap on the page.
     @Published var isPickingElement = false
+    /// A short confirmation shown over the page, such as after Add to Dashboard. Clears itself.
+    @Published var toast: String?
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
@@ -1418,7 +1420,36 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 })
                 return
             }
+            if HomeShortcuts.normalizedURLString(link.absoluteString) != nil {
+                // Keep WebKit's own link actions and add ours after them.
+                completionHandler(UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] suggested in
+                    let add = UIAction(title: "Add to Dashboard", image: UIImage(systemName: "plus.square.on.square")) { _ in
+                        Task { @MainActor in self?.addToDashboard(link) }
+                    }
+                    let extra = UIMenu(title: "", options: .displayInline, children: [add])
+                    return UIMenu(title: "", children: suggested + [extra])
+                })
+                return
+            }
         }
         completionHandler(nil)
+    }
+
+    /// Adds a link from the page to the new tab shortcuts.
+    func addToDashboard(_ link: URL) {
+        guard let normalized = HomeShortcuts.normalizedURLString(link.absoluteString) else { return }
+        let known = PopularSites.site(forHost: link.host)
+        let title = known?.name ?? AddressDisplay.friendlyHost(from: link) ?? link.absoluteString
+        let shortcut = HomeShortcut(title: title, urlString: normalized, symbolName: known?.symbolName ?? "globe")
+        let added = HomeShortcuts.add(shortcut)
+        showToast(added ? "Added to your dashboard." : "Already on your dashboard, or it is full.")
+    }
+
+    func showToast(_ message: String) {
+        toast = message
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_200_000_000)
+            if self?.toast == message { self?.toast = nil }
+        }
     }
 }
