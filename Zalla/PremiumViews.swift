@@ -163,6 +163,7 @@ struct PrivateLockView: View {
                 .font(.subheadline)
             }
         }
+        .accessibilityAddTraits(.isModal)
         .task(id: scenePhase) {
             // Ask once each time Zalla comes back to the front. The Face ID prompt itself briefly makes
             // the app inactive, which must not trigger another prompt.

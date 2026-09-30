@@ -26,6 +26,8 @@ struct BrowserView: View {
             }
         }
         .tint(theme.primary)
+        // While a private tab is locked, VoiceOver must not read the page hidden behind the lock screen.
+        .accessibilityHidden(browser.privateLocked && browser.selected?.isPrivate == true)
         .preferredColorScheme(appearance == "Dark" ? .dark : appearance == "Light" ? .light : nil)
         .sheet(item: $sheet) { item in
             NavigationStack {
