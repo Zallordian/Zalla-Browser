@@ -17,7 +17,7 @@ enum Changelog {
             version: "Build 14",
             name: "Built Around You",
             highlights: [
-                "The Flame: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
+                "Burn It All: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
                 "HTTPS-Only Mode is now on by default, with a clear warning page and a per-site Continue anyway",
                 "A tidier new tab page: no preloaded shortcuts, a plus tile, and an Add Shortcut list of popular sites, your bookmarks, or any address. Press and hold a link on any page to add it",
                 "Space and Jungle theme packs in Zalla Unlock: accents, icons, backgrounds, and an optional refresh animation that respects Reduce Motion",
@@ -131,7 +131,7 @@ enum SafetyOverview {
                 status: httpsOnly ? "On" : "Off", isOn: httpsOnly
             ),
             SafetyItem(
-                title: "The Flame",
+                title: "Burn It All",
                 detail: "Erases tabs, history, cookies, and site data in one confirmed tap, then closes Zalla. Free.",
                 status: "Ready", isOn: true
             ),

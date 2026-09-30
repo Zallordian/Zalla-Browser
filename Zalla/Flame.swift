@@ -3,7 +3,7 @@ import UIKit
 import WebKit
 
 /// A flame with the Zalla mark inside it. Drawn from a system flame and the bundled Zalla mark,
-/// so it follows Dynamic Type sizing through the size you give it.
+/// so it follows Dynamic Type sizing through the size you give it. The flame takes the current accent color.
 struct FlameMark: View {
     var size: CGFloat = 24
 
@@ -12,13 +12,7 @@ struct FlameMark: View {
             Image(systemName: "flame.fill")
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(red: 1.0, green: 0.78, blue: 0.25), Color(red: 0.98, green: 0.36, blue: 0.16), Color(red: 0.86, green: 0.15, blue: 0.20)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .foregroundStyle(.tint)
             Image("ZallaMark")
                 .renderingMode(.template)
                 .resizable()
@@ -35,8 +29,8 @@ struct FlameMark: View {
 extension View {
     /// Asks first, then wipes everything and closes the app.
     func flameConfirmation(isPresented: Binding<Bool>, browser: BrowserStore, onBurn: @escaping () -> Void = {}) -> some View {
-        confirmationDialog("Burn everything?", isPresented: isPresented, titleVisibility: .visible) {
-            Button("Burn it all", role: .destructive) {
+        confirmationDialog("Burn It All?", isPresented: isPresented, titleVisibility: .visible) {
+            Button("Burn It All", role: .destructive) {
                 onBurn()
                 Task { await browser.burnEverythingAndClose() }
             }
@@ -47,7 +41,7 @@ extension View {
     }
 }
 
-/// Shown while the flame works, so nobody wonders whether the tap registered.
+/// Shown while Burn It All works, so nobody wonders whether the tap registered.
 struct FlameProgressOverlay: View {
     var body: some View {
         ZStack {

@@ -16,6 +16,7 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
     case desktopSite
     case pageZoom
     case downloads
+    case burn
     case menu
 
     var id: String { rawValue }
@@ -36,6 +37,7 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         case .desktopSite: return "Desktop Site"
         case .pageZoom: return "Page Zoom"
         case .downloads: return "Downloads"
+        case .burn: return "Burn It All"
         case .menu: return "Menu"
         }
     }
@@ -56,6 +58,7 @@ enum ToolbarItemKind: String, Codable, CaseIterable, Identifiable {
         case .desktopSite: return "desktopcomputer"
         case .pageZoom: return "textformat.size"
         case .downloads: return "arrow.down.circle"
+        case .burn: return "flame"
         case .menu: return "ellipsis"
         }
     }

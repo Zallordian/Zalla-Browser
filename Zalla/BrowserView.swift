@@ -101,6 +101,7 @@ private struct TabContent: View {
     @ObservedObject private var unlockState = ZallaUnlock.shared
     @State private var address = ""
     @State private var showShare = false
+    @State private var confirmBurn = false
     @State private var isEditingCompactAddress = false
     @State private var isEditingClassicAddress = false
     @FocusState private var addressFocused: Bool
@@ -290,6 +291,7 @@ private struct TabContent: View {
         .sheet(isPresented: $showShare) {
             if let url = tab.url { ActivityShareSheet(items: [url]) }
         }
+        .flameConfirmation(isPresented: $confirmBurn, browser: browser)
         .confirmationDialog("Open another app?", isPresented: Binding(
             get: { tab.externalURL != nil },
             set: { if !$0 { tab.externalURL = nil } }
@@ -729,6 +731,7 @@ private struct TabContent: View {
         case .desktopSite: tab.toggleDesktopSite()
         case .pageZoom: sheet = .pageZoom
         case .downloads: sheet = .downloads
+        case .burn: confirmBurn = true
         case .menu: sheet = .menu
         }
     }
@@ -1571,7 +1574,7 @@ private struct BrowserMenuSheet: View {
                 Button(role: .destructive) {
                     confirmFlame = true
                 } label: {
-                    Label { Text("Flame") } icon: { FlameMark(size: 22) }
+                    Label { Text("Burn It All") } icon: { FlameMark(size: 22) }
                 }
             } footer: {
                 Text("Closes every tab, erases history, cookies, and site data, then closes Zalla.")
@@ -1817,7 +1820,7 @@ private struct TabsView: View {
                 Button {
                     confirmFlame = true
                 } label: {
-                    Label { Text("Flame") } icon: { FlameMark(size: 22) }
+                    Label { Text("Burn It All") } icon: { FlameMark(size: 22) }
                 }
                 .accessibilityHint("Erases tabs, history, cookies, and site data, then closes Zalla")
             }
@@ -2553,7 +2556,7 @@ private struct SettingsView: View {
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, the Flame, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space and Jungle theme packs.")
+                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space and Jungle theme packs.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }

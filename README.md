@@ -17,7 +17,7 @@ Implemented in source:
 
 ## Build 14
 
-- The Flame (free): confirm, then erase tabs, history, cookies, and site data, and close the app.
+- Burn It All (free): confirm, then erase tabs, history, cookies, and site data, and close the app. It lives in Tabs, the Menu, and as a Quick Action button option.
 - HTTPS-Only Mode is on by default, with a warning page and a per-site Continue anyway. Local and private network addresses are exempt.
 - New tab page: no preloaded shortcuts, a plus tile, an edit menu, and an Add Shortcut sheet (bundled popular sites, bookmarks, or a typed address). Press and hold a link on a page to Add to Dashboard.
 - Theme packs in Zalla Unlock: Space and Jungle, each with an accent, an app icon, new tab backgrounds, and an optional refresh animation that respects Reduce Motion.

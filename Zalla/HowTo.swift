@@ -22,7 +22,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .edgeSwipe: return "Swipe to go back"
         case .newTabPage: return "Your new tab page"
         case .addToDashboard: return "Add to Dashboard"
-        case .flame: return "The Flame"
+        case .flame: return "Burn It All"
         case .httpsOnly: return "HTTPS-Only Mode"
         case .privacyShield: return "Privacy Shield"
         case .desktopSite: return "Desktop sites"
@@ -53,7 +53,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .edgeSwipe: return "Swipe in from the screen edge."
         case .newTabPage: return "Shortcuts, backgrounds, and a search bar."
         case .addToDashboard: return "Press and hold any link."
-        case .flame: return "Erase it all and close the app."
+        case .flame: return "Erase everything and close the app."
         case .httpsOnly: return "Secure connections first, a warning otherwise."
         case .privacyShield: return "Cleaner links and fewer clues about you."
         case .desktopSite: return "Ask a site for its big-screen version."
@@ -96,7 +96,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             ]
         case .flame:
             return [
-                "Find the Flame in the Menu, in Tabs, or in the new tab pencil menu.",
+                "Find Burn It All in the Menu, in Tabs, or add it to your Quick Action buttons in Settings.",
                 "Confirm, and Zalla closes every tab and erases history, cookies, and site data.",
                 "Then Zalla closes. Open it again for a clean slate.",
                 "Bookmarks and downloads stay put."

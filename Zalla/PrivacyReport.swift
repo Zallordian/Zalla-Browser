@@ -74,7 +74,7 @@ enum PrivacyReport {
         defaults.removeObject(forKey: storageKey)
     }
 
-    /// Forgets which sites the counts belong to but keeps the overall totals. Used by the Flame and Clear Browsing Data.
+    /// Forgets which sites the counts belong to but keeps the overall totals. Used by Burn It All and Clear Browsing Data.
     static func clearHosts(in defaults: UserDefaults = .standard) {
         var store = load(from: defaults)
         store.byHost = [:]

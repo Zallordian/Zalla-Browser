@@ -44,7 +44,7 @@ final class BrowserStore: ObservableObject {
     @Published private(set) var downloads: [DownloadRecord] = []
     @Published var storageError: String?
     @Published var clearingData = false
-    /// True from the moment the Flame is confirmed until the app closes.
+    /// True from the moment Burn It All is confirmed until the app closes.
     @Published private(set) var isBurning = false
     @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
@@ -431,7 +431,7 @@ final class BrowserStore: ObservableObject {
         save()
     }
 
-    /// The Flame: close every tab, erase history, cookies, and site data (private tabs included),
+    /// Burn It All: close every tab, erase history, cookies, and site data (private tabs included),
     /// then close the app. Bookmarks and downloads are kept.
     func burnEverythingAndClose() async {
         guard !isBurning else { return }
