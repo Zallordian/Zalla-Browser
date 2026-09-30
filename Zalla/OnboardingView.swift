@@ -658,12 +658,14 @@ struct OnboardingView: View {
                     importMessage = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
                     return
                 }
-                let pages = BookmarkHTML.parse(text)
-                let added = browser.importBookmarks(pages)
-                importMessage = added == 0
-                    ? "No new bookmarks were found in that file."
-                    : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
-                goTo(4)
+                Task { @MainActor in
+                    let pages = await BookmarkHTML.parseInBackground(text)
+                    let added = browser.importBookmarks(pages)
+                    importMessage = added == 0
+                        ? "No new bookmarks were found in that file."
+                        : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
+                    goTo(4)
+                }
             } catch {
                 importMessage = error.localizedDescription
             }

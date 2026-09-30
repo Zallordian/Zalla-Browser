@@ -62,15 +62,52 @@ enum BookmarkHTML {
             .joined(separator: " ")
     }
 
-    private static func decodeEntities(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
-            .replacingOccurrences(of: "&#x27;", with: "'")
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
+    /// Decodes the common named entities and any numeric one (&#39; or &#x27;), in a single pass so nothing is decoded twice.
+    static func decodeEntities(_ value: String) -> String {
+        guard value.contains("&") else { return value }
+        var result = ""
+        var index = value.startIndex
+        while index < value.endIndex {
+            let character = value[index]
+            if character == "&", let semicolon = value[index...].prefix(12).firstIndex(of: ";") {
+                let body = String(value[value.index(after: index)..<semicolon])
+                if let decoded = decodeEntity(body) {
+                    result += decoded
+                    index = value.index(after: semicolon)
+                    continue
+                }
+            }
+            result.append(character)
+            index = value.index(after: index)
+        }
+        return result
+    }
+
+    private static func decodeEntity(_ body: String) -> String? {
+        switch body {
+        case "lt": return "<"
+        case "gt": return ">"
+        case "quot": return "\""
+        case "apos": return "'"
+        case "nbsp": return " "
+        case "amp": return "&"
+        default: break
+        }
+        guard body.hasPrefix("#") else { return nil }
+        let digits = body.dropFirst()
+        let number: UInt32?
+        if digits.hasPrefix("x") || digits.hasPrefix("X") {
+            number = UInt32(digits.dropFirst(), radix: 16)
+        } else {
+            number = UInt32(digits, radix: 10)
+        }
+        guard let number, number != 0, let scalar = Unicode.Scalar(number) else { return nil }
+        return String(Character(scalar))
+    }
+
+    /// Parses off the main thread. Large exports, such as Chrome's with inline icons, can take a moment.
+    static func parseInBackground(_ html: String) async -> [SavedPage] {
+        await Task.detached(priority: .userInitiated) { parse(html) }.value
     }
 
     /// Reads exported bookmark file bytes. Browsers save UTF-8, but older exports can be Latin-1 or UTF-16.

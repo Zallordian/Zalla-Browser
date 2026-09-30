@@ -2121,10 +2121,13 @@ private struct LibraryView: View {
                     message = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
                     return
                 }
-                let added = browser.importBookmarks(BookmarkHTML.parse(text))
-                message = added == 0
-                    ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
-                    : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
+                Task { @MainActor in
+                    let pages = await BookmarkHTML.parseInBackground(text)
+                    let added = browser.importBookmarks(pages)
+                    message = added == 0
+                        ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
+                        : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
+                }
             } catch {
                 message = error.localizedDescription
             }
@@ -2813,10 +2816,13 @@ private struct SettingsView: View {
                     bookmarkMessage = "That file could not be read as text. Export bookmarks as HTML from Safari or Chrome and try again."
                     return
                 }
-                let added = browser.importBookmarks(BookmarkHTML.parse(text))
-                bookmarkMessage = added == 0
-                    ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
-                    : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
+                Task { @MainActor in
+                    let pages = await BookmarkHTML.parseInBackground(text)
+                    let added = browser.importBookmarks(pages)
+                    bookmarkMessage = added == 0
+                        ? "No new bookmarks were found in that file. Zalla reads the HTML file that Safari, Chrome, and Firefox export."
+                        : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
+                }
             } catch {
                 bookmarkMessage = error.localizedDescription
             }
