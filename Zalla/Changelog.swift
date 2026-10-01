@@ -14,6 +14,18 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 16",
+            name: "Where You At",
+            highlights: [
+                "Websites can now ask for your location, for weather, nearby coffee, and the occasional map. Zalla asks you first, every time or once per site, and the default is still Ask",
+                "Prefer to stay unfindable? Settings, Privacy, Website location, Never. Sites get a polite no and you get no prompts",
+                "Your location goes only to the site you allow. Not to Zalla, and not anywhere else. Private tabs ask every time and remember nothing",
+                "Changed your mind? Settings, Privacy, Location lists every site you answered. Swipe one away and it has to ask again"
+            ],
+            improvements: "Burn It All and Reset the App now forget which sites you said yes or no to. Safety at a glance gets a Website location row. The Location page now says plainly that typing a city never uses GPS.",
+            fixes: "The Location page no longer claims Zalla never asks iOS for your location, because now it can, if you say so."
+        ),
+        ChangelogEntry(
             version: "Build 15",
             name: "Fewer Loose Ends",
             highlights: [
@@ -132,6 +144,7 @@ enum SafetyOverview {
         let faceID = PrivateTabLock.isRequired(unlocked: unlocked, defaults: defaults)
         let schedule = unlocked ? AutoClear.schedule(defaults) : .off
         let city = LocationSettings.city(defaults)
+        let websiteLocation = WebsiteLocation.mode(defaults)
         return [
             SafetyItem(
                 title: "Ad and tracker blocking",
@@ -195,8 +208,13 @@ enum SafetyOverview {
             ),
             SafetyItem(
                 title: "Location",
-                detail: "Zalla never uses GPS. You can type a city for local searches, and choose which sites see an approximate spot.",
+                detail: "Typing a city never uses GPS. You can use it for local searches, and choose which sites see an approximate spot.",
                 status: city.isEmpty ? "Not set" : "City set", isOn: !city.isEmpty
+            ),
+            SafetyItem(
+                title: "Website location",
+                detail: "Sites can ask where you are, and nothing is shared unless you say yes. Your location goes only to the site you allow, never to Zalla. Private tabs ask every time.",
+                status: websiteLocation.title, isOn: true
             ),
             SafetyItem(
                 title: "Your data stays here",

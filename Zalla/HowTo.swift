@@ -12,6 +12,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
     case privacyShield
     case desktopSite
     case findInPage
+    case websiteLocation
 
     var id: String { rawValue }
 
@@ -27,6 +28,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .privacyShield: return "Privacy Shield"
         case .desktopSite: return "Desktop sites"
         case .findInPage: return "Find on a page"
+        case .websiteLocation: return "Website location"
         }
     }
 
@@ -42,6 +44,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .privacyShield: return "shield.lefthalf.filled"
         case .desktopSite: return "desktopcomputer"
         case .findInPage: return "text.magnifyingglass"
+        case .websiteLocation: return "location"
         }
     }
 
@@ -58,6 +61,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .privacyShield: return "Cleaner links and fewer clues about you."
         case .desktopSite: return "Ask a site for its big-screen version."
         case .findInPage: return "Jump to a word on the page."
+        case .websiteLocation: return "Choose whether sites can ask where you are."
         }
     }
 
@@ -124,6 +128,13 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             return [
                 "Open the Menu on a page and choose Find on page.",
                 "Type a word. Use the arrows to jump between matches."
+            ]
+        case .websiteLocation:
+            return [
+                "Open Settings, Privacy, Website location. Ask is the default. Never blocks every request.",
+                "When a site asks, choose Allow or Don't Allow. Zalla remembers your answer for that site.",
+                "Your location goes only to the site you allow, never to Zalla. Private tabs ask every time and remember nothing.",
+                "To change a saved answer, open Settings, Privacy, Location and swipe the site away."
             ]
         }
     }

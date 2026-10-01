@@ -9,9 +9,10 @@ final class AboutTests: XCTestCase {
     }
 
     func testChangelogOrderAndContent() {
-        XCTAssertEqual(Changelog.releases.first?.version, "Build 15")
-        XCTAssertEqual(Changelog.releases.first?.name, "Fewer Loose Ends")
-        XCTAssertEqual(Changelog.releases.dropFirst().first?.version, "Build 14")
+        XCTAssertEqual(Changelog.releases.first?.version, "Build 16")
+        XCTAssertEqual(Changelog.releases.first?.name, "Where You At")
+        XCTAssertEqual(Changelog.releases.dropFirst().first?.version, "Build 15")
+        XCTAssertEqual(Changelog.releases.dropFirst(2).first?.version, "Build 14")
         XCTAssertEqual(Changelog.releases.last?.version, "1.0")
         XCTAssertEqual(Changelog.releases.last?.name, "Private by Default")
         XCTAssertEqual(Changelog.beta.map(\.version), ["Beta 3", "Beta 2", "Beta 1"])
@@ -41,6 +42,7 @@ final class AboutTests: XCTestCase {
         XCTAssertEqual(item("HTTPS-Only Mode").status, "On", "On unless you turn it off")
         XCTAssertEqual(item("Face ID for private tabs").status, "Locked")
         XCTAssertEqual(item("Encrypted DNS").status, "Off")
+        XCTAssertEqual(item("Website location").status, "Ask", "Ask unless you choose Never")
         defaults.set(false, forKey: HTTPSOnly.storageKey)
         defaults.set(true, forKey: PrivacyShield.encryptedDNSKey)
         defaults.set(true, forKey: PrivateTabLock.storageKey)
@@ -49,6 +51,9 @@ final class AboutTests: XCTestCase {
         XCTAssertEqual(item("Encrypted DNS").status, "On")
         XCTAssertEqual(item("Face ID for private tabs").status, "On")
         XCTAssertEqual(item("Auto-clear").status, "Off")
+        WebsiteLocation.setMode(.never, defaults)
+        items = SafetyOverview.items(unlocked: true, defaults: defaults)
+        XCTAssertEqual(item("Website location").status, "Never")
     }
 
     func testSafetyOverviewHasNoEmDashesOrVPNClaims() {
