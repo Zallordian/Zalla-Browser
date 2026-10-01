@@ -120,6 +120,7 @@ struct LocationSettingsView: View {
     @State private var status: String?
     @State private var working = false
     @State private var sites: [String] = []
+    @State private var answers: [WebsiteLocationAnswer] = []
 
     var body: some View {
         Form {
@@ -153,7 +154,7 @@ struct LocationSettingsView: View {
             } header: {
                 Text("Your city")
             } footer: {
-                Text("Optional and off by default. Your city is stored only on this device. Zalla does not use GPS or ask iOS for your location. Saving a city sends its name once to Apple Maps to find its center.")
+                Text("Optional and off by default. Your city is stored only on this device. Typing a city never uses GPS. Saving a city sends its name once to Apple Maps to find its center.")
             }
 
             Section {
@@ -182,12 +183,33 @@ struct LocationSettingsView: View {
             } footer: {
                 Text("Turn this on for a site from its page menu. It then sees the center of your city instead of your real location. Sites that use other ways to guess your location can still find you.")
             }
+
+            Section {
+                if answers.isEmpty {
+                    Text("No answers yet").foregroundStyle(.secondary)
+                }
+                ForEach(answers) { answer in
+                    LabeledContent(answer.host, value: answer.allowed ? "Allowed" : "Not allowed")
+                }
+                .onDelete { offsets in
+                    let list = answers
+                    for offset in offsets where list.indices.contains(offset) {
+                        LocationSettings.forget(host: list[offset].host)
+                    }
+                    answers = LocationSettings.answers()
+                }
+            } header: {
+                Text("Sites you answered")
+            } footer: {
+                Text(WebsiteLocation.Copy.answersFooter)
+            }
         }
         .navigationTitle("Location")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             draft = city
             sites = LocationSettings.sites()
+            answers = LocationSettings.answers()
         }
     }
 
