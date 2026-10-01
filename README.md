@@ -15,6 +15,14 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 16
+
+- Website location: sites can now ask for your real location (weather, nearby businesses, maps). Settings, Privacy, Website location is Ask by default, or Never to block every request without a prompt. Zalla asks Allow or Don't Allow per site and remembers the answer; Settings, Privacy, Location lists the answers so you can forget one. Private tabs ask every time and remember nothing.
+- Your location goes only to the site you allow, through WebKit. It never goes to Zalla, and Zalla keeps no copy. Typing a city for local search still never uses GPS.
+- Burn It All and Reset the App forget remembered per-site location answers. Reset also puts Website location back to Ask.
+- Uses `NSLocationWhenInUseUsageDescription`. The in-app Allow or Don't Allow prompt, and remembered answers, use WebKit's geolocation delegate, which is public API from iOS 27. On iOS 17 to 26, WebKit shows its own prompt, and Never and Don't Allow are enforced by a script in the page.
+- A How to page, a Safety at a glance row, and a Build 16 changelog entry.
+
 ## Build 15
 
 - The Flame is now Burn It All (free). It sits in Tabs, the Menu, and as an optional Quick Action button, no longer in the new tab edit menu, and its icon follows the accent color.
