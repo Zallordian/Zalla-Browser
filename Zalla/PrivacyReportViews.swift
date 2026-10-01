@@ -75,11 +75,12 @@ struct PrivacyReportView: View {
             thirdParties = await tab.thirdPartyHostsOnPage()
             measured = true
         }
-        .confirmationDialog("Reset the privacy report?", isPresented: $confirmReset, titleVisibility: .visible) {
+        .alert("Reset the privacy report?", isPresented: $confirmReset) {
             Button("Reset", role: .destructive) {
                 PrivacyReport.reset()
                 store = PrivacyReport.load()
             }
+            Button("Cancel", role: .cancel) {}
         }
     }
 

@@ -294,10 +294,10 @@ private struct TabContent: View {
             if let url = tab.url { ActivityShareSheet(items: [url]) }
         }
         .flameConfirmation(isPresented: $confirmBurn, browser: browser)
-        .confirmationDialog("Open another app?", isPresented: Binding(
+        .alert("Open another app?", isPresented: Binding(
             get: { tab.externalURL != nil },
             set: { if !$0 { tab.externalURL = nil } }
-        ), titleVisibility: .visible) {
+        )) {
             if let url = tab.externalURL {
                 Button("Open \(url.scheme ?? "link")") {
                     UIApplication.shared.open(url)
@@ -1829,7 +1829,7 @@ private struct TabsView: View {
             ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         }
         .flameConfirmation(isPresented: $confirmFlame, browser: browser, onBurn: { dismiss() })
-        .confirmationDialog("Close all tabs?", isPresented: $confirmCloseAll, titleVisibility: .visible) {
+        .alert("Close all tabs?", isPresented: $confirmCloseAll) {
             Button("Close All", role: .destructive) {
                 showUndoClose = false
                 undoClose = nil
@@ -2248,8 +2248,9 @@ private struct DownloadsView: View {
             }
         }
         .quickLookPreview($previewURL)
-        .confirmationDialog("Clear all downloads?", isPresented: $confirmClear, titleVisibility: .visible) {
+        .alert("Clear all downloads?", isPresented: $confirmClear) {
             Button("Clear all", role: .destructive) { browser.clearAllDownloads() }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -2577,12 +2578,13 @@ private struct SettingsView: View {
 
         .navigationTitle("Settings")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        .confirmationDialog("Clear browsing data and close all tabs?", isPresented: $confirmClear, titleVisibility: .visible) {
+        .alert("Clear browsing data and close all tabs?", isPresented: $confirmClear) {
             Button("Clear browsing data", role: .destructive) {
                 Task { await browser.clearBrowsingData(); dismiss() }
             }
+            Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog("Reset the App? Bookmarks are kept.", isPresented: $confirmReset, titleVisibility: .visible) {
+        .alert("Reset the App? Bookmarks are kept.", isPresented: $confirmReset) {
             Button("Reset the App", role: .destructive) {
                 Task {
                     await browser.resetApp(keepingBookmarks: true)
@@ -2590,14 +2592,14 @@ private struct SettingsView: View {
                     dismiss()
                 }
             }
+            Button("Cancel", role: .cancel) {}
         }
-        .confirmationDialog(
+        .alert(
             "Use a matching app icon?",
             isPresented: Binding(
                 get: { suggestIconForTheme != nil },
                 set: { if !$0 { suggestIconForTheme = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
             if let id = suggestIconForTheme {
                 let suggested = id.suggestedAppIcon

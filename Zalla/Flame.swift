@@ -28,8 +28,10 @@ struct FlameMark: View {
 
 extension View {
     /// Asks first, then wipes everything and closes the app.
+    /// An alert, not a confirmation dialog: on iPhone a dialog can show up as a popover pinned to whatever
+    /// view it hangs off, which put it at the top of the Menu sheet. An alert is always centered.
     func flameConfirmation(isPresented: Binding<Bool>, browser: BrowserStore, onBurn: @escaping () -> Void = {}) -> some View {
-        confirmationDialog("Burn It All?", isPresented: isPresented, titleVisibility: .visible) {
+        alert("Burn It All?", isPresented: isPresented) {
             Button("Burn It All", role: .destructive) {
                 onBurn()
                 Task { await browser.burnEverythingAndClose() }
