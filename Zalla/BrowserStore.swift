@@ -441,6 +441,7 @@ final class BrowserStore: ObservableObject {
         clearSavedSession()
         let privateStores = tabs.filter(\.isPrivate).map { $0.webView.configuration.websiteDataStore }
         MediaPermissionSession.memory.removeAll()
+        LocationSettings.clearSiteChoices()
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
         PrivacyReport.clearHosts()
@@ -467,6 +468,7 @@ final class BrowserStore: ObservableObject {
         sessionSavingEnabled = false
         clearSavedSession()
         MediaPermissionSession.memory.removeAll()
+        LocationSettings.forgetAnswers()
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
         PrivacyReport.clearHosts()
@@ -531,6 +533,7 @@ final class BrowserStore: ObservableObject {
         ContentBlocker.shared.resetSettings()
         PrivacyShield.resetSettings()
         LocationSettings.clear()
+        WebsiteLocation.resetSettings()
         SiteCSS.clearAll()
         defaults.removeObject(forKey: PrivateTabLock.storageKey)
         defaults.removeObject(forKey: TabSleep.storageKey)
@@ -838,7 +841,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 source: CookieBannerDismiss.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
             ))
         }
-        for spec in PageScripts.plan(for: url, unlocked: ZallaUnlock.shared.isUnlocked) {
+        for spec in PageScripts.plan(for: url, unlocked: ZallaUnlock.shared.isUnlocked, isPrivate: isPrivate) {
             controller.addUserScript(WKUserScript(
                 source: spec.source,
                 injectionTime: spec.atDocumentStart ? .atDocumentStart : .atDocumentEnd,
@@ -1504,6 +1507,46 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         })
         alert.addAction(UIAlertAction(title: MediaCapturePrompt.allowTitle, style: .default) { _ in
             MediaPermissionSession.memory.remember(true, site: site, kind: kind, isPrivate: privateTab)
+            decisionHandler(.grant)
+        })
+        host.present(alert, animated: true)
+    }
+
+    /// Website location (iOS 27 and later, where WebKit offers this as public API). WebKit asks iOS for location
+    /// access first, then asks here. Never and remembered answers resolve without a prompt, a private tab always
+    /// asks and remembers nothing, and Allow or Don't Allow is remembered per site otherwise. On earlier iOS
+    /// versions WebKit shows its own prompt, and Never and Don't Allow are enforced by a script in the page.
+    @available(iOS 27.0, *)
+    @objc(webView:requestGeolocationPermissionForOrigin:initiatedByFrame:decisionHandler:)
+    func webView(_ webView: WKWebView, requestGeolocationPermissionFor origin: WKSecurityOrigin,
+                 initiatedByFrame frame: WKFrameInfo,
+                 decisionHandler: @escaping (WKPermissionDecision) -> Void) {
+        let siteKey = LocationSettings.siteKey(forHost: origin.host)
+        let privateTab = isPrivate
+        let remembered = siteKey.flatMap { LocationSettings.answer(forHost: $0) }
+        switch WebsiteLocation.verdict(mode: WebsiteLocation.mode(), isPrivate: privateTab, remembered: remembered) {
+        case .allow:
+            decisionHandler(.grant)
+            return
+        case .deny:
+            decisionHandler(.deny)
+            return
+        case .ask:
+            break
+        }
+        guard let host = hostController() else { decisionHandler(.deny); return }
+        let site = MediaCapturePrompt.siteLabel(scheme: origin.protocol, host: origin.host, port: origin.port)
+        let alert = UIAlertController(
+            title: WebsiteLocation.Copy.title(site: site),
+            message: WebsiteLocation.Copy.message(isPrivate: privateTab),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: WebsiteLocation.Copy.denyTitle, style: .cancel) { _ in
+            if let siteKey { LocationSettings.remember(false, host: siteKey, isPrivate: privateTab) }
+            decisionHandler(.deny)
+        })
+        alert.addAction(UIAlertAction(title: WebsiteLocation.Copy.allowTitle, style: .default) { _ in
+            if let siteKey { LocationSettings.remember(true, host: siteKey, isPrivate: privateTab) }
             decisionHandler(.grant)
         })
         host.present(alert, animated: true)
