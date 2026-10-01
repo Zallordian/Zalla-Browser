@@ -14,6 +14,17 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 17",
+            name: "Menus that line up",
+            highlights: [
+                "Burn It All now asks in the middle of the screen, not in a little popover at the top pointing at the wrong button",
+                "Close all tabs, Clear browsing data, Reset the App, and the other are-you-sure questions ask the same way, each with a Cancel",
+                "Bookmark page now tells you it worked"
+            ],
+            improvements: "Find on page opens its bar and keyboard once the Menu has closed. Page Zoom has room for its footnote. Downloads in Settings no longer has a Done button that only goes back. Resetting the new tab page asks first and updates the page right away. Editing a shortcut checks its address the way Add Shortcut does.",
+            fixes: "The search engine menu in setup no longer repeats its own label."
+        ),
+        ChangelogEntry(
             version: "Build 16",
             name: "Where You At",
             highlights: [
