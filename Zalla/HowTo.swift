@@ -72,7 +72,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Tap the center button to fan out Back, Forward, Reload, Tabs, New Tab, and Share.",
                 "Tap the search bar on the left, or press and hold the center button, to search or type an address.",
                 "Menu sits beside Tabs.",
-                "Switch styles any time in Settings, Toolbar style."
+                "Switch styles any time in Settings, Appearance, Toolbar."
             ]
         case .historyPeek:
             return [

@@ -57,10 +57,6 @@ enum ThemePacks {
         all.first { $0.themeID.rawValue == themeID }
     }
 
-    static func refreshAnimationEnabled(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: refreshAnimationKey) as? Bool ?? true
-    }
-
     /// The pack whose refresh animation should play right now, or nil when nothing should animate.
     static func activeRefresh(themeID: String, useCustomAccent: Bool, unlocked: Bool,
                               animationOn: Bool, reduceMotion: Bool) -> ThemePack? {

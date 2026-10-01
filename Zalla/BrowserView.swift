@@ -37,7 +37,6 @@ struct BrowserView: View {
                 case .settings: SettingsView(browser: browser)
                 case .menu: BrowserMenuSheet(browser: browser, sheet: $sheet)
                 case .downloads: DownloadsView(browser: browser)
-                case .homePersonalization: HomePersonalizationView()
                 case .pageZoom:
                     if let tab = browser.selected {
                         PageZoomSheet(tab: tab)
@@ -73,14 +72,14 @@ extension BrowserView {
     private func detents(for item: BrowserSheet) -> Set<PresentationDetent> {
         switch item {
         case .menu: return [.medium, .large]
-        case .pageZoom: return [.height(220)]
+        case .pageZoom: return [.height(300)]
         default: return [.large]
         }
     }
 }
 
 enum BrowserSheet: String, Identifiable {
-    case tabs, library, settings, menu, downloads, homePersonalization, pageZoom
+    case tabs, library, settings, menu, downloads, pageZoom
     var id: String { rawValue }
 }
 
@@ -1288,11 +1287,6 @@ private struct TabContent: View {
         }
         .accessibilityLabel("Tabs, \(browser.tabs.count) open")
         .contextMenu { tabsContextMenu }
-        .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                // Context menu covers long-press; also available via menu actions.
-            }
-        )
     }
 
     @ViewBuilder
@@ -1505,8 +1499,13 @@ private struct BrowserMenuSheet: View {
                     Task { await browser.openPrivateTab() }
                 } label: { Label("New private tab", systemImage: "eye.slash") }
                 Button {
-                    browser.selected?.findOnPage()
+                    let tab = browser.selected
                     dismiss()
+                    // The find bar needs the page, not the sheet, to take focus.
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        tab?.findOnPage()
+                    }
                 } label: { Label("Find on page", systemImage: "text.magnifyingglass") }
                 .disabled(!(browser.selected?.hasPage ?? false))
                 Button {
@@ -2137,6 +2136,8 @@ private struct LibraryView: View {
 
 private struct DownloadsView: View {
     @ObservedObject var browser: BrowserStore
+    /// Off when pushed from Settings, where Done would only step back and the Back button does that already.
+    var showsDone = true
     @Environment(\.dismiss) private var dismiss
     @State private var shareURL: URL?
     @State private var showShare = false
@@ -2241,7 +2242,11 @@ private struct DownloadsView: View {
             }
         }
         .navigationTitle("Downloads")
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if showsDone { Button("Done") { dismiss() } }
+            }
+        }
         .sheet(isPresented: $showShare) {
             if let shareURL {
                 ActivityShareSheet(items: [shareURL])
@@ -2270,6 +2275,7 @@ private struct HomePersonalizationView: View {
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
     @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
     @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
+    @State private var confirmReset = false
 
     var body: some View {
         Form {
@@ -2299,18 +2305,24 @@ private struct HomePersonalizationView: View {
                 }
             }
             Section {
-                Button("Reset shortcuts to defaults") {
-                    HomeShortcuts.resetToDefaults()
-                    welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
-                    userName = ""
-                    showSlider = true
-                    showRecentHistory = true
-                }
+                Button("Reset the new tab page", role: .destructive) { confirmReset = true }
             } footer: {
-                Text("Shortcuts themselves are edited from the new tab Edit button. Reset restores the default shortcut set and these toggles.")
+                Text("Shortcuts themselves are edited from the pencil on the new tab page. Reset removes all your shortcuts and puts these settings back.")
             }
         }
         .navigationTitle("Home")
+        .alert("Reset the new tab page?", isPresented: $confirmReset) {
+            Button("Reset", role: .destructive) {
+                HomeShortcuts.resetToDefaults()
+                welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
+                userName = ""
+                showSlider = true
+                showRecentHistory = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes every shortcut and restores the default welcome and widgets.")
+        }
     }
 }
 
@@ -2358,7 +2370,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "6"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "17"
         return "\(marketing) (\(build))"
     }
 
@@ -2488,7 +2500,7 @@ private struct SettingsView: View {
                     Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
                 }
                 NavigationLink {
-                    DownloadsView(browser: browser)
+                    DownloadsView(browser: browser, showsDone: false)
                 } label: {
                     Label("Downloads", systemImage: "arrow.down.circle")
                 }

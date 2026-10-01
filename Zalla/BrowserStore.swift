@@ -396,9 +396,14 @@ final class BrowserStore: ObservableObject {
     }
 
     func bookmark(_ tab: BrowserTab) {
-        guard let url = tab.url, !bookmarks.contains(where: { $0.url == url }) else { return }
+        guard let url = tab.url else { return }
+        if bookmarks.contains(where: { $0.url == url }) {
+            tab.showToast("Already in your bookmarks.")
+            return
+        }
         bookmarks.append(SavedPage(title: tab.title, url: url))
         save()
+        tab.showToast("Bookmarked.")
     }
 
     @discardableResult

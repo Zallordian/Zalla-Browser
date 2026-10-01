@@ -18,6 +18,7 @@ struct NewTabView: View {
     @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
     @AppStorage(HomeShortcuts.showRecentHistoryKey) private var showRecentHistory = true
     @AppStorage(HomeShortcuts.hideAddHintKey) private var hideAddHint = false
+    @AppStorage(HomeShortcuts.storageKey) private var storedShortcuts = Data()
     @AppStorage(NewTabBackground.storageKey) private var backgroundRaw = NewTabBackground.standard.storageValue
     @AppStorage(NewTabPhotoStore.revisionKey) private var photoRevision = 0
     @ObservedObject private var unlock = ZallaUnlock.shared
@@ -71,6 +72,8 @@ struct NewTabView: View {
             )
         }
         .onAppear { shortcuts = HomeShortcuts.load() }
+        // Settings can reset the list while this page is still showing underneath.
+        .onChange(of: storedShortcuts) { _, _ in shortcuts = HomeShortcuts.load() }
         .sheet(isPresented: $showBackgroundPicker) {
             NewTabBackgroundSheet()
                 .presentationDetents([.large])
@@ -517,18 +520,14 @@ private struct ShortcutEditor: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
                     let title = shortcut.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    var urlString = shortcut.urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !urlString.lowercased().hasPrefix("http://"), !urlString.lowercased().hasPrefix("https://") {
-                        urlString = "https://" + urlString
-                    }
-                    guard !title.isEmpty, URL(string: urlString) != nil else { return }
+                    guard !title.isEmpty, let urlString = HomeShortcuts.normalizedURLString(shortcut.urlString) else { return }
                     shortcut.title = title
                     shortcut.urlString = urlString
                     onSave(shortcut)
                 }
                 .disabled(
                     shortcut.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || shortcut.urlString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || HomeShortcuts.normalizedURLString(shortcut.urlString) == nil
                 )
             }
         }

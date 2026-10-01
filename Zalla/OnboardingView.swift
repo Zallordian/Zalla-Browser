@@ -288,6 +288,7 @@ struct OnboardingView: View {
                                 ForEach(SearchEngine.choices(customTemplate: nil), id: \.rawValue) { Text($0.displayName).tag($0.rawValue) }
                             }
                             .pickerStyle(.menu)
+                            .labelsHidden()
                         }
                         Text("Searches open inside Zalla. Your chosen engine receives what you search for. You can change it later by pressing and holding the engine label on the search bar.")
                             .font(.footnote)
