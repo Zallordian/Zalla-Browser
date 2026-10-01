@@ -1,4 +1,4 @@
-# Zalla Browser — Project Handoff
+# Zalla Browser: Project Handoff
 
 **Prepared:** September 21, 2026  
 **Purpose:** Portable project context for starting a new ChatGPT Project without losing the decisions, direction, or ideas developed so far.
@@ -144,7 +144,7 @@ Potential brand themes:
 
 ---
 
-## 5. Feature Strategy — Local-First Launch
+## 5. Feature Strategy - Local-First Launch
 
 The initial feature set should favor capabilities that can be implemented on-device or through native iOS frameworks.
 
@@ -519,7 +519,7 @@ Paste the following into the new project’s instructions or first project chat 
 
 ---
 
-# Appendix A — Available Conversation Record
+# Appendix A - Available Conversation Record
 
 The following is the project conversation content currently visible in context, preserved as closely as possible.
 
@@ -597,7 +597,7 @@ I noticed a lot of the time ill try and save a photo, and i have to save it as W
 
 ---
 
-# Appendix B — Current Project Source of Truth
+# Appendix B - Current Project Source of Truth
 
 Unless explicitly changed later, future work should assume:
 

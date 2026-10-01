@@ -15,6 +15,12 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 17
+
+- Burn It All and the other are-you-sure questions (close all tabs, clear browsing data, reset the app, clear downloads, reset the privacy report, open another app, matching app icon) are now centered alerts with a Cancel. On iPhone a confirmation dialog can render as a popover pinned to a distant view, which is what put Burn It All at the top of the Menu sheet with its arrow on the wrong row.
+- Menu and layout fixes found in an audit: Find on page opens after the Menu closes, Bookmark page shows a toast, the Page Zoom sheet is taller, Downloads in Settings has no Done, the setup search engine menu has no doubled label, resetting the new tab page asks first and refreshes the page, and the shortcut editor validates addresses like Add Shortcut does.
+- Dead code removed: the unused Home personalization sheet case, a no-op long press on the Compact tabs button, and an unused refresh animation helper.
+
 ## Build 16
 
 - Website location: sites can now ask for your real location (weather, nearby businesses, maps). Settings, Privacy, Website location is Ask by default, or Never to block every request without a prompt. Zalla asks Allow or Don't Allow per site and remembers the answer; Settings, Privacy, Location lists the answers so you can forget one. Private tabs ask every time and remember nothing.
