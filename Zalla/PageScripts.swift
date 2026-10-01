@@ -149,6 +149,43 @@ enum PageScripts {
         """
     }
 
+    /// Tells a site that location is denied, without WebKit or iOS being asked. Used for Never and for sites
+    /// you said Don't Allow to.
+    static let blockedLocation = """
+    (function () {
+      try {
+        var denied = function () {
+          return { code: 1, message: 'User denied Geolocation', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 };
+        };
+        var nextWatch = 0;
+        var blocked = {
+          getCurrentPosition: function (success, failure) {
+            if (typeof failure === 'function') { setTimeout(function () { failure(denied()); }, 0); }
+          },
+          watchPosition: function (success, failure) {
+            nextWatch += 1;
+            if (typeof failure === 'function') { setTimeout(function () { failure(denied()); }, 0); }
+            return nextWatch;
+          },
+          clearWatch: function () {}
+        };
+        Object.defineProperty(navigator, 'geolocation', { get: function () { return blocked; }, configurable: true });
+        if (navigator.permissions && navigator.permissions.query) {
+          var originalQuery = navigator.permissions.query.bind(navigator.permissions);
+          navigator.permissions.query = function (descriptor) {
+            if (descriptor && descriptor.name === 'geolocation') {
+              return Promise.resolve({
+                state: 'denied', onchange: null,
+                addEventListener: function () {}, removeEventListener: function () {}
+              });
+            }
+            return originalQuery(descriptor);
+          };
+        }
+      } catch (e) {}
+    })();
+    """
+
     /// Adds the user's CSS for a site as soon as the page starts.
     static func siteCSS(_ css: String) -> String {
         """

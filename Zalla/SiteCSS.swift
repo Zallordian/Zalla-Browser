@@ -52,7 +52,8 @@ extension PageScripts {
     static func plan(
         for url: URL?,
         unlocked: Bool,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        isPrivate: Bool = false
     ) -> [PageScriptSpec] {
         var specs: [PageScriptSpec] = []
         let isWeb = ["http", "https"].contains(url?.scheme?.lowercased() ?? "")
@@ -70,6 +71,8 @@ extension PageScripts {
                     atDocumentStart: true,
                     mainFrameOnly: false
                 ))
+            } else if WebsiteLocation.blocksInPage(host: host, isPrivate: isPrivate, defaults) {
+                specs.append(PageScriptSpec(source: blockedLocation, atDocumentStart: true, mainFrameOnly: false))
             }
             if unlocked {
                 let css = SiteCSS.css(forHost: host, in: defaults)

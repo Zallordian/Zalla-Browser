@@ -1,7 +1,8 @@
 import Foundation
 import MapKit
 
-/// An optional city or town, kept only on this device. Zalla never asks iOS for your location.
+/// An optional city or town, kept only on this device. Typing a city never uses GPS. Sites can separately ask for
+/// your real location (see WebsiteLocation), and Zalla itself never reads it.
 enum LocationSettings {
     static let cityKey = "locationCity"
     static let latitudeKey = "locationCityLatitude"
