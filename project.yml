@@ -37,6 +37,7 @@ targets:
         NSCameraUsageDescription: Zalla uses the camera only when a website you are visiting asks for it and you allow it.
         NSFaceIDUsageDescription: Zalla uses Face ID only to unlock your private tabs, if you turn that on in Settings.
         NSMicrophoneUsageDescription: Zalla uses the microphone only when a website you are visiting asks for it and you allow it.
+        NSLocationWhenInUseUsageDescription: Sites you choose can ask for your location, for things like weather and nearby businesses. Zalla asks you first, and your location goes only to the site you allow.
         NSLocalNetworkUsageDescription: Zalla connects to devices on your local network only when you open their address.
         UIBackgroundModes:
           - audio
