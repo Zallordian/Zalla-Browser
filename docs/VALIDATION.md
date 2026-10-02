@@ -57,6 +57,18 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Floating bottom bar (Build 23)
+Needs a physical iPhone. Check: with Immersive layout on there is no frosted box behind the bottom controls; in Classic, Back, Forward, Share, Tabs, the address, and the menu are separate glass shapes with the page showing between them; in Compact and Quick Action the circles and pill float the same way; taps in the gaps go to the page (scroll, tap a link right above the bar); everything is a bit smaller than Build 22 and the bottom gap is still about 12 pt above the home indicator; the keyboard, landscape, and a bar on top still work; Immersive layout off brings back the solid bars.
+
+## Status bar matches the page (Build 23)
+Needs a physical iPhone. Check: on YouTube the logo is no longer under the clock and the top strip matches the page; light pages show dark clock text and dark pages light text; pages with a theme-color meta tag use it, others use their body color; the strip color animates when a page changes its theme-color or switches to dark mode; Reader and error pages look right; the new tab page keeps its full bleed wallpaper with the light fade; Settings, Appearance, Status bar matches the page off keeps content under the clock the Build 22 way (or the Zalla background in the strip) and does not recolor it; explicit Light or Dark appearance is respected; no flicker while scrolling.
+
+## App banners (Build 23)
+Needs a physical iPhone. Check: on a page with an apple-itunes-app tag (YouTube, Reddit, Amazon) a slim banner appears under the status bar with the app name, Open, and X; Open launches the installed app on that page, and with the app not installed the banner just hides (no App Store, no browser jump); X hides it for that host until Zalla is quit, other hosts still show it; private tabs show the banner but forget dismissals; the page moves down with the banner and back when it goes; Settings, Browsing, App banners off hides it everywhere; no network request to Apple.
+
+## Volcano, Deep Ocean, and Retro Arcade (Build 23)
+Needs a physical iPhone. Check: without Zalla Unlock the three packs show a lock and Apply opens the Unlock sheet; with it, Apply sets accent, icon, and new tab background; the home screen icons show the Z mark in ember, aqua, and arcade colors; Volcano lava rises with sparks and clears upward, Deep Ocean's wave rolls across and pulls back with bubbles and light rays, Retro Arcade dissolves into pixels with scanlines and a scan bar and clears; each at Slow, Normal, and Fast, with Theme transitions off, and with Reduce Motion on (quick tinted fade); a reload and a pull to refresh play them; the new tab backgrounds read well in the light and dark text styles; no dropped frames or heat on an older iPhone.
+
 ## Required before public beta
 JavaScript alert/confirm/prompt support, downloads, file upload and system credential validation, camera/microphone permissions, memory management, content-process recovery, restoration policy, meaningful connection security UX, and explicit handling of unsupported content. Add targeted tests as these behaviors are implemented.
 

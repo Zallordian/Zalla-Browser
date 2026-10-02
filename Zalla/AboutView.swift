@@ -7,7 +7,7 @@ struct AboutView: View {
 
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "22"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "23"
         return "\(marketing) (\(build))"
     }
 

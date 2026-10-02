@@ -14,6 +14,18 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 23",
+            name: "Float On",
+            highlights: [
+                "The bottom bar now floats for real, like Safari on iOS 26. No frosted box behind it: the Back button, the address, and the menu button are each their own little glass shape sitting right on the page, with the page showing through the gaps. Classic, Compact, and Quick Action all float the same way, everything is about 12 percent smaller, and Settings, Appearance, Immersive layout still brings back the solid bars",
+                "The page now starts below the clock instead of running under it, and the status bar area takes on the page's own color, so YouTube keeps its logo and the top looks seamless. Light pages get dark text and dark pages get light text. Settings, Appearance, Status bar matches the page turns it off",
+                "App banners: when a site says it has an app (the same hint Safari reads), a slim banner under the status bar offers Open in the app. It only opens an app you already have, never goes to the App Store, and never calls Apple. Dismiss it and it stays away for that site until you quit Zalla. Settings, Browsing, App banners turns it off",
+                "Three new theme packs in Zalla Unlock: Volcano (black and ember red, with a lava wipe and flying sparks), Deep Ocean (teal and aqua, with a wave that rolls across and pulls back, bubbles, and light rays), and Retro Arcade (pink, blue, and yellow pixel stars, with a CRT pixel dissolve). Each has an accent, an app icon, and new tab backgrounds"
+            ],
+            improvements: "The new themes play on refresh and when applied, follow the same On and Off and Speed switches in Settings, Theme packs, and get the quick fade when Reduce Motion is on. The new tab page keeps its full bleed wallpaper.",
+            fixes: "The status bar clock and the YouTube logo are no longer hidden by the page."
+        ),
+        ChangelogEntry(
             version: "Build 22",
             name: "Edge to Edge",
             highlights: [
