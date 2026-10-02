@@ -813,7 +813,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
-        webView.allowsBackForwardNavigationGestures = SwipeNavigation.isEnabled
+        EdgeNavigation.install(on: webView, enabled: SwipeNavigation.isEnabled)
         // Swiping down on the page drags the keyboard away, like Safari.
         webView.scrollView.keyboardDismissMode = .interactive
         // Avoid black flash behind page chrome and during empty/transient loads. The web view stays opaque so
@@ -1655,7 +1655,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     /// Applies the Settings toggle for edge swipes to this tab.
     func setSwipeNavigation(_ enabled: Bool) {
-        webView.allowsBackForwardNavigationGestures = enabled
+        EdgeNavigation.install(on: webView, enabled: enabled)
     }
 
     func showToast(_ message: String) {

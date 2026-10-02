@@ -1451,6 +1451,8 @@ private struct WebSurface: UIViewRepresentable {
     var chromeInsets: UIEdgeInsets = .zero
 
     func makeUIView(context: Context) -> WKWebView {
+        // Every time a tab is shown, make sure its edge swipes are in place and match the Settings switch.
+        EdgeNavigation.install(on: webView, enabled: SwipeNavigation.isEnabled)
         Self.apply(chromeInsets, to: webView)
         return webView
     }
