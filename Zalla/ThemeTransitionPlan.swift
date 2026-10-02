@@ -110,52 +110,32 @@ enum JungleLeaves {
     }
 }
 
-/// Burn It All: the fire effect, or a quick fade when Reduce Motion is on.
+/// Burn It All: the fire effect, or a quick fade when Reduce Motion is on or the effect is switched off.
 struct BurnEffectPlan: Equatable {
     enum Style: Equatable {
         case fire
         case fade
     }
 
-    static let fireDuration = 1.2
+    /// Flames rise, fill the screen, break apart, and fade to embers, in about two and a half seconds.
+    static let fireDuration = 2.4
     static let fadeDuration = 0.3
     /// Set when Burn It All is confirmed and cleared once the wipe is done. If Zalla is closed in between,
     /// the next launch finishes the wipe and restores nothing.
     static let pendingKey = "burnPending"
+    /// Settings, Privacy: the fire effect on or off. On by default; off plays the quick fade.
+    static let animationKey = "burnAnimation"
 
     let style: Style
     let duration: Double
 
-    static func make(reduceMotion: Bool) -> BurnEffectPlan {
-        reduceMotion
+    static func animationEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: animationKey) as? Bool ?? true
+    }
+
+    static func make(reduceMotion: Bool, animated: Bool = true) -> BurnEffectPlan {
+        (reduceMotion || !animated)
             ? BurnEffectPlan(style: .fade, duration: fadeDuration)
             : BurnEffectPlan(style: .fire, duration: fireDuration)
-    }
-}
-
-/// One tongue of flame along a burning edge. `center` and `halfWidth` are fractions of the edge length,
-/// `height` is how far the tip reaches into the flame band (0 to 1), `lean` slants the tip sideways.
-struct FlameTongue: Equatable {
-    var center: Double
-    var halfWidth: Double
-    var height: Double
-    var lean: Double
-}
-
-enum FlameTongues {
-    /// Evenly spaced tongues that never overlap, with a little jitter so the edge looks alive.
-    static func make(count: Int, seed: UInt64) -> [FlameTongue] {
-        guard count > 0 else { return [] }
-        var generator = SeededGenerator(seed: seed)
-        let spacing = 1.0 / Double(count)
-        return (0..<count).map { i in
-            let jitter = Double.random(in: -0.1...0.1, using: &generator) * spacing
-            return FlameTongue(
-                center: (Double(i) + 0.5) * spacing + jitter,
-                halfWidth: spacing * 0.5 * Double.random(in: 0.78...0.95, using: &generator),
-                height: Double.random(in: 0.55...1.0, using: &generator),
-                lean: Double.random(in: -0.5...0.5, using: &generator)
-            )
-        }
     }
 }

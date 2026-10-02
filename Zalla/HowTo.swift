@@ -121,7 +121,8 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             return [
                 "Find Burn It All in the Menu, in Tabs, or add it to your Quick Action buttons in Settings.",
                 "Confirm, and Zalla closes every tab and erases history, cookies, and site data.",
-                "Flames creep in from the edges while it works, then Zalla closes. With Reduce Motion on, the screen just fades.",
+                "Flames rise over the page, break apart into embers, and fade to black. Then a plain Clearing browsing data label shows while it finishes, and Zalla closes.",
+                "Prefer it quiet? Turn off Burn It All fire effect in Settings, Privacy. With Reduce Motion on, the screen just fades.",
                 "Open Zalla again for a clean slate. Bookmarks and downloads stay put."
             ]
         case .themeTransitions:

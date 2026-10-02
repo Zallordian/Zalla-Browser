@@ -453,7 +453,10 @@ final class BrowserStore: ObservableObject {
         guard !isBurning else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: BurnEffectPlan.pendingKey)
-        let plan = BurnEffectPlan.make(reduceMotion: UIAccessibility.isReduceMotionEnabled)
+        let plan = BurnEffectPlan.make(
+            reduceMotion: UIAccessibility.isReduceMotionEnabled,
+            animated: BurnEffectPlan.animationEnabled()
+        )
         let started = Date()
         burnPlan = plan
         isBurning = true
@@ -480,8 +483,8 @@ final class BrowserStore: ObservableObject {
         selectedID = nil
         // A second pass, in case a page wrote something while the fire was going.
         await eraseSiteData(in: privateStores)
-        // Leave the confirmation on screen for a beat, then close.
-        try? await Task.sleep(nanoseconds: 700_000_000)
+        // Leave the "Clearing browsing data..." label on screen for a beat, then close.
+        try? await Task.sleep(nanoseconds: 900_000_000)
         defaults.removeObject(forKey: BurnEffectPlan.pendingKey)
         exit(0)
     }
@@ -582,6 +585,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: TabSleep.storageKey)
         defaults.removeObject(forKey: SwipeNavigation.storageKey)
         defaults.removeObject(forKey: PullToRefresh.storageKey)
+        defaults.removeObject(forKey: BurnEffectPlan.animationKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)
         defaults.removeObject(forKey: CookieBannerDismiss.storageKey)

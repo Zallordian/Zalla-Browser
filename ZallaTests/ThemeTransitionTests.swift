@@ -55,19 +55,19 @@ final class ThemeTransitionTests: XCTestCase {
 
     func testBurnPlanRules() {
         XCTAssertEqual(BurnEffectPlan.make(reduceMotion: false).style, .fire)
-        XCTAssertEqual(BurnEffectPlan.make(reduceMotion: false).duration, 1.2, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(BurnEffectPlan.make(reduceMotion: false).duration, 2.0)
+        XCTAssertLessThanOrEqual(BurnEffectPlan.make(reduceMotion: false).duration, 2.5)
         XCTAssertEqual(BurnEffectPlan.make(reduceMotion: true).style, .fade)
         XCTAssertLessThan(BurnEffectPlan.make(reduceMotion: true).duration, 0.5)
     }
 
-    func testFlameTonguesDoNotOverlap() {
-        let tongues = FlameTongues.make(count: 14, seed: 3)
-        XCTAssertEqual(tongues.count, 14)
-        XCTAssertEqual(tongues, FlameTongues.make(count: 14, seed: 3))
-        for (a, b) in zip(tongues, tongues.dropFirst()) {
-            XCTAssertLessThan(a.center + a.halfWidth, b.center - b.halfWidth)
-        }
-        XCTAssertTrue(tongues.allSatisfy { $0.center - $0.halfWidth >= 0 && $0.center + $0.halfWidth <= 1 })
-        XCTAssertTrue(FlameTongues.make(count: 0, seed: 1).isEmpty)
+    func testBurnEffectCanBeSwitchedOff() {
+        XCTAssertEqual(BurnEffectPlan.make(reduceMotion: false, animated: false).style, .fade)
+        XCTAssertEqual(BurnEffectPlan.make(reduceMotion: true, animated: true).style, .fade)
+        let defaults = UserDefaults(suiteName: "ThemeTransitionTests.burn")!
+        defaults.removePersistentDomain(forName: "ThemeTransitionTests.burn")
+        XCTAssertTrue(BurnEffectPlan.animationEnabled(in: defaults), "On by default")
+        defaults.set(false, forKey: BurnEffectPlan.animationKey)
+        XCTAssertFalse(BurnEffectPlan.animationEnabled(in: defaults))
     }
 }
