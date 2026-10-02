@@ -2536,6 +2536,7 @@ private struct SettingsView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
+    @AppStorage(SettingsTabHaptics.storageKey) private var settingsTabHaptics = SettingsTabHaptics.defaultEnabled
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(BurnEffectPlan.animationKey) private var burnAnimation = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
@@ -2687,6 +2688,7 @@ private struct SettingsView: View {
                     }
                 }
                 Toggle("Immersive layout", isOn: $immersiveLayout)
+                Toggle("Haptic tap on Settings tabs", isOn: $settingsTabHaptics)
                 NavigationLink("Customize Toolbar") {
                     ToolbarEditorView(theme: theme)
                 }
