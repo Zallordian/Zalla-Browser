@@ -6,12 +6,15 @@ import WebKit
 /// both fire, and so the swipe works the same for every tab, new tab, and popup.
 final class EdgeNavigationRecognizer: UIScreenEdgePanGestureRecognizer, UIGestureRecognizerDelegate {
     private weak var webView: WKWebView?
+    /// The tab that owns the web view. It knows about the new tab page, which counts as a history entry.
+    private weak var tab: BrowserTab?
     private let side: EdgeSwipe.Side
     private var cue: EdgeSwipeCue?
     private var armed = false
 
-    init(webView: WKWebView, side: EdgeSwipe.Side) {
+    init(webView: WKWebView, tab: BrowserTab?, side: EdgeSwipe.Side) {
         self.webView = webView
+        self.tab = tab
         self.side = side
         super.init(target: nil, action: nil)
         edges = side == .left ? .left : .right
@@ -21,7 +24,12 @@ final class EdgeNavigationRecognizer: UIScreenEdgePanGestureRecognizer, UIGestur
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         guard let webView else { return false }
-        return EdgeSwipe.canBegin(side: side, enabled: SwipeNavigation.isEnabled, canGoBack: webView.canGoBack, canGoForward: webView.canGoForward)
+        return EdgeSwipe.canBegin(
+            side: side,
+            enabled: SwipeNavigation.isEnabled,
+            canGoBack: tab?.canNavigateBack ?? webView.canGoBack,
+            canGoForward: tab?.canNavigateForward ?? webView.canGoForward
+        )
     }
 
     /// Lets the page keep scrolling and the fan, toolbar, and tab gestures keep their own touches.
@@ -48,7 +56,11 @@ final class EdgeNavigationRecognizer: UIScreenEdgePanGestureRecognizer, UIGestur
         case .ended:
             let commit = EdgeSwipe.shouldCommit(translation: x, velocity: Double(velocity(in: webView).x), side: side)
             if commit {
-                if side == .left { webView.goBack() } else { webView.goForward() }
+                if let tab {
+                    if side == .left { tab.goBack() } else { tab.goForward() }
+                } else {
+                    if side == .left { webView.goBack() } else { webView.goForward() }
+                }
             }
             cue?.finish(committed: commit)
             cue = nil
@@ -111,13 +123,13 @@ private final class EdgeSwipeCue: UIView {
 enum EdgeNavigation {
     /// Adds the edge swipes to a web view once, and turns them on or off. Safe to call again for the same web view.
     @MainActor
-    static func install(on webView: WKWebView, enabled: Bool) {
+    static func install(on webView: WKWebView, tab: BrowserTab? = nil, enabled: Bool) {
         // WebKit's own gesture stays off: Zalla's takes over so the swipe works in every layout.
         webView.allowsBackForwardNavigationGestures = false
         var ours = webView.gestureRecognizers?.compactMap { $0 as? EdgeNavigationRecognizer } ?? []
         if ours.isEmpty {
             for side in [EdgeSwipe.Side.left, EdgeSwipe.Side.right] {
-                let recognizer = EdgeNavigationRecognizer(webView: webView, side: side)
+                let recognizer = EdgeNavigationRecognizer(webView: webView, tab: tab, side: side)
                 webView.addGestureRecognizer(recognizer)
                 ours.append(recognizer)
             }

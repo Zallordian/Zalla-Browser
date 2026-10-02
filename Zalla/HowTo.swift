@@ -81,13 +81,14 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .historyPeek:
             return [
                 "Press and hold Back or Forward.",
-                "Slide to a page in the list.",
+                "Slide to a page in the list. The new tab page is the last stop going back.",
                 "Let go to open it. Slide away from the list to cancel."
             ]
         case .edgeSwipe:
             return [
                 "Swipe in from the left edge to go back.",
                 "Swipe in from the right edge to go forward.",
+                "Swipe back from the first page you opened and you land on your new tab page. Swipe forward to return.",
                 "A small arrow follows your finger. Let go past it to turn the page, or let go early to stay put.",
                 "If it gets in the way, turn it off in Settings, Browsing."
             ]

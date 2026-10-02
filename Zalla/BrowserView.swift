@@ -101,6 +101,7 @@ private struct TabContent: View {
     @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
     @AppStorage(ThemeTransitionSpeed.storageKey) private var transitionSpeedRaw = ThemeTransitionSpeed.normal.rawValue
     @ObservedObject private var unlockState = ZallaUnlock.shared
+    @AppStorage(SwipeNavigation.storageKey) private var swipeNavigationOn = true
     @State private var address = ""
     @State private var showShare = false
     @State private var confirmBurn = false
@@ -164,6 +165,7 @@ private struct TabContent: View {
                 // Extra safe area so home content starts clear of the bars but still scrolls under them.
                 .safeAreaPadding(.top, topChromeHeight)
                 .safeAreaPadding(.bottom, bottomChromeHeight)
+                .overlay(alignment: .trailing) { newTabForwardSwipe }
             }
 
             if let fallback = tab.httpsFallback {
@@ -458,6 +460,27 @@ private struct TabContent: View {
         .zIndex(20)
     }
 
+    /// A thin strip on the right edge of the new tab page. Swiping in from it goes forward to the page this tab
+    /// stepped back from. Only present when there is a page to go forward to.
+    @ViewBuilder
+    private var newTabForwardSwipe: some View {
+        if swipeNavigationOn, tab.canGoForward {
+            Color.clear
+                .frame(width: 24)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 12)
+                        .onEnded { value in
+                            if EdgeSwipe.shouldCommit(translation: Double(value.translation.width), velocity: 0, side: .right) {
+                                UISelectionFeedbackGenerator().selectionChanged()
+                                tab.goForward()
+                            }
+                        }
+                )
+                .accessibilityHidden(true)
+        }
+    }
+
     private func beginHoldReveal(_ kind: HoldRevealKind) {
         let history: [HistoryListItem]
         switch kind {
@@ -665,14 +688,14 @@ private struct TabContent: View {
                 icon: "chevron.left",
                 enabled: tab.canGoBack,
                 kind: .back
-            ) { tab.webView.goBack() }
+            ) { tab.goBack() }
         case .forward:
             holdNavButton(
                 label: "Forward",
                 icon: "chevron.right",
                 enabled: tab.canGoForward,
                 kind: .forward
-            ) { tab.webView.goForward() }
+            ) { tab.goForward() }
         case .share:
             control("Share page", icon: "square.and.arrow.up") { showShare = true }.disabled(tab.url == nil)
         case .tabs:
@@ -721,8 +744,8 @@ private struct TabContent: View {
     private func performToolbarItem(_ kind: ToolbarItemKind) {
         switch kind {
         case .address: beginCompactAddressEditing()
-        case .back: tab.webView.goBack()
-        case .forward: tab.webView.goForward()
+        case .back: tab.goBack()
+        case .forward: tab.goForward()
         case .reload:
             tab.reloadOrStop()
         case .share: showShare = true
@@ -995,14 +1018,14 @@ private struct TabContent: View {
                 return QuickActionEntry(
                     item: item,
                     enabled: tab.canGoBack,
-                    action: { tab.webView.goBack() },
+                    action: { tab.goBack() },
                     onHold: { showQuickActionHistory(.back) }
                 )
             case .forward:
                 return QuickActionEntry(
                     item: item,
                     enabled: tab.canGoForward,
-                    action: { tab.webView.goForward() },
+                    action: { tab.goForward() },
                     onHold: { showQuickActionHistory(.forward) }
                 )
             case .reload:
@@ -1096,14 +1119,14 @@ private struct TabContent: View {
                 enabled: tab.canGoBack,
                 label: "Back",
                 kind: .back
-            ) { tab.webView.goBack() }
+            ) { tab.goBack() }
         case .forward:
             compactHoldCircle(
                 icon: "chevron.right",
                 enabled: tab.canGoForward,
                 label: "Forward",
                 kind: .forward
-            ) { tab.webView.goForward() }
+            ) { tab.goForward() }
         case .share:
             compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page") {
                 showShare = true
@@ -1609,11 +1632,11 @@ private struct MenuNavigationRow: View {
     var body: some View {
         HStack {
             navButton("Back", icon: "chevron.left", enabled: tab.canGoBack) {
-                tab.webView.goBack()
+                tab.goBack()
                 onDone()
             }
             navButton("Forward", icon: "chevron.right", enabled: tab.canGoForward) {
-                tab.webView.goForward()
+                tab.goForward()
                 onDone()
             }
             navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: tab.hasPage) {
@@ -2384,7 +2407,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "18"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "19"
         return "\(marketing) (\(build))"
     }
 

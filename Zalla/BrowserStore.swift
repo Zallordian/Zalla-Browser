@@ -267,6 +267,8 @@ final class BrowserStore: ObservableObject {
     func addTab(isPrivate: Bool = false, url: URL? = nil) -> BrowserTab {
         let tab = BrowserTab(isPrivate: isPrivate)
         configure(tab)
+        // A tab opened blank starts on the new tab page, which then counts as the first step of its history.
+        if url == nil { tab.startsOnNewTabPage() }
         tabs.append(tab)
         selectedID = tab.id
         if let url { tab.load(url) }
@@ -760,6 +762,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var canGoBack = false
     @Published var canGoForward = false
     @Published var hasPage = false
+    /// Where the new tab page sits in this tab's history, so back and forward can reach it.
+    private var newTabHistory = NewTabHistory()
     @Published var errorMessage: String?
     /// A failed page load, shown as a full-page message instead of a small banner.
     @Published var pageError: FriendlyError?
@@ -851,7 +855,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isFindInteractionEnabled = true
-        EdgeNavigation.install(on: webView, enabled: SwipeNavigation.isEnabled)
+        EdgeNavigation.install(on: webView, tab: self, enabled: SwipeNavigation.isEnabled)
         // Swiping down on the page drags the keyboard away, like Safari.
         webView.scrollView.keyboardDismissMode = .interactive
         // Avoid black flash behind page chrome and during empty/transient loads. The web view stays opaque so
@@ -923,14 +927,14 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     private func refresh() {
         // A tab waiting to be restored or woken keeps showing its saved title and address.
-        if !isReaderActive, httpsFallback == nil, pendingRestore == nil {
+        if !isReaderActive, httpsFallback == nil, pendingRestore == nil, !newTabHistory.isParked {
             title = webView.title ?? webView.url?.host ?? "New tab"
             url = webView.url
         }
         progress = webView.estimatedProgress
         isLoading = webView.isLoading
-        canGoBack = webView.canGoBack
-        canGoForward = webView.canGoForward
+        canGoBack = canNavigateBack
+        canGoForward = canNavigateForward
         hasOnlySecureContent = webView.hasOnlySecureContent
     }
 
@@ -943,7 +947,112 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         isReaderActive = false
         readerOriginalURL = nil
         hasPage = true
+        // A new address replaces the parked new tab page state; the new tab page stays behind the history.
+        newTabHistory.isParked = false
         webView.load(URLRequest(url: url))
+    }
+
+    // MARK: - Back and forward with the new tab page
+
+    /// Marks this tab as starting on the new tab page, so going back from its first page returns there.
+    func startsOnNewTabPage() {
+        newTabHistory.hasNewTabBehind = true
+    }
+
+    /// Live answers for the buttons and edge swipes. They count the new tab page as a history entry.
+    var canNavigateBack: Bool {
+        newTabHistory.canGoBack(webCanGoBack: webView.canGoBack, pageShown: hasPage)
+    }
+
+    var canNavigateForward: Bool {
+        newTabHistory.canGoForward(webCanGoForward: webView.canGoForward)
+    }
+
+    func goBack() {
+        switch newTabHistory.backStep(webCanGoBack: webView.canGoBack, pageShown: hasPage) {
+        case .web: webView.goBack()
+        case .showNewTab: showNewTabPage(rewind: false)
+        case .showPage, .none: break
+        }
+    }
+
+    func goForward() {
+        switch newTabHistory.forwardStep(webCanGoForward: webView.canGoForward) {
+        case .web: webView.goForward()
+        case .showPage: showParkedPage()
+        case .showNewTab, .none: break
+        }
+    }
+
+    private static let newTabHistoryURL = URL(string: "https://zalla.invalid/new-tab")!
+
+    /// Shows the new tab page and keeps the pages in the web view, so forward can bring them back.
+    /// `rewind` first moves the web view to its first page, so forward returns to the start of the trail.
+    private func showNewTabPage(rewind: Bool) {
+        errorMessage = nil
+        pageError = nil
+        httpsFallback = nil
+        webView.pauseAllMediaPlayback {}
+        previewImage = nil
+        if webView.backForwardList.currentItem == nil {
+            // Nothing loaded (a failed first load or the HTTPS notice): just show the new tab page.
+            hasPage = false
+            newTabHistory.isParked = false
+            isReaderActive = false
+            readerOriginalURL = nil
+            title = "New tab"
+            url = nil
+            refresh()
+            return
+        }
+        if rewind, let first = webView.backForwardList.backList.first {
+            webView.go(to: first)
+        }
+        isReaderActive = false
+        readerOriginalURL = nil
+        newTabHistory.isParked = true
+        hasPage = false
+        title = "New tab"
+        url = nil
+        refresh()
+    }
+
+    private func showParkedPage() {
+        guard newTabHistory.isParked else { return }
+        newTabHistory.isParked = false
+        hasPage = true
+        refresh()
+    }
+
+    private func historyEntries(direction: HoldRevealKind, limit: Int) -> [NewTabHistoryEntry<WKBackForwardListItem>] {
+        switch direction {
+        case .back:
+            return newTabHistory.backEntries(
+                web: Array(webView.backForwardList.backList.reversed()), limit: limit, pageShown: hasPage
+            )
+        case .forward:
+            return newTabHistory.forwardEntries(web: webView.backForwardList.forwardList, limit: limit)
+        }
+    }
+
+    private func historyItems(direction: HoldRevealKind, limit: Int) -> [HistoryListItem] {
+        historyEntries(direction: direction, limit: limit).enumerated().map { index, entry -> HistoryListItem in
+            switch entry {
+            case .newTab:
+                return HistoryListItem(id: index + 1, title: "New tab", host: "Zalla home", url: Self.newTabHistoryURL)
+            case .currentPage:
+                let item = webView.backForwardList.currentItem
+                return Self.historyItem(id: index + 1, title: item?.title, url: item?.url ?? Self.newTabHistoryURL)
+            case .web(let item):
+                return Self.historyItem(id: index + 1, title: item.title, url: item.url)
+            }
+        }
+    }
+
+    private static func historyItem(id: Int, title: String?, url: URL) -> HistoryListItem {
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let host = url.host ?? url.absoluteString
+        return HistoryListItem(id: id, title: trimmed.isEmpty ? host : trimmed, host: host, url: url)
     }
 
     /// Switches between the desktop and mobile version of this site, then reloads. The choice is remembered
@@ -1141,21 +1250,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func backHistoryItems(limit: Int = 5) -> [HistoryListItem] {
-        let list = webView.backForwardList.backList.reversed().prefix(limit)
-        let mapped = list.map { item -> (title: String, url: URL) in
-            let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return (title, item.url)
-        }
-        return HistoryListHelper.limited(Array(mapped), limit: limit)
+        historyItems(direction: .back, limit: limit)
     }
 
     func forwardHistoryItems(limit: Int = 5) -> [HistoryListItem] {
-        let list = webView.backForwardList.forwardList.prefix(limit)
-        let mapped = list.map { item -> (title: String, url: URL) in
-            let title = item.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return (title, item.url)
-        }
-        return HistoryListHelper.limited(Array(mapped), limit: limit)
+        historyItems(direction: .forward, limit: limit)
     }
 
     func goToBackForwardItem(_ item: WKBackForwardListItem) {
@@ -1165,16 +1264,18 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func goToHistoryListItem(_ item: HistoryListItem, direction: HoldRevealKind) {
-        let source: [WKBackForwardListItem]
-        switch direction {
-        case .back:
-            source = Array(webView.backForwardList.backList.reversed().prefix(5))
-        case .forward:
-            source = Array(webView.backForwardList.forwardList.prefix(5))
-        }
+        let entries = historyEntries(direction: direction, limit: 5)
         let index = item.id - 1
-        guard source.indices.contains(index) else { return }
-        goToBackForwardItem(source[index])
+        guard entries.indices.contains(index) else { return }
+        switch entries[index] {
+        case .newTab:
+            showNewTabPage(rewind: true)
+        case .currentPage:
+            showParkedPage()
+        case .web(let target):
+            if direction == .forward { showParkedPage() }
+            goToBackForwardItem(target)
+        }
     }
 
     func capturePreview() {

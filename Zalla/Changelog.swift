@@ -14,6 +14,15 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 19",
+            name: "Pull Down, Burn Up",
+            highlights: [
+                "The new tab page is now the first page of every tab's history. Swipe back from your first site and you land on it, and swipe forward to return. The Back and Forward buttons and the history peek know about it too"
+            ],
+            improvements: "",
+            fixes: "Going back from the first page no longer leaves you with nowhere to go."
+        ),
+        ChangelogEntry(
             version: "Build 18",
             name: "Swipe, Sweep, Burn",
             highlights: [

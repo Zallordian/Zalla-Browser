@@ -15,6 +15,11 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 19
+
+- New tab page in history. A tab that starts on the Zalla new tab page now treats it as the first history entry. WebKit does not know about that page (it is a SwiftUI view shown while `BrowserTab.hasPage` is false), so `NewTabHistory` (pure logic in `NewTabHistory.swift`, with Linux tests) tracks it: back from the first loaded page "parks" the tab on the new tab page while the web view keeps its pages, and forward shows the page again. Edge swipe, the Back and Forward buttons in every toolbar style, the Quick Action fan, the menu, and the hold-to-peek history lists all go through `BrowserTab.goBack()` and `goForward()`. On the new tab page a thin strip on the right edge handles the forward swipe, because the web view is not on screen there. Tabs opened from a link or another app start on a page, so they have no new tab page behind them.
+- Known limit: if you step back to the new tab page and then open a different address, the page you left stays in the web view's history, so back from the new page goes to it before reaching the new tab page.
+
 ## Build 18
 
 - Edge swipe fixed. Cause: the old setting relied on WebKit's `allowsBackForwardNavigationGestures`, which could not be confirmed on device in this layout (the web view sits full-bleed under a SwiftUI ZStack with the chrome and gesture overlays above it, and the system edge pan is not guaranteed to reach it there). Zalla now installs its own `UIScreenEdgePanGestureRecognizer` pair on every web view (left edge back, right edge forward), with a small arrow cue, a distance or flick threshold, and a haptic. WebKit's own gesture is switched off so the two never both fire. It is installed when a tab is created and again whenever a tab is shown, and the Settings, Browsing toggle (on by default) applies live to every tab.
