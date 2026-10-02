@@ -2384,7 +2384,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "17"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "18"
         return "\(marketing) (\(build))"
     }
 

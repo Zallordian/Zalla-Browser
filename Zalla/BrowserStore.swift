@@ -785,7 +785,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageZoom = PageZoom.defaultLevel
     /// True while Hide Element waits for a tap on the page.
     @Published var isPickingElement = false
-    /// Bumps on every reload the user asks for, so a theme pack can play its refresh animation.
+    /// Bumps on every reload the user asks for, so a theme pack can play its transition.
     @Published private(set) var refreshPulse = 0
     /// A short confirmation shown over the page, such as after Add to Dashboard. Clears itself.
     @Published var toast: String?

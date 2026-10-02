@@ -8,6 +8,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
     case newTabPage
     case addToDashboard
     case flame
+    case themeTransitions
     case httpsOnly
     case privacyShield
     case desktopSite
@@ -24,6 +25,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .newTabPage: return "Your new tab page"
         case .addToDashboard: return "Add to Dashboard"
         case .flame: return "Burn It All"
+        case .themeTransitions: return "Theme transitions"
         case .httpsOnly: return "HTTPS-Only Mode"
         case .privacyShield: return "Privacy Shield"
         case .desktopSite: return "Desktop sites"
@@ -40,6 +42,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .newTabPage: return "square.grid.2x2"
         case .addToDashboard: return "plus.square.on.square"
         case .flame: return "flame"
+        case .themeTransitions: return "sparkles"
         case .httpsOnly: return "lock"
         case .privacyShield: return "shield.lefthalf.filled"
         case .desktopSite: return "desktopcomputer"
@@ -57,6 +60,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .newTabPage: return "Shortcuts, backgrounds, and a search bar."
         case .addToDashboard: return "Press and hold any link."
         case .flame: return "Erase everything and close the app."
+        case .themeTransitions: return "A leafy sweep or a rocket on refresh."
         case .httpsOnly: return "Secure connections first, a warning otherwise."
         case .privacyShield: return "Cleaner links and fewer clues about you."
         case .desktopSite: return "Ask a site for its big-screen version."
@@ -84,13 +88,15 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             return [
                 "Swipe in from the left edge to go back.",
                 "Swipe in from the right edge to go forward.",
+                "A small arrow follows your finger. Let go past it to turn the page, or let go early to stay put.",
                 "If it gets in the way, turn it off in Settings, Browsing."
             ]
         case .newTabPage:
             return [
                 "Tap the pencil in the corner to change the background or edit shortcuts.",
                 "Tap the plus tile to add a shortcut from a popular list, your bookmarks, or a web address.",
-                "In Shortcuts, drag the handles to reorder and swipe to delete."
+                "In Shortcuts, drag the handles to reorder and swipe to delete.",
+                "Logo style in Settings, Home picks the red, white, or black Zalla logo. Auto chooses the one that stands out on your background."
             ]
         case .addToDashboard:
             return [
@@ -102,8 +108,15 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             return [
                 "Find Burn It All in the Menu, in Tabs, or add it to your Quick Action buttons in Settings.",
                 "Confirm, and Zalla closes every tab and erases history, cookies, and site data.",
-                "Then Zalla closes. Open it again for a clean slate.",
-                "Bookmarks and downloads stay put."
+                "Flames creep in from the edges while it works, then Zalla closes. With Reduce Motion on, the screen just fades.",
+                "Open Zalla again for a clean slate. Bookmarks and downloads stay put."
+            ]
+        case .themeTransitions:
+            return [
+                "Jungle sweeps a leafy curtain across the screen. Space sends a rocket up. They play when you refresh and when you apply a theme.",
+                "Open Settings, Theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
+                "With Reduce Motion on, you get a quick fade instead.",
+                "Theme packs are part of Zalla Unlock."
             ]
         case .httpsOnly:
             return [

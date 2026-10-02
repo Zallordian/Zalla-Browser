@@ -14,6 +14,18 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 18",
+            name: "Swipe, Sweep, Burn",
+            highlights: [
+                "Swiping in from the screen edge now goes back and forward. It was supposed to before. It is now Zalla's own swipe, with a little arrow that follows your finger",
+                "Jungle and Space got proper full-screen transitions: a leafy curtain and a rocket. Switch them off or set the speed in Settings, Theme packs",
+                "Burn It All now lights the browser from the edges and burns it toward the middle before closing",
+                "The Zalla logo on your new tab turns white or black when red would get lost. Logo style in Settings, Home lets you pick"
+            ],
+            improvements: "The saying, shortcut names, and the pencil on the new tab page now pick light or dark to read on your wallpaper. Reduce Motion gets a quick fade instead of the big effects. Burn It All finishes its wipe even if you close Zalla while the flames are going.",
+            fixes: "Edge swipe now works on every tab, including new ones."
+        ),
+        ChangelogEntry(
             version: "Build 17",
             name: "Menus that line up",
             highlights: [
