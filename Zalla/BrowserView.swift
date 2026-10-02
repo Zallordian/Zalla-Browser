@@ -1610,12 +1610,18 @@ private struct BrowserMenuSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showShare = false
     @State private var confirmFlame = false
+    @AppStorage(MenuTopRow.storageKey) private var menuTopRowData = Data()
 
     var body: some View {
         List {
             if let tab = browser.selected {
-                // Back, Forward, Reload, and Tabs stay reachable even when removed from the toolbar.
-                MenuNavigationRow(tab: tab, onTabs: { sheet = .tabs }, onDone: { dismiss() })
+                // Customize it in Settings, Appearance. Every action here also lives further down the Menu.
+                MenuNavigationRow(
+                    tab: tab,
+                    items: MenuTopRow.decode(menuTopRowData).items,
+                    onAction: { performTopRowAction($0, tab: tab) },
+                    onDone: { dismiss() }
+                )
             }
             Section("Page actions") {
                 Button {
@@ -1721,31 +1727,83 @@ private struct BrowserMenuSheet: View {
             }
         }
     }
+
+    /// Back, Forward, and Reload run inside the row. Everything else lands here.
+    private func performTopRowAction(_ item: MenuTopRowItem, tab: BrowserTab) {
+        switch item {
+        case .back, .forward, .reload:
+            break
+        case .tabs:
+            sheet = .tabs
+        case .settings:
+            sheet = .settings
+        case .downloads:
+            sheet = .downloads
+        case .share:
+            showShare = true
+        case .bookmark:
+            browser.bookmark(tab)
+            dismiss()
+        case .find:
+            dismiss()
+            // The find bar needs the page, not the sheet, to take focus.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                tab.findOnPage()
+            }
+        case .newTab:
+            browser.addTab()
+            dismiss()
+        case .home:
+            tab.goHome()
+            dismiss()
+        case .burn:
+            confirmFlame = true
+        }
+    }
 }
 
-/// Back, Forward, Reload, and Tabs at the top of the menu sheet.
+/// The customizable top row of the menu sheet. Default: Back, Forward, Reload, Tabs, Settings.
 private struct MenuNavigationRow: View {
     @ObservedObject var tab: BrowserTab
-    let onTabs: () -> Void
+    let items: [MenuTopRowItem]
+    let onAction: (MenuTopRowItem) -> Void
     let onDone: () -> Void
 
     var body: some View {
-        HStack {
-            navButton("Back", icon: "chevron.left", enabled: tab.canGoBack) {
+        HStack(spacing: 2) {
+            ForEach(items) { item in
+                cell(item)
+            }
+        }
+        .buttonStyle(.borderless)
+    }
+
+    @ViewBuilder
+    private func cell(_ item: MenuTopRowItem) -> some View {
+        switch item {
+        case .back:
+            navButton("Back", icon: item.symbolName, enabled: tab.canGoBack) {
                 tab.goBack()
                 onDone()
             }
-            navButton("Forward", icon: "chevron.right", enabled: tab.canGoForward) {
+        case .forward:
+            navButton("Forward", icon: item.symbolName, enabled: tab.canGoForward) {
                 tab.goForward()
                 onDone()
             }
-            navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : "arrow.clockwise", enabled: tab.hasPage) {
+        case .reload:
+            navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : item.symbolName, enabled: tab.hasPage) {
                 tab.reloadOrStop()
                 onDone()
             }
-            navButton("Tabs", icon: "square.on.square", enabled: true, action: onTabs)
+        case .share, .bookmark:
+            navButton(item.shortTitle, icon: item.symbolName, enabled: tab.url != nil) { onAction(item) }
+        case .find, .home:
+            navButton(item.shortTitle, icon: item.symbolName, enabled: tab.hasPage) { onAction(item) }
+        case .tabs, .settings, .newTab, .burn, .downloads:
+            navButton(item.shortTitle, icon: item.symbolName, enabled: true) { onAction(item) }
         }
-        .buttonStyle(.borderless)
     }
 
     private func navButton(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -1755,6 +1813,8 @@ private struct MenuNavigationRow: View {
                     .font(.body.weight(.semibold))
                 Text(title)
                     .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
         }
@@ -2629,6 +2689,9 @@ private struct SettingsView: View {
                 Toggle("Immersive layout", isOn: $immersiveLayout)
                 NavigationLink("Customize Toolbar") {
                     ToolbarEditorView(theme: theme)
+                }
+                NavigationLink("Customize Menu Row") {
+                    MenuTopRowEditorView(theme: theme)
                 }
                 NavigationLink("Home personalization") {
                     HomePersonalizationView()

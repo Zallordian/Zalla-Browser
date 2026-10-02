@@ -587,6 +587,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: PullToRefresh.storageKey)
         defaults.removeObject(forKey: SettingsCategory.storageKey)
         defaults.removeObject(forKey: ImmersiveLayout.storageKey)
+        defaults.removeObject(forKey: MenuTopRow.storageKey)
         defaults.removeObject(forKey: BurnEffectPlan.animationKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)
@@ -996,6 +997,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         case .showPage: showParkedPage()
         case .showNewTab, .none: break
         }
+    }
+
+    /// Menu Home: shows the Zalla new tab page for this tab. Forward brings the page back.
+    func goHome() {
+        guard hasPage else { return }
+        showNewTabPage(rewind: false)
     }
 
     private static let newTabHistoryURL = URL(string: "https://zalla.invalid/new-tab")!
