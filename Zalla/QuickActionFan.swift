@@ -183,6 +183,8 @@ struct QuickActionGlyph: View {
     let theme: ZallaTheme
     var isOpen: Bool = false
     static let size: CGFloat = 54
+    /// The drawn diameter. The fan uses the default; the floating bar passes a slightly smaller one.
+    var diameter: CGFloat = QuickActionGlyph.size
 
     var body: some View {
         ZStack {
@@ -195,7 +197,7 @@ struct QuickActionGlyph: View {
                 .foregroundStyle(.white)
                 .rotationEffect(.degrees(isOpen ? 90 : 0))
         }
-        .frame(width: Self.size, height: Self.size)
+        .frame(width: diameter, height: diameter)
         .shadow(color: theme.primary.opacity(0.42), radius: 12, y: 5)
         .contentShape(Circle())
     }

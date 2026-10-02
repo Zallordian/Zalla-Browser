@@ -47,4 +47,18 @@ final class ImmersiveLayoutTests: XCTestCase {
         XCTAssertGreaterThan(ImmersiveLayout.solidBottomPullDown, 0)
         XCTAssertLessThan(ImmersiveLayout.solidBottomPullDown, 20)
     }
+
+    func testFloatingControlsAreAboutTenToFifteenPercentSmaller() {
+        XCTAssertGreaterThanOrEqual(ImmersiveLayout.barScale, 0.85)
+        XCTAssertLessThanOrEqual(ImmersiveLayout.barScale, 0.90)
+        XCTAssertEqual(ImmersiveLayout.scaled(44), 39)
+        XCTAssertEqual(ImmersiveLayout.scaled(48), 42)
+        XCTAssertEqual(ImmersiveLayout.scaled(54), 48)
+        XCTAssertEqual(ImmersiveLayout.scaled(-5), 0)
+    }
+
+    func testSolidBarsKeepTheirSize() {
+        XCTAssertEqual(ImmersiveLayout.size(44, immersive: false), 44)
+        XCTAssertEqual(ImmersiveLayout.size(44, immersive: true), 39)
+    }
 }

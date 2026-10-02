@@ -151,6 +151,13 @@ private struct TabContent: View {
     private var toolbarLayout: ToolbarLayout {
         ToolbarLayout.decode(toolbarLayoutData)
     }
+    /// A control dimension: a little smaller in the immersive layout, unchanged for the solid bars.
+    private func barSize(_ value: CGFloat) -> CGFloat {
+        ImmersiveLayout.size(value, immersive: immersiveLayout)
+    }
+    private var barIconFont: Font {
+        immersiveLayout ? .subheadline.weight(.semibold) : .body.weight(.semibold)
+    }
     /// Bottom inset for page content. In the immersive layout the capsule sits inside the home indicator
     /// inset the system already adds, so that slack is not counted twice.
     private var bottomContentInset: CGFloat {
@@ -397,7 +404,7 @@ private struct TabContent: View {
                 }
                 topChrome
                     .padding(.top, immersiveLayout ? ImmersiveLayout.topGap : 0)
-                    .contentShape(Rectangle())
+                    .solidHitArea(!immersiveLayout)
                     .background(ChromeHeightReader(key: TopChromeHeightKey.self))
             } else {
                 // Keeps the status bar legible over full-screen pages when no bar sits at the top.
@@ -419,7 +426,9 @@ private struct TabContent: View {
             // Immersive: a slim gap under the floating capsule. Solid: the bar is pulled a little into the
             // home indicator area so the bezel under it is not so tall.
             .padding(.bottom, immersiveLayout ? ImmersiveLayout.bottomGap : -ImmersiveLayout.solidBottomPullDown)
-            .contentShape(Rectangle())
+            // Solid bars own their whole band. Floating controls only catch touches on themselves,
+            // so the page stays live in the gaps between them.
+            .solidHitArea(!immersiveLayout)
             .background(ChromeHeightReader(key: BottomChromeHeightKey.self))
         }
         // Immersive: the bar group runs to the physical bottom edge (the keyboard still lifts it).
@@ -568,17 +577,15 @@ private struct TabContent: View {
         switch toolbarStyle {
         case .classic:
             classicAddressBlock(includeNav: false)
-                .padding(.horizontal, 18)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                .padding(.horizontal, immersiveLayout ? 12 : 18)
+                .padding(.top, immersiveLayout ? 0 : 8)
+                .padding(.bottom, immersiveLayout ? 6 : 8)
                 .background { chromeScrim(edge: .top) }
         case .compact:
             compactToolbar
-                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .top) }
         case .quickAction:
             quickActionToolbar
-                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .top) }
         }
     }
@@ -590,11 +597,9 @@ private struct TabContent: View {
             classicToolbar
         case .compact:
             compactToolbar
-                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .bottom) }
         case .quickAction:
             quickActionToolbar
-                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .bottom) }
         }
     }
@@ -603,9 +608,9 @@ private struct TabContent: View {
         VStack(spacing: 10) {
             classicAddressBlock(includeNav: true)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 10)
-        .padding(.bottom, immersiveLayout ? 10 : 6)
+        .padding(.horizontal, immersiveLayout ? 12 : 18)
+        .padding(.top, immersiveLayout ? 0 : 10)
+        .padding(.bottom, immersiveLayout ? 0 : 6)
         .background { chromeScrim(edge: .bottom) }
     }
 
@@ -613,9 +618,9 @@ private struct TabContent: View {
         VStack(spacing: 0) {
             classicNavRow
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 8)
-        .padding(.bottom, immersiveLayout ? 8 : 6)
+        .padding(.horizontal, immersiveLayout ? 12 : 18)
+        .padding(.top, immersiveLayout ? 0 : 8)
+        .padding(.bottom, immersiveLayout ? 0 : 6)
         .background { chromeScrim(edge: .bottom) }
     }
 
@@ -627,24 +632,9 @@ private struct TabContent: View {
     /// marks the edge. `extent` lets the band start a little beyond the controls.
     @ViewBuilder
     private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 0) -> some View {
-        if immersiveLayout {
-            immersiveGlass
-        } else {
+        if !immersiveLayout {
             solidChromeScrim(edge: edge, extent: extent)
         }
-    }
-
-    /// Immersive layout: the bar is a floating glass capsule inset from the screen edges. The page keeps
-    /// running underneath it, with no band behind or beside it.
-    private var immersiveGlass: some View {
-        let shape = RoundedRectangle(cornerRadius: ImmersiveLayout.cornerRadius, style: .continuous)
-        return shape
-            .fill(.ultraThinMaterial)
-            .overlay(shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.75))
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.16), radius: 14, y: 4)
-            .padding(.horizontal, ImmersiveLayout.sideMargin)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
     }
 
     /// Status bar backdrop when no bar sits at the top. Immersive: a very light fade so status bar text
@@ -745,8 +735,8 @@ private struct TabContent: View {
             .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
             .frame(minWidth: 44, minHeight: 44)
         }
-        .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
+        .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: barSize(52))
+        .modifier(ClassicAddressSurface(immersive: immersiveLayout, isDark: colorScheme == .dark))
         .contentShape(Capsule())
         .onTapGesture {
             if !(addressFocused || isEditingClassicAddress) {
@@ -765,6 +755,11 @@ private struct TabContent: View {
                     Spacer()
                 }
                 classicItem(kind)
+                    .modifier(FloatingCircle(
+                        size: barSize(48),
+                        active: immersiveLayout,
+                        isDark: colorScheme == .dark
+                    ))
             }
         }
     }
@@ -792,8 +787,8 @@ private struct TabContent: View {
             tabsButton
         case .menu:
             Button { sheet = .menu } label: {
-                Image(systemName: "ellipsis.circle").font(.title3)
-                    .frame(minWidth: 44, minHeight: 44)
+                Image(systemName: immersiveLayout ? "ellipsis" : "ellipsis.circle").font(.title3)
+                    .frame(minWidth: barSize(44), minHeight: barSize(44))
             }
             .accessibilityLabel("Browser menu")
         default:
@@ -922,7 +917,7 @@ private struct TabContent: View {
                 // The matched geometry lets the search pill grow into the full-width editor.
                 compactPill
                     .matchedGeometryEffect(id: "quickActionAddress", in: addressNamespace)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, immersiveLayout ? 12 : 16)
             } else {
                 HStack(spacing: 12) {
                     quickActionSearchPill
@@ -938,11 +933,11 @@ private struct TabContent: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, immersiveLayout ? 12 : 16)
             }
         }
-        .padding(.top, 6)
-        .padding(.bottom, 8)
+        .padding(.top, immersiveLayout ? 0 : 6)
+        .padding(.bottom, immersiveLayout ? 0 : 8)
     }
 
     /// Outlined search pill: clear fill with a faint accent tint, accent capsule stroke matching the
@@ -970,10 +965,10 @@ private struct TabContent: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .frame(height: 36)
-            .background(theme.primary.opacity(0.08), in: Capsule(style: .continuous))
+            .frame(height: barSize(36))
+            .modifier(QuickActionPillSurface(immersive: immersiveLayout, tint: theme.primary))
             .overlay(Capsule(style: .continuous).stroke(theme.primary, lineWidth: 1.7))
-            .frame(minHeight: 44)
+            .frame(minHeight: barSize(44))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1053,8 +1048,8 @@ private struct TabContent: View {
         } else {
             Button { performToolbarItem(kind) } label: {
                 Image(systemName: toolbarSymbol(kind))
-                    .font(.body.weight(.semibold))
-                    .frame(width: 44, height: 44)
+                    .font(barIconFont)
+                    .frame(width: barSize(44), height: barSize(44))
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .contentShape(Rectangle())
             }
@@ -1067,15 +1062,15 @@ private struct TabContent: View {
     /// so it stays legible when floating over page content.
     private func quickActionSideLabel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         content()
-            .frame(width: 24, height: 26)
+            .frame(width: barSize(24), height: barSize(26))
             .overlay(RoundedRectangle(cornerRadius: 7).stroke(lineWidth: 1.7))
-            .frame(width: 44, height: 44)
+            .frame(width: barSize(44), height: barSize(44))
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(Rectangle())
     }
 
     private var quickActionButton: some View {
-        QuickActionGlyph(theme: theme, isOpen: false)
+        QuickActionGlyph(theme: theme, isOpen: false, diameter: barSize(QuickActionGlyph.size))
             .opacity(quickActionOpen ? 0 : 1)
             .background(
                 GeometryReader { geo in
@@ -1194,8 +1189,8 @@ private struct TabContent: View {
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
+            .padding(.horizontal, immersiveLayout ? 12 : 16)
+            .padding(.bottom, immersiveLayout ? 0 : 8)
         }
         .background(Color.clear)
     }
@@ -1295,7 +1290,7 @@ private struct TabContent: View {
             }
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: 48)
+        .frame(minHeight: barSize(48))
         .background(.ultraThinMaterial, in: Capsule(style: .continuous))
         .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
@@ -1349,8 +1344,8 @@ private struct TabContent: View {
     private func compactCircle(icon: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.body.weight(.semibold))
-                .frame(width: 44, height: 44)
+                .font(barIconFont)
+                .frame(width: barSize(44), height: barSize(44))
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
                 .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
@@ -1362,10 +1357,10 @@ private struct TabContent: View {
 
     private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
-            .font(.body.weight(.semibold))
+            .font(barIconFont)
             // Accent when there is somewhere to go, like the other bar buttons; dim when not.
             .foregroundStyle(enabled ? theme.primary : Color.primary)
-            .frame(width: 48, height: 48)
+            .frame(width: barSize(48), height: barSize(48))
             .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
             .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
@@ -1390,7 +1385,7 @@ private struct TabContent: View {
             Text("\(browser.tabs.count)").font(.subheadline.bold())
                 .frame(width: 24, height: 26)
                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(lineWidth: 1.7))
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(minWidth: barSize(44), minHeight: barSize(44))
         }
         .accessibilityLabel("Tabs, \(browser.tabs.count) open")
         .contextMenu { tabsContextMenu }
@@ -1424,7 +1419,7 @@ private struct TabContent: View {
     private func holdNavButton(label: String, icon: String, enabled: Bool, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .foregroundStyle(enabled ? theme.primary : Color.primary)
-            .frame(minWidth: 52, minHeight: 52)
+            .frame(minWidth: barSize(52), minHeight: barSize(52))
             .contentShape(Rectangle())
             .opacity(enabled ? 1 : 0.35)
             .accessibilityLabel(label)
@@ -1487,7 +1482,7 @@ private struct TabContent: View {
     }
 
     private func control(_ label: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Image(systemName: icon).frame(minWidth: 44, minHeight: 44) }
+        Button(action: action) { Image(systemName: icon).frame(minWidth: barSize(44), minHeight: barSize(44)) }
             .accessibilityLabel(label)
     }
 }
@@ -1513,6 +1508,76 @@ private struct ChromeHeightReader<Key: PreferenceKey>: View where Key.Value == C
     var body: some View {
         GeometryReader { geo in
             Color.clear.preference(key: key, value: geo.size.height)
+        }
+    }
+}
+
+extension View {
+    /// Solid bars own their whole band for touches. Floating controls catch touches only on themselves.
+    @ViewBuilder
+    fileprivate func solidHitArea(_ solid: Bool) -> some View {
+        if solid {
+            contentShape(Rectangle())
+        } else {
+            self
+        }
+    }
+}
+
+/// Immersive layout: one control floating on its own glass circle over the page.
+private struct FloatingCircle: ViewModifier {
+    let size: CGFloat
+    let active: Bool
+    let isDark: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if active {
+            content
+                .frame(width: size, height: size)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.primary.opacity(isDark ? 0.16 : 0.10), lineWidth: 0.75))
+                .shadow(color: .black.opacity(isDark ? 0.35 : 0.16), radius: 10, y: 3)
+        } else {
+            content
+        }
+    }
+}
+
+/// The Classic address field: a solid grouped capsule, or its own floating glass capsule when immersive.
+private struct ClassicAddressSurface: ViewModifier {
+    let immersive: Bool
+    let isDark: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if immersive {
+            content
+                .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+                .overlay(Capsule(style: .continuous).strokeBorder(Color.primary.opacity(isDark ? 0.16 : 0.10), lineWidth: 0.75))
+                .shadow(color: .black.opacity(isDark ? 0.35 : 0.16), radius: 10, y: 3)
+        } else {
+            content
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule(style: .continuous))
+        }
+    }
+}
+
+/// The Quick Action search pill: a faint accent tint, plus glass behind it when floating over the page.
+private struct QuickActionPillSurface: ViewModifier {
+    let immersive: Bool
+    let tint: Color
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if immersive {
+            content
+                .background(tint.opacity(0.08), in: Capsule(style: .continuous))
+                .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+                .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        } else {
+            content
+                .background(tint.opacity(0.08), in: Capsule(style: .continuous))
         }
     }
 }
@@ -2701,7 +2766,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with the bars floating over them as glass capsules. Turn it off for solid bars.")
+                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars.")
             }
 
             Section {

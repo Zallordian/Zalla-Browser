@@ -23,6 +23,19 @@ enum ImmersiveLayout {
     /// Safe area bottom values above this are the keyboard, not the home indicator.
     static let maxHomeIndicatorInset: CGFloat = 60
 
+    /// The floating controls are drawn at this share of their solid-bar size (Build 23: a little smaller).
+    static let barScale: CGFloat = 0.88
+
+    /// A control dimension at the immersive size, rounded to a whole point.
+    static func scaled(_ value: CGFloat) -> CGFloat {
+        (max(value, 0) * barScale).rounded()
+    }
+
+    /// The size to use for a control: the immersive size when it is on, the solid size when it is off.
+    static func size(_ value: CGFloat, immersive: Bool) -> CGFloat {
+        immersive ? scaled(value) : value
+    }
+
     static func isEnabled(_ stored: Bool?) -> Bool {
         stored ?? defaultEnabled
     }
