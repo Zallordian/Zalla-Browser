@@ -14,6 +14,17 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 22",
+            name: "Edge to Edge",
+            highlights: [
+                "Pages now run edge to edge, under the status bar and down to the bottom of the screen, like Safari on iOS 26. The bar floats over the page as a frosted glass capsule just above the home indicator, and the page still scrolls clear of it. It works with Classic, Compact, Quick Action, and a bar on top. Settings, Appearance, Immersive layout turns it off for the solid bars",
+                "The top row of the Menu is yours now: Back, Forward, Reload, Tabs, and a new Settings gear by default. Settings, Appearance, Customize Menu Row lets you pick and reorder, and adds Share, Bookmark, Find on page, New tab, Burn It All, Downloads, and Home",
+                "Settings tabs are bigger, the one you pick slides to the middle, there is a small tap when it changes, and the edges fade when more tabs are hiding off screen"
+            ],
+            improvements: "The bar sits closer to the bottom edge, with a smaller gap under it, even with Immersive layout off. The Burn It All flames have softer curved edges, a glow in the bright core, and sparks and ash among the embers, with the same timing as before.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 21",
             name: "Settings, Sorted",
             highlights: [
