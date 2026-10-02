@@ -13,6 +13,7 @@ struct NewTabView: View {
     @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
     @AppStorage(HomeShortcuts.washIntensityKey) private var washIntensity = 0.35
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
+    @AppStorage(LogoStyle.storageKey) private var logoStyleRaw = LogoStyle.auto.rawValue
     @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
     @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
@@ -52,6 +53,38 @@ struct NewTabView: View {
     private var contentColorScheme: ColorScheme {
         guard let dark = background.prefersDarkContent else { return systemColorScheme }
         return dark ? .dark : .light
+    }
+
+    /// The color behind the logo and the saying, as best Zalla can tell, for the contrast rules.
+    private var backdropColor: LogoRGB {
+        switch background {
+        case .standard:
+            let accent = LogoRGB(hex: useCustomAccent ? customAccentHex : theme.id.primaryHex)
+            return LogoContrast.standardBackground(
+                darkMode: systemColorScheme == .dark, accent: accent, washIntensity: washIntensity
+            )
+        case .preset(let id):
+            guard let preset = NewTabCatalog.preset(id: id) else { return LogoContrast.zallaRed }
+            return LogoContrast.gradientColor(hexes: preset.colors, fraction: LogoContrast.contentFraction)
+        case .photo:
+            _ = photoRevision
+            return NewTabPhotoStore.averageColor()
+        }
+    }
+
+    /// Text and icons drawn straight over a wallpaper. Nil on the plain look, which keeps the system colors.
+    private var wallpaperInk: Color? {
+        guard let light = wallpaperUsesLightInk else { return nil }
+        return light ? Color.white : Color(red: 0.07, green: 0.07, blue: 0.09)
+    }
+
+    private var wallpaperUsesLightInk: Bool? {
+        if case .standard = background { return nil }
+        return LogoContrast.isLightInkBetter(on: backdropColor)
+    }
+
+    private var logoImageName: String {
+        LogoContrast.variant(style: LogoStyle(rawValue: logoStyleRaw) ?? .auto, background: backdropColor).assetName
     }
 
     var body: some View {
@@ -126,7 +159,7 @@ struct NewTabView: View {
                                     Text(shortcut.title)
                                         .font(.caption.weight(.semibold))
                                         .lineLimit(1)
-                                        .foregroundStyle(.primary)
+                                        .foregroundStyle(wallpaperInk ?? Color.primary)
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -137,6 +170,7 @@ struct NewTabView: View {
                 }
                 Button("View library") { onOpenLibrary() }
                     .font(.subheadline.weight(.semibold))
+                    .tint(wallpaperInk ?? theme.primary)
                 Spacer(minLength: 40)
             }
             .padding(24)
@@ -207,7 +241,7 @@ struct NewTabView: View {
     private var welcomePage: some View {
         VStack(spacing: 18) {
             if showLogo {
-                Image("ZallaMark")
+                Image(logoImageName)
                     .resizable()
                     .scaledToFit()
                     .frame(width: 72, height: 72)
@@ -228,16 +262,16 @@ struct NewTabView: View {
             if trimmed.isEmpty {
                 Text("Welcome back")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(wallpaperInk ?? Color.primary)
             } else {
                 Text("Welcome, \(trimmed)")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(wallpaperInk ?? Color.primary)
             }
         case .quotes:
             Text(tab.newTabSaying)
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(wallpaperInk ?? Color.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 8)
         }
@@ -409,15 +443,26 @@ struct NewTabView: View {
                 .foregroundStyle(.primary)
                 .frame(width: 40, height: 40)
                 .background(.regularMaterial, in: Circle())
-                .background(Circle().fill(Color.black.opacity(0.28)))
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.35), lineWidth: 0.75))
+                .background(Circle().fill(pencilBacking))
+                .overlay(Circle().strokeBorder(pencilRing, lineWidth: 0.75))
                 .shadow(color: .black.opacity(0.28), radius: 6, y: 2)
-                .environment(\.colorScheme, .dark)
+                .environment(\.colorScheme, pencilUsesLightInk ? .dark : .light)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
         .accessibilityLabel("Edit new tab")
         .accessibilityHint("Change the background or edit shortcuts")
+    }
+
+    /// The pencil keeps a white glyph on a dark disc, and flips to a dark glyph on a light disc over bright wallpapers.
+    private var pencilUsesLightInk: Bool {
+        wallpaperUsesLightInk ?? true
+    }
+    private var pencilBacking: Color {
+        pencilUsesLightInk ? Color.black.opacity(0.28) : Color.white.opacity(0.45)
+    }
+    private var pencilRing: Color {
+        pencilUsesLightInk ? Color.white.opacity(0.35) : Color.black.opacity(0.2)
     }
 
     private var searchField: some View {

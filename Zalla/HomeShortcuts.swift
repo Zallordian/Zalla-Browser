@@ -83,6 +83,7 @@ enum HomeShortcuts {
         defaults.set(true, forKey: showRecentHistoryKey)
         defaults.set(0.35, forKey: washIntensityKey)
         defaults.set(true, forKey: showLogoKey)
+        defaults.removeObject(forKey: LogoStyle.storageKey)
         defaults.set(true, forKey: showSliderKey)
         defaults.set(HomeWelcomeMode.quotes.rawValue, forKey: HomeWelcomeMode.storageKey)
         defaults.removeObject(forKey: HomeWelcomeMode.userNameKey)

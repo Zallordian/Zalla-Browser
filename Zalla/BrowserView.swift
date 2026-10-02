@@ -2273,6 +2273,7 @@ private struct DownloadsView: View {
 private struct HomePersonalizationView: View {
     @AppStorage(HomeShortcuts.washIntensityKey) private var washIntensity = 0.35
     @AppStorage(HomeShortcuts.showLogoKey) private var showLogo = true
+    @AppStorage(LogoStyle.storageKey) private var logoStyleRaw = LogoStyle.auto.rawValue
     @AppStorage(HomeWelcomeMode.storageKey) private var welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
     @AppStorage(HomeWelcomeMode.userNameKey) private var userName = ""
     @AppStorage(HomeShortcuts.showSliderKey) private var showSlider = true
@@ -2292,6 +2293,13 @@ private struct HomePersonalizationView: View {
             }
             Section("New tab") {
                 Toggle("Show Zalla logo", isOn: $showLogo)
+                if showLogo {
+                    Picker("Logo style", selection: $logoStyleRaw) {
+                        ForEach(LogoStyle.allCases) { style in
+                            Text(style.rawValue).tag(style.rawValue)
+                        }
+                    }
+                }
                 Picker("Welcome", selection: $welcomeModeRaw) {
                     ForEach(HomeWelcomeMode.allCases) { mode in
                         Text(mode.rawValue).tag(mode.rawValue)
@@ -2309,7 +2317,7 @@ private struct HomePersonalizationView: View {
             Section {
                 Button("Reset the new tab page", role: .destructive) { confirmReset = true }
             } footer: {
-                Text("Shortcuts themselves are edited from the pencil on the new tab page. Reset removes all your shortcuts and puts these settings back.")
+                Text("Shortcuts themselves are edited from the pencil on the new tab page. Reset removes all your shortcuts and puts these settings back. Logo style Auto picks the red, white, or black logo that stands out on your background.")
             }
         }
         .navigationTitle("Home")
@@ -2317,6 +2325,7 @@ private struct HomePersonalizationView: View {
             Button("Reset", role: .destructive) {
                 HomeShortcuts.resetToDefaults()
                 welcomeModeRaw = HomeWelcomeMode.quotes.rawValue
+                logoStyleRaw = LogoStyle.auto.rawValue
                 userName = ""
                 showSlider = true
                 showRecentHistory = true

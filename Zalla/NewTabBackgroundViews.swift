@@ -7,6 +7,7 @@ enum NewTabPhotoStore {
     static let revisionKey = "newTabPhotoRevision"
     private static let maxDimension: CGFloat = 1600
     private static var cached: UIImage?
+    private static var cachedAverage: LogoRGB?
 
     static var fileURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -26,6 +27,27 @@ enum NewTabPhotoStore {
         return image
     }
 
+    /// The photo's average color as it looks on the page (with the dimming layer), so the logo and text can pick
+    /// a color that reads on it. Worked out once per photo.
+    static func averageColor() -> LogoRGB {
+        if let cachedAverage { return cachedAverage }
+        var average = LogoRGB(r: 0.5, g: 0.5, b: 0.5)
+        if let cgImage = image()?.cgImage,
+           let context = CGContext(
+            data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+           ),
+           let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
+            context.interpolationQuality = .high
+            context.draw(cgImage, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            average = LogoRGB(r: Double(pixels[0]) / 255, g: Double(pixels[1]) / 255, b: Double(pixels[2]) / 255)
+        }
+        let dimmed = LogoContrast.photoBackground(average: average)
+        cachedAverage = dimmed
+        return dimmed
+    }
+
     /// Downsizes and saves picked photo data. Returns false when the data is not an image.
     @discardableResult
     static func save(_ data: Data) -> Bool {
@@ -40,12 +62,14 @@ enum NewTabPhotoStore {
             return false
         }
         cached = scaled
+        cachedAverage = nil
         return true
     }
 
     static func remove() {
         try? FileManager.default.removeItem(at: fileURL)
         cached = nil
+        cachedAverage = nil
     }
 }
 
