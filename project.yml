@@ -95,12 +95,24 @@ targets:
               CFBundleIconFiles:
                 - AppIconJungle
               UIPrerenderedIcon: false
+            AppIconVolcano:
+              CFBundleIconFiles:
+                - AppIconVolcano
+              UIPrerenderedIcon: false
+            AppIconDeepOcean:
+              CFBundleIconFiles:
+                - AppIconDeepOcean
+              UIPrerenderedIcon: false
+            AppIconRetroArcade:
+              CFBundleIconFiles:
+                - AppIconRetroArcade
+              UIPrerenderedIcon: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zalla.browser
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconDark AppIconTinted AppIconOrange AppIconYellow AppIconGreen AppIconBlue AppIconIndigo AppIconViolet AppIconOcean AppIconForest AppIconSpace AppIconJungle
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconDark AppIconTinted AppIconOrange AppIconYellow AppIconGreen AppIconBlue AppIconIndigo AppIconViolet AppIconOcean AppIconForest AppIconSpace AppIconJungle AppIconVolcano AppIconDeepOcean AppIconRetroArcade
   ZallaTests:
     type: bundle.unit-test
     platform: iOS

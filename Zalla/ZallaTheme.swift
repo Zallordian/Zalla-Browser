@@ -13,11 +13,19 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
     case forest
     case space
     case jungle
+    case volcano
+    case deepOcean
+    case arcade
 
     var id: String { rawValue }
 
-    /// Jungle arrives with its theme pack, which is part of Zalla Unlock. Older accents stay free.
-    var requiresUnlock: Bool { self == .jungle }
+    /// Jungle, Volcano, Deep Ocean, and Retro Arcade arrive with their theme packs, which are part of Zalla Unlock. Older accents stay free.
+    var requiresUnlock: Bool {
+        switch self {
+        case .jungle, .volcano, .deepOcean, .arcade: return true
+        default: return false
+        }
+    }
 
     var displayName: String {
         switch self {
@@ -32,11 +40,14 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .forest: return "Forest"
         case .space: return "Space"
         case .jungle: return "Jungle"
+        case .volcano: return "Volcano"
+        case .deepOcean: return "Deep Ocean"
+        case .arcade: return "Retro Arcade"
         }
     }
 
     /// Featured accents shown first in Settings (refined, not a wall of chips).
-    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space, .jungle] }
+    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space, .jungle, .volcano, .deepOcean, .arcade] }
 
     /// Secondary rainbow accents, presented more quietly.
     static var secondary: [ZallaThemeID] {
@@ -57,6 +68,9 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .forest: return .forest
         case .space: return .space
         case .jungle: return .jungle
+        case .volcano: return .volcano
+        case .deepOcean: return .deepOcean
+        case .arcade: return .arcade
         }
     }
 
@@ -74,6 +88,9 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .forest: return "2F7A4A"
         case .space: return "6B7CFF"
         case .jungle: return "8DB63C"
+        case .volcano: return "E8481C"
+        case .deepOcean: return "14A3B8"
+        case .arcade: return "FF4FB0"
         }
     }
 }
@@ -175,6 +192,12 @@ struct ZallaTheme: Equatable {
             return ZallaTheme(id: id, primary: hex("6B7CFF"), bright: hex("8B9BFF"), deep: hex("3A4499"), highlight: hex("B0A0FF"), gradientEnd: hex("9B6BFF"))
         case .jungle:
             return ZallaTheme(id: id, primary: hex("8DB63C"), bright: hex("A8D354"), deep: hex("4E6F1E"), highlight: hex("C5E27A"), gradientEnd: hex("3F9B4E"))
+        case .volcano:
+            return ZallaTheme(id: id, primary: hex("E8481C"), bright: hex("FF6A2E"), deep: hex("9E2410"), highlight: hex("FFA14A"), gradientEnd: hex("FF8A1E"))
+        case .deepOcean:
+            return ZallaTheme(id: id, primary: hex("14A3B8"), bright: hex("3CD0E0"), deep: hex("0B5F70"), highlight: hex("8FEAF0"), gradientEnd: hex("1E7FC4"))
+        case .arcade:
+            return ZallaTheme(id: id, primary: hex("FF4FB0"), bright: hex("FF7AC8"), deep: hex("A3216F"), highlight: hex("FFE35A"), gradientEnd: hex("4F7BFF"))
         }
     }
 
@@ -265,11 +288,28 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
     case forest = "Forest"
     case space = "Space"
     case jungle = "Jungle"
+    case volcano = "Volcano"
+    case deepOcean = "DeepOcean"
+    case arcade = "RetroArcade"
 
     var id: String { rawValue }
 
-    /// Jungle is part of its theme pack, so it needs Zalla Unlock to pick.
-    var requiresUnlock: Bool { self == .jungle }
+    /// Name shown in Settings. Raw values stay free of spaces because they build asset names.
+    var displayName: String {
+        switch self {
+        case .deepOcean: return "Deep Ocean"
+        case .arcade: return "Retro Arcade"
+        default: return rawValue
+        }
+    }
+
+    /// Jungle, Volcano, Deep Ocean, and Retro Arcade are part of their theme packs, so they need Zalla Unlock to pick.
+    var requiresUnlock: Bool {
+        switch self {
+        case .jungle, .volcano, .deepOcean, .arcade: return true
+        default: return false
+        }
+    }
 
     /// Alternate icon name passed to UIApplication.setAlternateIconName. nil restores primary.
     /// Each name matches an .appiconset in Assets.xcassets and an entry in project.yml.

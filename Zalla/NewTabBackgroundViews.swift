@@ -321,7 +321,8 @@ struct NewTabBackgroundSheet: View {
     }
 }
 
-/// Stars for the Space pack and leaves for the Jungle pack. Drawn once, never animated.
+/// Stars for the Space pack, leaves for Jungle, embers for Volcano, bubbles for Deep Ocean, and pixel stars for Retro
+/// Arcade. Drawn once, never animated.
 struct NewTabDecorView: View {
     let decor: NewTabPreset.Decor
 
@@ -358,6 +359,70 @@ struct NewTabDecorView: View {
                         .position(x: geo.size.width - 10, y: geo.size.height - 60)
                     leaf(size: 100, angle: 200, opacity: 0.12)
                         .position(x: 20, y: geo.size.height - 140)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .embers:
+            Canvas { context, size in
+                var seed: UInt64 = 0x1B873593A1B2C3D4
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                for _ in 0..<46 {
+                    let x = next() * size.width
+                    // More embers low on the page, like heat rising from below.
+                    let y = size.height * (1 - next() * next())
+                    let r = 0.7 + next() * 1.8
+                    let alpha = 0.25 + next() * 0.6
+                    let heat = next()
+                    let color = Color(red: 1.0, green: 0.35 + 0.4 * heat, blue: 0.1)
+                    let rect = CGRect(x: x, y: y, width: r * 2, height: r * 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(color.opacity(alpha)))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .bubbles:
+            Canvas { context, size in
+                var seed: UInt64 = 0x7F4A7C15D1E2F3A4
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                for _ in 0..<26 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let r = 2.0 + next() * 9.0
+                    let alpha = 0.18 + next() * 0.4
+                    let rect = CGRect(x: x, y: y, width: r * 2, height: r * 2)
+                    context.stroke(Path(ellipseIn: rect), with: .color(Color(red: 0.8, green: 1.0, blue: 1.0).opacity(alpha)), lineWidth: 1)
+                    let shine = CGRect(x: x + r * 0.45, y: y + r * 0.4, width: r * 0.45, height: r * 0.35)
+                    context.fill(Path(ellipseIn: shine), with: .color(Color.white.opacity(alpha)))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .pixels:
+            Canvas { context, size in
+                var seed: UInt64 = 0x5DEECE66D0BADF00
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                let colors: [Color] = [
+                    Color(red: 1.0, green: 0.31, blue: 0.69),
+                    Color(red: 0.31, green: 0.55, blue: 1.0),
+                    Color(red: 1.0, green: 0.89, blue: 0.35)
+                ]
+                let unit = 4.0
+                for i in 0..<48 {
+                    let x = (next() * size.width / unit).rounded(.down) * unit
+                    let y = (next() * size.height / unit).rounded(.down) * unit
+                    let side = unit * (next() > 0.8 ? 2 : 1)
+                    let alpha = 0.35 + next() * 0.6
+                    context.fill(Path(CGRect(x: x, y: y, width: side, height: side)), with: .color(colors[i % 3].opacity(alpha)))
                 }
             }
             .allowsHitTesting(false)

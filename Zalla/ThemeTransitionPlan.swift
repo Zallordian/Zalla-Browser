@@ -6,6 +6,12 @@ enum ThemeTransitionKind: Equatable {
     case jungle
     /// A rocket climbs the screen and its exhaust washes over the page.
     case space
+    /// Lava floods up the screen throwing sparks, then drains away upward.
+    case volcano
+    /// A wave rolls across the screen with bubbles and light, then pulls back.
+    case ocean
+    /// The screen dissolves into big pixels behind CRT scanlines, then clears again.
+    case arcade
 }
 
 /// How fast theme transitions play. Normal is about a second.

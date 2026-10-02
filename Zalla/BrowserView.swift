@@ -3109,7 +3109,7 @@ private struct SettingsView: View {
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space and Jungle theme packs.")
+                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, and Retro Arcade theme packs.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
@@ -3156,7 +3156,7 @@ private struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .strokeBorder(isSelected ? theme.primary : Color.clear, lineWidth: 2.5)
                     }
-                Text(option.requiresUnlock && !unlock.isUnlocked ? "\(option.rawValue) \u{1F512}" : option.rawValue)
+                Text(option.requiresUnlock && !unlock.isUnlocked ? "\(option.displayName) \u{1F512}" : option.displayName)
                     .font(.caption2)
                     .foregroundStyle(isSelected ? theme.primary : .secondary)
                     .lineLimit(1)
@@ -3164,7 +3164,7 @@ private struct SettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(option.rawValue) icon")
+        .accessibilityLabel("\(option.displayName) icon")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
