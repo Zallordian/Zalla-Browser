@@ -588,6 +588,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: SettingsCategory.storageKey)
         defaults.removeObject(forKey: ImmersiveLayout.storageKey)
         defaults.removeObject(forKey: PageColor.storageKey)
+        defaults.removeObject(forKey: AppBanner.storageKey)
         defaults.removeObject(forKey: MenuTopRow.storageKey)
         defaults.removeObject(forKey: SettingsTabHaptics.storageKey)
         defaults.removeObject(forKey: BurnEffectPlan.animationKey)
@@ -797,6 +798,15 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageInfo: PageInfo?
     /// The page's own background color, for the status bar area. Kept across navigations so it can animate.
     @Published private(set) var pageColor: PageRGB?
+    /// The host (without www or m.) that `pageInfo` was read from, so a stale tag is never shown for another site.
+    private(set) var pageInfoHost: String?
+
+    /// The app banner for this page, from its apple-itunes-app meta tag. Nil on the new tab page and in Reader.
+    var appBanner: AppBannerInfo? {
+        guard hasPage, !isReaderActive, let host = pageInfoHost,
+              host == AppBanner.hostKey(url?.host) else { return nil }
+        return AppBanner.info(from: pageInfo, pageURL: url)
+    }
     /// The saying shown on this tab's new tab page. Picked once per tab so it does not change while the page is open.
     let newTabSaying = NewTabSayings.next()
     /// Set when HTTPS-Only Mode could not open a site securely; shows the in-app notice.
@@ -1399,6 +1409,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == PageColor.messageName {
             if let info = PageInfo.from(message.body) {
+                pageInfoHost = AppBanner.hostKey(webView.url?.host)
                 pageInfo = info
                 pageColor = PageColor.sample(from: info)
             }
@@ -1445,6 +1456,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         lastStrippedSource = nil
         stripCount = 0
         applyStoredPageZoom()
+        // A new site does not inherit the last site's banner. The page script reads its own on load.
+        if pageInfoHost != AppBanner.hostKey(webView.url?.host) {
+            pageInfo = nil
+            pageInfoHost = nil
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

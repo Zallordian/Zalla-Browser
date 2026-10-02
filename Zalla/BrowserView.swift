@@ -103,6 +103,8 @@ private struct TabContent: View {
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage("appearance") private var appearance = "System"
+    @AppStorage(AppBanner.storageKey) private var appBannersOn = AppBanner.defaultEnabled
+    @ObservedObject private var appBannerSession = AppBannerSession.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
@@ -153,6 +155,21 @@ private struct TabContent: View {
     private var toolbarLayout: ToolbarLayout {
         ToolbarLayout.decode(toolbarLayoutData)
     }
+    /// The "Open in the app" banner to show now, if any: the page has the tag, the setting is on, and it was not dismissed.
+    private var visibleAppBanner: AppBannerInfo? {
+        guard appBannersOn, !addressFocused, let info = tab.appBanner,
+              !appBannerSession.isDismissed(info.hostKey, isPrivate: tab.isPrivate) else { return nil }
+        return info
+    }
+
+    /// Tries the app's universal link and nothing else. If the app is not installed the system refuses and
+    /// nothing happens. Either way the banner goes away for this host until Zalla closes.
+    private func openAppBanner(_ info: AppBannerInfo) {
+        appBannerSession.dismiss(info.hostKey, isPrivate: tab.isPrivate)
+        guard let target = AppBanner.openURL(for: info, pageURL: tab.url) else { return }
+        UIApplication.shared.open(target, options: [.universalLinksOnly: true], completionHandler: nil)
+    }
+
     /// What to paint above the page, and whether the status bar text should lean light or dark.
     private var statusBarPlan: PageColor.StatusBarPlan {
         PageColor.plan(
@@ -419,16 +436,32 @@ private struct TabContent: View {
                         .frame(height: 0)
                         .background { statusBarScrim }
                 }
-                topChrome
-                    .padding(.top, immersiveLayout ? ImmersiveLayout.topGap : 0)
-                    .solidHitArea(!immersiveLayout)
-                    .background(ChromeHeightReader(key: TopChromeHeightKey.self))
             } else {
                 // Keeps the status bar legible over full-screen pages when no bar sits at the top.
                 Color.clear
                     .frame(height: 0)
                     .background { statusBarBackdrop }
             }
+            // Everything stacked at the top: the app banner, then a top address bar. Its height is what content
+            // insets measure.
+            VStack(spacing: 0) {
+                if let banner = visibleAppBanner {
+                    AppBannerView(
+                        info: banner,
+                        accent: theme.primary,
+                        onOpen: { openAppBanner(banner) },
+                        onDismiss: { appBannerSession.dismiss(banner.hostKey, isPrivate: tab.isPrivate) }
+                    )
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+                if addressBarPlacement == .top {
+                    topChrome
+                        .padding(.top, immersiveLayout ? ImmersiveLayout.topGap : 0)
+                        .solidHitArea(!immersiveLayout)
+                }
+            }
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: visibleAppBanner)
+            .background(ChromeHeightReader(key: TopChromeHeightKey.self))
             Spacer(minLength: 0)
             if let error = tab.errorMessage {
                 errorBanner(error)
@@ -2665,6 +2698,7 @@ private struct SettingsView: View {
     @AppStorage(SwipeNavigation.storageKey) private var swipeNavigation = true
     @AppStorage(PullToRefresh.storageKey) private var pullToRefresh = true
     @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
+    @AppStorage(AppBanner.storageKey) private var appBanners = AppBanner.defaultEnabled
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
     @AppStorage(SettingsCategory.storageKey) private var selectedCategory = SettingsCategory.default.rawValue
     @State private var confirmClear = false
@@ -2957,6 +2991,7 @@ private struct SettingsView: View {
                     .onChange(of: pullToRefresh) { _, newValue in
                         browser.tabs.forEach { $0.setPullToRefresh(newValue) }
                     }
+                Toggle("App banners", isOn: $appBanners)
                 Button {
                     exportBookmarks()
                 } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
@@ -2964,7 +2999,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Browsing")
             } footer: {
-                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it.")
+                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it. App banners show a slim Open in the app bar when a site says it has an app; Open only tries the app if it is installed and never goes to the App Store.")
             }
         }
     }
