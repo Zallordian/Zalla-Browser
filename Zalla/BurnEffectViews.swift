@@ -10,54 +10,32 @@ import SwiftUI
 struct BurnOverlay: View {
     let plan: BurnEffectPlan
 
-    @State private var start = Date()
-    @State private var covered = false
-    @State private var settled = false
-
     var body: some View {
-        ZStack {
-            switch plan.style {
-            case .fire:
-                fire
-            case .fade:
-                Color(uiColor: .systemBackground)
-                    .opacity(covered ? 0.96 : 0)
-                    .animation(.easeInOut(duration: plan.duration), value: covered)
-                    .ignoresSafeArea()
-                clearingLabel(light: false)
-                    .opacity(settled ? 1 : 0)
-                    .animation(.easeOut(duration: 0.25), value: settled)
-            }
-        }
-        .onAppear {
-            start = Date()
-            covered = true
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: UInt64(plan.duration * 1_000_000_000))
-                settled = true
+        // The clock comes from the plan's start time, not from view state, so rebuilding this view
+        // (for example when the tabs go away behind it) can never replay the fire.
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
+            let t = BurnFire.progress(startedAt: plan.startedAt, now: timeline.date, duration: plan.duration)
+            ZStack {
+                switch plan.style {
+                case .fire:
+                    if t >= 1 {
+                        Color.black.ignoresSafeArea()
+                    } else {
+                        FireScene(t: t, duration: plan.duration)
+                    }
+                    clearingLabel(light: true)
+                        .opacity(BurnFire.labelOpacity(at: t))
+                case .fade:
+                    Color(uiColor: .systemBackground)
+                        .opacity(0.96 * BurnFire.smooth(t))
+                        .ignoresSafeArea()
+                    clearingLabel(light: false)
+                        .opacity(t >= 1 ? 1 : 0)
+                }
             }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Clearing browsing data. Zalla will close in a moment.")
-    }
-
-    @ViewBuilder
-    private var fire: some View {
-        if settled {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                clearingLabel(light: true)
-            }
-        } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
-                let t = BurnFire.clamp(timeline.date.timeIntervalSince(start) / plan.duration)
-                ZStack {
-                    FireScene(t: t, duration: plan.duration)
-                    clearingLabel(light: true)
-                        .opacity(BurnFire.labelOpacity(at: t))
-                }
-            }
-        }
     }
 
     private func clearingLabel(light: Bool) -> some View {

@@ -253,14 +253,17 @@ struct BurnEffectPlan: Equatable {
 
     let style: Style
     let duration: Double
+    /// When the effect began. The overlay reads its clock from here, never from its own state, so a view that is
+    /// rebuilt while the effect runs picks up where it was instead of starting over.
+    let startedAt: Date
 
     static func animationEnabled(in defaults: UserDefaults = .standard) -> Bool {
         defaults.object(forKey: animationKey) as? Bool ?? true
     }
 
-    static func make(reduceMotion: Bool, animated: Bool = true) -> BurnEffectPlan {
+    static func make(reduceMotion: Bool, animated: Bool = true, now: Date = Date()) -> BurnEffectPlan {
         (reduceMotion || !animated)
-            ? BurnEffectPlan(style: .fade, duration: fadeDuration)
-            : BurnEffectPlan(style: .fire, duration: fireDuration)
+            ? BurnEffectPlan(style: .fade, duration: fadeDuration, startedAt: now)
+            : BurnEffectPlan(style: .fire, duration: fireDuration, startedAt: now)
     }
 }

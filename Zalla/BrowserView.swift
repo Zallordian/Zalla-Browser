@@ -21,6 +21,10 @@ struct BrowserView: View {
             if let tab = browser.selected {
                 TabContent(browser: browser, tab: tab, sheet: $sheet)
                     .id(tab.id)
+            } else if browser.isBurning {
+                // Burn It All draws its own label over this. Nothing else may show one underneath.
+                (browser.burnPlan?.style == .fade ? Color(uiColor: .systemBackground) : Color.black)
+                    .ignoresSafeArea()
             } else {
                 ProgressView("Clearing browsing data...")
             }
@@ -2411,7 +2415,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "19"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "20"
         return "\(marketing) (\(build))"
     }
 

@@ -14,6 +14,15 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 20",
+            name: "One Burn Is Enough",
+            highlights: [
+                "Burn It All no longer lights a second, smaller fire at the bottom of the screen while it says Clearing browsing data. The flames burn out once, then it is just black and the label"
+            ],
+            improvements: "",
+            fixes: "The Burn It All effect keeps its own clock, so it can no longer start over when the tabs close behind it."
+        ),
+        ChangelogEntry(
             version: "Build 19",
             name: "Pull Down, Burn Up",
             highlights: [

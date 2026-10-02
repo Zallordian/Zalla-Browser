@@ -39,6 +39,9 @@ Needs a physical iPhone. Check: Jungle leaves look organic and uneven, in three 
 ## Burn It All fire (Build 19)
 Needs a physical iPhone. Check: from the Menu, Tabs, and the fan, the page chars and darkens while yellow, orange, and red flame tongues rise, fill the screen, break apart into licks, and fade into small red-orange embers on black in about 2.5 seconds; then a plain "Clearing browsing data..." label with a small spinner on black (no box), then Zalla closes and the next launch is empty with nothing restored; force-quit during the flames and relaunch to confirm it is still wiped; Reduce Motion on, and Settings, Privacy, Burn It All fire effect off, each give a quick fade with the same label; frame rate and heat on an older iPhone (it should hold 60 frames a second), and the effect on an iPhone SE sized screen and in landscape.
 
+## Burn It All, no second fire (Build 20)
+Needs a physical iPhone. Check: after the flames fade to black and "Clearing browsing data..." appears, nothing grows from the bottom edge and there is exactly one label until Zalla closes; the same with Reduce Motion on and with Settings, Privacy, Burn It All fire effect off (fade, one label); from the Menu, Tabs, and the fan; relaunch is still empty.
+
 ## Required before public beta
 JavaScript alert/confirm/prompt support, downloads, file upload and system credential validation, camera/microphone permissions, memory management, content-process recovery, restoration policy, meaningful connection security UX, and explicit handling of unsupported content. Add targeted tests as these behaviors are implemented.
 

@@ -17,6 +17,12 @@ enum BurnFire {
 
     static func clamp(_ value: Double) -> Double { min(max(value, 0), 1) }
 
+    /// How far along the effect is, 0 to 1, from when it started. Time alone decides it, so it can never restart.
+    static func progress(startedAt: Date, now: Date, duration: Double) -> Double {
+        guard duration > 0 else { return 1 }
+        return clamp(now.timeIntervalSince(startedAt) / duration)
+    }
+
     static func smooth(_ value: Double) -> Double {
         let x = clamp(value)
         return x * x * (3 - 2 * x)

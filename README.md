@@ -15,6 +15,10 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 20
+
+- Burn It All no longer replays. Cause (most likely): when the wipe removed the tabs, `BrowserView` switched to its empty-state branch and the overlay was rebuilt, resetting its `@State` start time, so the fire ran again from the bottom with the plain label beneath. Now `BurnEffectPlan.startedAt` is the clock (`BurnFire.progress(startedAt:now:duration:)`), the overlay keeps no state, `t >= 1` draws only black and the label, and the empty-state branch is plain black (or the system background for the fade) while `isBurning`, so there is one label. The wipe is unchanged.
+
 ## Build 19
 
 - New tab page in history. A tab that starts on the Zalla new tab page now treats it as the first history entry. WebKit does not know about that page (it is a SwiftUI view shown while `BrowserTab.hasPage` is false), so `NewTabHistory` (pure logic in `NewTabHistory.swift`, with Linux tests) tracks it: back from the first loaded page "parks" the tab on the new tab page while the web view keeps its pages, and forward shows the page again. Edge swipe, the Back and Forward buttons in every toolbar style, the Quick Action fan, the menu, and the hold-to-peek history lists all go through `BrowserTab.goBack()` and `goForward()`. On the new tab page a thin strip on the right edge handles the forward swipe, because the web view is not on screen there. Tabs opened from a link or another app start on a page, so they have no new tab page behind them.

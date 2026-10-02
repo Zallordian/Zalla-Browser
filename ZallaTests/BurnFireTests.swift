@@ -113,6 +113,32 @@ final class BurnFireTests: XCTestCase {
         XCTAssertGreaterThan(glowing.count, 5)
     }
 
+    func testProgressComesFromTheStartTimeAndNeverRestarts() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start, duration: 2.4), 0, accuracy: 0.0001)
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start.addingTimeInterval(1.2), duration: 2.4), 0.5, accuracy: 0.0001)
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start.addingTimeInterval(2.4), duration: 2.4), 1, accuracy: 0.0001)
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start.addingTimeInterval(60), duration: 2.4), 1, "It stays finished")
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start.addingTimeInterval(-5), duration: 2.4), 0)
+        XCTAssertEqual(BurnFire.progress(startedAt: start, now: start, duration: 0), 1)
+    }
+
+    func testPlanCarriesItsStartTimeAndAFinishedFireDrawsNoFlames() {
+        let start = Date(timeIntervalSince1970: 5_000)
+        let plan = BurnEffectPlan.make(reduceMotion: false, now: start)
+        XCTAssertEqual(plan.startedAt, start)
+        let end = BurnFire.progress(startedAt: plan.startedAt, now: start.addingTimeInterval(500), duration: plan.duration)
+        XCTAssertEqual(end, 1)
+        for tongue in BurnFire.tongues {
+            XCTAssertEqual(BurnFire.state(of: tongue, at: end).opacity, 0, accuracy: 0.0001)
+        }
+        for ember in BurnFire.embers {
+            XCTAssertEqual(BurnFire.state(of: ember, at: end).alpha, 0, accuracy: 0.0001)
+        }
+        XCTAssertEqual(BurnFire.cover(at: end), 1, accuracy: 0.0001)
+        XCTAssertEqual(BurnFire.labelOpacity(at: end), 1, accuracy: 0.0001)
+    }
+
     func testNoEmDashesInTheLabels() {
         XCTAssertFalse("Clearing browsing data...".contains("\u{2014}"))
     }
