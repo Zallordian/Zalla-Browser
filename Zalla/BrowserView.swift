@@ -100,6 +100,7 @@ private struct TabContent: View {
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
+    @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
@@ -135,6 +136,8 @@ private struct TabContent: View {
     /// Measured heights of the floating chrome (inside the safe area) so content can scroll clear of it.
     @State private var topChromeHeight: CGFloat = 0
     @State private var bottomChromeHeight: CGFloat = 0
+    /// Home indicator inset of the device, remembered while the keyboard is away (immersive layout).
+    @State private var homeIndicatorInset: CGFloat = 0
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -148,6 +151,15 @@ private struct TabContent: View {
     private var toolbarLayout: ToolbarLayout {
         ToolbarLayout.decode(toolbarLayoutData)
     }
+    /// Bottom inset for page content. In the immersive layout the capsule sits inside the home indicator
+    /// inset the system already adds, so that slack is not counted twice.
+    private var bottomContentInset: CGFloat {
+        ImmersiveLayout.bottomContentInset(
+            barHeight: bottomChromeHeight,
+            homeIndicatorInset: homeIndicatorInset,
+            immersive: immersiveLayout
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -155,7 +167,7 @@ private struct TabContent: View {
             if tab.hasPage {
                 WebSurface(
                     webView: tab.webView,
-                    chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomChromeHeight, right: 0)
+                    chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomContentInset, right: 0)
                 )
                 // Container only: the keyboard still resizes the page like before.
                 .ignoresSafeArea(.container, edges: .all)
@@ -168,7 +180,7 @@ private struct TabContent: View {
                 )
                 // Extra safe area so home content starts clear of the bars but still scrolls under them.
                 .safeAreaPadding(.top, topChromeHeight)
-                .safeAreaPadding(.bottom, bottomChromeHeight)
+                .safeAreaPadding(.bottom, bottomContentInset)
                 .overlay(alignment: .trailing) { newTabForwardSwipe }
             }
 
@@ -183,7 +195,7 @@ private struct TabContent: View {
                         onContinue: { tab.continueOverHTTP() }
                     )
                     .safeAreaPadding(.top, topChromeHeight)
-                    .safeAreaPadding(.bottom, bottomChromeHeight)
+                    .safeAreaPadding(.bottom, bottomContentInset)
                 }
             }
 
@@ -198,7 +210,7 @@ private struct TabContent: View {
                         onDismiss: { tab.dismissError() }
                     )
                     .safeAreaPadding(.top, topChromeHeight)
-                    .safeAreaPadding(.bottom, bottomChromeHeight)
+                    .safeAreaPadding(.bottom, bottomContentInset)
                 }
             }
 
@@ -256,6 +268,17 @@ private struct TabContent: View {
             }
         }
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        .background {
+            // Reads the device bottom inset (home indicator) for the immersive layout.
+            GeometryReader { geo in
+                Color.clear.preference(key: HomeIndicatorInsetKey.self, value: geo.safeAreaInsets.bottom)
+            }
+        }
+        .onPreferenceChange(HomeIndicatorInsetKey.self) { value in
+            if let inset = ImmersiveLayout.homeIndicatorInset(fromSafeAreaBottom: value) {
+                homeIndicatorInset = inset
+            }
+        }
         .onChange(of: tab.url) { _, url in
             if !addressFocused {
                 address = url?.absoluteString ?? ""
@@ -366,14 +389,21 @@ private struct TabContent: View {
     private var chromeLayer: some View {
         VStack(spacing: 0) {
             if addressBarPlacement == .top {
+                if immersiveLayout {
+                    // Light fade over the status bar only, above the floating capsule.
+                    Color.clear
+                        .frame(height: 0)
+                        .background { statusBarScrim }
+                }
                 topChrome
+                    .padding(.top, immersiveLayout ? ImmersiveLayout.topGap : 0)
                     .contentShape(Rectangle())
                     .background(ChromeHeightReader(key: TopChromeHeightKey.self))
             } else {
                 // Keeps the status bar legible over full-screen pages when no bar sits at the top.
                 Color.clear
                     .frame(height: 0)
-                    .background { chromeScrim(edge: .top, extent: 0) }
+                    .background { statusBarBackdrop }
             }
             Spacer(minLength: 0)
             if let error = tab.errorMessage {
@@ -386,9 +416,14 @@ private struct TabContent: View {
                     classicNavOnly
                 }
             }
+            // Immersive: a slim gap under the floating capsule. Solid: the bar is pulled a little into the
+            // home indicator area so the bezel under it is not so tall.
+            .padding(.bottom, immersiveLayout ? ImmersiveLayout.bottomGap : -ImmersiveLayout.solidBottomPullDown)
             .contentShape(Rectangle())
             .background(ChromeHeightReader(key: BottomChromeHeightKey.self))
         }
+        // Immersive: the bar group runs to the physical bottom edge (the keyboard still lifts it).
+        .ignoresSafeArea(.container, edges: immersiveLayout ? .bottom : [])
         .onPreferenceChange(TopChromeHeightKey.self) { topChromeHeight = $0 }
         .onPreferenceChange(BottomChromeHeightKey.self) { bottomChromeHeight = $0 }
     }
@@ -539,9 +574,11 @@ private struct TabContent: View {
                 .background { chromeScrim(edge: .top) }
         case .compact:
             compactToolbar
+                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .top) }
         case .quickAction:
             quickActionToolbar
+                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .top) }
         }
     }
@@ -553,9 +590,11 @@ private struct TabContent: View {
             classicToolbar
         case .compact:
             compactToolbar
+                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .bottom) }
         case .quickAction:
             quickActionToolbar
+                .padding(.top, immersiveLayout ? 6 : 0)
                 .background { chromeScrim(edge: .bottom) }
         }
     }
@@ -566,7 +605,7 @@ private struct TabContent: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 10)
-        .padding(.bottom, 6)
+        .padding(.bottom, immersiveLayout ? 10 : 6)
         .background { chromeScrim(edge: .bottom) }
     }
 
@@ -576,7 +615,7 @@ private struct TabContent: View {
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
-        .padding(.bottom, 6)
+        .padding(.bottom, immersiveLayout ? 8 : 6)
         .background { chromeScrim(edge: .bottom) }
     }
 
@@ -586,7 +625,54 @@ private struct TabContent: View {
     /// render the blur in a separate pass that no longer follows the page, which made the bar look like a
     /// frozen picture. A light color wash (color only, no blur) keeps controls legible, and a hairline
     /// marks the edge. `extent` lets the band start a little beyond the controls.
+    @ViewBuilder
     private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 0) -> some View {
+        if immersiveLayout {
+            immersiveGlass
+        } else {
+            solidChromeScrim(edge: edge, extent: extent)
+        }
+    }
+
+    /// Immersive layout: the bar is a floating glass capsule inset from the screen edges. The page keeps
+    /// running underneath it, with no band behind or beside it.
+    private var immersiveGlass: some View {
+        let shape = RoundedRectangle(cornerRadius: ImmersiveLayout.cornerRadius, style: .continuous)
+        return shape
+            .fill(.ultraThinMaterial)
+            .overlay(shape.strokeBorder(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.10), lineWidth: 0.75))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.35 : 0.16), radius: 14, y: 4)
+            .padding(.horizontal, ImmersiveLayout.sideMargin)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// Status bar backdrop when no bar sits at the top. Immersive: a very light fade so status bar text
+    /// stays readable over any page. Solid: the usual material band.
+    @ViewBuilder
+    private var statusBarBackdrop: some View {
+        if immersiveLayout {
+            statusBarScrim
+        } else {
+            solidChromeScrim(edge: .top, extent: 0)
+        }
+    }
+
+    /// Light gradient over the status bar area only. It follows light and dark so the clock and battery
+    /// keep their contrast, and it fades to nothing so the page still shows through.
+    private var statusBarScrim: some View {
+        let base: Color = colorScheme == .dark ? .black : .white
+        return LinearGradient(
+            colors: [base.opacity(colorScheme == .dark ? 0.45 : 0.50), base.opacity(0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea(.container, edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func solidChromeScrim(edge: VerticalEdge, extent: CGFloat = 0) -> some View {
         let isDark = colorScheme == .dark
         let towardEdge = edge == .bottom
         let wash = LinearGradient(
@@ -1428,6 +1514,14 @@ private struct ChromeHeightReader<Key: PreferenceKey>: View where Key.Value == C
         GeometryReader { geo in
             Color.clear.preference(key: key, value: geo.size.height)
         }
+    }
+}
+
+/// Reports the device safe area bottom (home indicator) to the immersive layout.
+private struct HomeIndicatorInsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
@@ -2381,6 +2475,7 @@ private struct SettingsView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
+    @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(BurnEffectPlan.animationKey) private var burnAnimation = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
@@ -2531,6 +2626,7 @@ private struct SettingsView: View {
                         Text(placement.rawValue).tag(placement.rawValue)
                     }
                 }
+                Toggle("Immersive layout", isOn: $immersiveLayout)
                 NavigationLink("Customize Toolbar") {
                     ToolbarEditorView(theme: theme)
                 }
@@ -2540,7 +2636,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control.")
+                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with the bars floating over them as glass capsules. Turn it off for solid bars.")
             }
 
             Section {
