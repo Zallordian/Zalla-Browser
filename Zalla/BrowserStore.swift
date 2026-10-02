@@ -587,6 +587,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: PullToRefresh.storageKey)
         defaults.removeObject(forKey: SettingsCategory.storageKey)
         defaults.removeObject(forKey: ImmersiveLayout.storageKey)
+        defaults.removeObject(forKey: PageColor.storageKey)
         defaults.removeObject(forKey: MenuTopRow.storageKey)
         defaults.removeObject(forKey: SettingsTabHaptics.storageKey)
         defaults.removeObject(forKey: BurnEffectPlan.animationKey)
@@ -792,6 +793,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Last time this tab was on screen, used to decide when it has been idle long enough to sleep.
     var lastActiveAt = Date()
     @Published var hasOnlySecureContent = true
+    /// What the page said about itself after it loaded (colors and the app banner tag).
+    @Published private(set) var pageInfo: PageInfo?
+    /// The page's own background color, for the status bar area. Kept across navigations so it can animate.
+    @Published private(set) var pageColor: PageRGB?
     /// The saying shown on this tab's new tab page. Picked once per tab so it does not change while the page is open.
     let newTabSaying = NewTabSayings.next()
     /// Set when HTTPS-Only Mode could not open a site securely; shows the in-app notice.
@@ -862,6 +867,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             scriptHandlerProxy.delegate = self
             newController.add(scriptHandlerProxy, name: "zallaImage")
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
+            newController.add(scriptHandlerProxy, name: PageColor.messageName)
         }
         if newController != nil {
             applyPageScripts(for: nil)
@@ -898,6 +904,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         controller.addUserScript(WKUserScript(
             source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false
         ))
+        if ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
+            // Page colors for the status bar and the app banner tag. The script only reads; it loads nothing.
+            controller.addUserScript(WKUserScript(
+                source: PageColor.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
+            ))
+        }
         if !isPrivate, CookieBannerDismiss.isEnabled, ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
             controller.addUserScript(WKUserScript(
                 source: CookieBannerDismiss.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
@@ -1385,6 +1397,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == PageColor.messageName {
+            if let info = PageInfo.from(message.body) {
+                pageInfo = info
+                pageColor = PageColor.sample(from: info)
+            }
+            return
+        }
         if message.name == CookieBannerDismiss.messageName {
             if !isPrivate { PrivacyReport.record(.cookieBannerDismissed, host: webView.url?.host) }
             return

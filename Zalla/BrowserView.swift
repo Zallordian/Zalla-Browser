@@ -101,6 +101,8 @@ private struct TabContent: View {
     @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
+    @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
+    @AppStorage("appearance") private var appearance = "System"
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
@@ -151,6 +153,16 @@ private struct TabContent: View {
     private var toolbarLayout: ToolbarLayout {
         ToolbarLayout.decode(toolbarLayoutData)
     }
+    /// What to paint above the page, and whether the status bar text should lean light or dark.
+    private var statusBarPlan: PageColor.StatusBarPlan {
+        PageColor.plan(
+            immersive: immersiveLayout,
+            matchPage: statusBarMatchesPage,
+            hasPage: tab.hasPage,
+            sample: tab.isReaderActive ? nil : tab.pageColor,
+            appearance: appearance
+        )
+    }
     /// A control dimension: a little smaller in the immersive layout, unchanged for the solid bars.
     private func barSize(_ value: CGFloat) -> CGFloat {
         ImmersiveLayout.size(value, immersive: immersiveLayout)
@@ -190,6 +202,8 @@ private struct TabContent: View {
                 .safeAreaPadding(.bottom, bottomContentInset)
                 .overlay(alignment: .trailing) { newTabForwardSwipe }
             }
+
+            statusBarStrip
 
             if let fallback = tab.httpsFallback {
                 ZStack {
@@ -275,6 +289,9 @@ private struct TabContent: View {
             }
         }
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
+        // Light or dark status bar text to suit the page color. Only while Appearance is System; an explicit
+        // Light or Dark choice is never overridden.
+        .preferredColorScheme(statusBarScheme)
         .background {
             // Reads the device bottom inset (home indicator) for the immersive layout.
             GeometryReader { geo in
@@ -396,7 +413,7 @@ private struct TabContent: View {
     private var chromeLayer: some View {
         VStack(spacing: 0) {
             if addressBarPlacement == .top {
-                if immersiveLayout {
+                if immersiveLayout, !tab.hasPage {
                     // Light fade over the status bar only, above the floating capsule.
                     Color.clear
                         .frame(height: 0)
@@ -642,9 +659,48 @@ private struct TabContent: View {
     @ViewBuilder
     private var statusBarBackdrop: some View {
         if immersiveLayout {
-            statusBarScrim
+            // A page gets the painted strip instead (statusBarStrip). The new tab page keeps its wallpaper and
+            // only gets the light fade.
+            if !tab.hasPage {
+                statusBarScrim
+            }
         } else {
             solidChromeScrim(edge: .top, extent: 0)
+        }
+    }
+
+    /// The status bar area in the immersive layout, painted with the page's own color so the clock sits on what
+    /// looks like part of the page. Page content stops below it. The color change eases in.
+    @ViewBuilder
+    private var statusBarStrip: some View {
+        switch statusBarPlan.fill {
+        case .none:
+            EmptyView()
+        case .page(let color):
+            statusStrip(fill: Color(red: color.red, green: color.green, blue: color.blue))
+        case .fallback:
+            statusStrip(fill: Color(uiColor: .systemBackground))
+        }
+    }
+
+    private func statusStrip(fill: Color) -> some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 0)
+                .background { fill.ignoresSafeArea(.container, edges: .top) }
+            Spacer(minLength: 0)
+        }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: statusBarPlan.fill)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var statusBarScheme: ColorScheme? {
+        guard appearance == "System" else { return nil }
+        switch statusBarPlan.schemeOverride {
+        case .some(.dark): return .dark
+        case .some(.light): return .light
+        case .none: return nil
         }
     }
 
@@ -2601,6 +2657,7 @@ private struct SettingsView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
+    @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage(SettingsTabHaptics.storageKey) private var settingsTabHaptics = SettingsTabHaptics.defaultEnabled
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(BurnEffectPlan.animationKey) private var burnAnimation = true
@@ -2753,6 +2810,8 @@ private struct SettingsView: View {
                     }
                 }
                 Toggle("Immersive layout", isOn: $immersiveLayout)
+                Toggle("Status bar matches the page", isOn: $statusBarMatchesPage)
+                    .disabled(!immersiveLayout)
                 Toggle("Haptic tap on Settings tabs", isOn: $settingsTabHaptics)
                 NavigationLink("Customize Toolbar") {
                     ToolbarEditorView(theme: theme)
@@ -2766,7 +2825,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars.")
+                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars. With Immersive layout on, the status bar area takes the page's own color and page content stops below it; Status bar matches the page turns that coloring off.")
             }
 
             Section {
