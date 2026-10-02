@@ -1008,6 +1008,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         previewImage = nil
         if webView.backForwardList.currentItem == nil {
             // Nothing loaded (a failed first load or the HTTPS notice): just show the new tab page.
+            // Stopping keeps a page that is still loading from landing behind it.
+            webView.stopLoading()
             hasPage = false
             newTabHistory.isParked = false
             isReaderActive = false
