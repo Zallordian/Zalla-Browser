@@ -6,11 +6,21 @@ struct ThemePacksView: View {
     @AppStorage("useCustomAccent") private var useCustomAccent = false
     @AppStorage("appIconPreference") private var appIconPreference = AppIconPreference.default.rawValue
     @AppStorage(NewTabBackground.storageKey) private var backgroundRaw = NewTabBackground.standard.storageValue
-    @AppStorage(ThemePacks.refreshAnimationKey) private var refreshAnimationOn = true
+    @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
+    @AppStorage(ThemeTransitionSpeed.storageKey) private var transitionSpeedRaw = ThemeTransitionSpeed.normal.rawValue
     @ObservedObject private var unlock = ZallaUnlock.shared
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showUpsell = false
     @State private var message: String?
+    @State private var previewKind: ThemeTransitionKind = .jungle
+    @State private var previewPulse = 0
+
+    private var previewPlan: ThemeTransitionPlan? {
+        ThemeTransitionPlan.make(
+            kind: previewKind, unlocked: unlock.isUnlocked, enabled: transitionsOn,
+            reduceMotion: reduceMotion, speed: ThemeTransitionSpeed(stored: transitionSpeedRaw)
+        )
+    }
 
     var body: some View {
         List {
@@ -24,11 +34,20 @@ struct ThemePacksView: View {
                 }
             }
             Section {
-                Toggle("Refresh animations", isOn: $refreshAnimationOn)
+                Toggle("Theme transitions", isOn: $transitionsOn)
+                if transitionsOn {
+                    Picker("Speed", selection: $transitionSpeedRaw) {
+                        ForEach(ThemeTransitionSpeed.allCases) { speed in
+                            Text(speed.rawValue).tag(speed.rawValue)
+                        }
+                    }
+                }
+            } header: {
+                Text("Customization")
             } footer: {
                 Text(reduceMotion
-                     ? "Reduce Motion is on, so the animations stay off no matter what."
-                     : "A rocket for Space, a passing tree for Jungle. They play for about a second when you refresh, and they respect Reduce Motion.")
+                     ? "Reduce Motion is on, so transitions are a quick fade."
+                     : "A leafy curtain for Jungle, a rocket for Space. They play for about a second when you refresh and when you apply a theme.")
             }
             if let message {
                 Section { Text(message).font(.footnote).foregroundStyle(.secondary) }
@@ -37,6 +56,9 @@ struct ThemePacksView: View {
         .navigationTitle("Theme packs")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showUpsell) { ZallaUnlockSheet() }
+        .overlay {
+            ThemeTransitionOverlay(plan: previewPlan, pulse: previewPulse)
+        }
     }
 
     private func packCard(_ pack: ThemePack) -> some View {
@@ -88,6 +110,8 @@ struct ThemePacksView: View {
             showUpsell = true
             return
         }
+        previewKind = pack.transition
+        previewPulse += 1
         useCustomAccent = false
         themeID = pack.themeID.rawValue
         appIconPreference = pack.icon.rawValue

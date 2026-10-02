@@ -98,7 +98,8 @@ private struct TabContent: View {
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(ThemePacks.refreshAnimationKey) private var refreshAnimationOn = true
+    @AppStorage(ThemePacks.transitionsKey) private var transitionsOn = true
+    @AppStorage(ThemeTransitionSpeed.storageKey) private var transitionSpeedRaw = ThemeTransitionSpeed.normal.rawValue
     @ObservedObject private var unlockState = ZallaUnlock.shared
     @State private var address = ""
     @State private var showShare = false
@@ -203,16 +204,18 @@ private struct TabContent: View {
                     .zIndex(5)
             }
 
-            ThemeRefreshEffect(
-                pack: ThemePacks.activeRefresh(
+            ThemeTransitionOverlay(
+                plan: ThemePacks.activeTransition(
                     themeID: themeID,
                     useCustomAccent: useCustomAccent,
                     unlocked: unlockState.isUnlocked,
-                    animationOn: refreshAnimationOn,
-                    reduceMotion: reduceMotion
+                    enabled: transitionsOn,
+                    reduceMotion: reduceMotion,
+                    speed: ThemeTransitionSpeed(stored: transitionSpeedRaw)
                 ),
                 pulse: tab.refreshPulse
             )
+            .zIndex(4)
 
             chromeLayer
 

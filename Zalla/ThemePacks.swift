@@ -1,54 +1,42 @@
 import Foundation
 
-/// A theme pack bundles an accent, a matching app icon, a new tab background, and an optional refresh animation.
+/// A theme pack bundles an accent, a matching app icon, a new tab background, and an optional full-screen transition.
 /// Packs are part of Zalla Unlock. The Space accent and icon stay free on their own, as they always were.
 struct ThemePack: Identifiable, Equatable {
-    enum Refresh: String, Equatable {
-        case rocket
-        case tree
-    }
-
     let id: String
     let name: String
     let tagline: String
     let themeID: ZallaThemeID
     let icon: AppIconPreference
     let backgroundPresetID: String
-    let refresh: Refresh
+    let transition: ThemeTransitionKind
     let symbolName: String
-
-    /// What the refresh animation draws.
-    var refreshGlyph: String {
-        switch refresh {
-        case .rocket: return "\u{1F680}"
-        case .tree: return "\u{1F334}"
-        }
-    }
 }
 
 enum ThemePacks {
-    /// Turns the refresh animation off. It is on by default and always yields to Reduce Motion.
-    static let refreshAnimationKey = "themeRefreshAnimation"
+    /// Turns theme transitions off. It is on by default; Reduce Motion turns them into a quick fade.
+    /// The key keeps its Build 14 name, so anyone who switched the old animation off stays off.
+    static let transitionsKey = "themeRefreshAnimation"
 
     static let all: [ThemePack] = [
         ThemePack(
             id: "space",
             name: "Space",
-            tagline: "Stars, a purple-blue glow, and a rocket for every refresh.",
+            tagline: "Stars, a purple-blue glow, and a rocket that crosses the screen on refresh.",
             themeID: .space,
             icon: .space,
             backgroundPresetID: "nebula",
-            refresh: .rocket,
+            transition: .space,
             symbolName: "sparkles"
         ),
         ThemePack(
             id: "jungle",
             name: "Jungle",
-            tagline: "Leaves, deep greens, and a tree that brushes past on refresh.",
+            tagline: "Leaves, deep greens, and a leafy curtain that sweeps across on refresh.",
             themeID: .jungle,
             icon: .jungle,
             backgroundPresetID: "canopy",
-            refresh: .tree,
+            transition: .jungle,
             symbolName: "leaf"
         )
     ]
@@ -57,10 +45,12 @@ enum ThemePacks {
         all.first { $0.themeID.rawValue == themeID }
     }
 
-    /// The pack whose refresh animation should play right now, or nil when nothing should animate.
-    static func activeRefresh(themeID: String, useCustomAccent: Bool, unlocked: Bool,
-                              animationOn: Bool, reduceMotion: Bool) -> ThemePack? {
-        guard unlocked, animationOn, !reduceMotion, !useCustomAccent else { return nil }
-        return pack(for: themeID)
+    /// What should play right now, or nil for nothing. Same gating as Build 14: a pack accent chosen by name,
+    /// Zalla Unlock, and the switch on. Reduce Motion still plays, as a quick fade.
+    static func activeTransition(themeID: String, useCustomAccent: Bool, unlocked: Bool, enabled: Bool,
+                                 reduceMotion: Bool, speed: ThemeTransitionSpeed) -> ThemeTransitionPlan? {
+        guard !useCustomAccent, let pack = pack(for: themeID) else { return nil }
+        return ThemeTransitionPlan.make(kind: pack.transition, unlocked: unlocked, enabled: enabled,
+                                        reduceMotion: reduceMotion, speed: speed)
     }
 }

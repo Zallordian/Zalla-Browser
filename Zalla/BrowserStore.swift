@@ -546,7 +546,9 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)
         defaults.removeObject(forKey: CookieBannerDismiss.storageKey)
-        defaults.removeObject(forKey: ThemePacks.refreshAnimationKey)
+        defaults.removeObject(forKey: ThemePacks.transitionsKey)
+        defaults.removeObject(forKey: ThemeTransitionSpeed.storageKey)
+        defaults.removeObject(forKey: LogoStyle.storageKey)
         PrivacyReport.reset(in: defaults)
         AutoClear.resetSettings()
         groups = []

@@ -66,16 +66,21 @@ final class ThemePackTests: XCTestCase {
         XCTAssertFalse(ZallaThemeID.space.requiresUnlock)
     }
 
-    func testRefreshAnimationRules() {
+    func testTransitionRules() {
         let base = { (unlocked: Bool, on: Bool, reduce: Bool, custom: Bool) in
-            ThemePacks.activeRefresh(themeID: "space", useCustomAccent: custom, unlocked: unlocked, animationOn: on, reduceMotion: reduce)
+            ThemePacks.activeTransition(themeID: "space", useCustomAccent: custom, unlocked: unlocked, enabled: on,
+                                        reduceMotion: reduce, speed: .normal)
         }
-        XCTAssertEqual(base(true, true, false, false)?.id, "space")
+        XCTAssertEqual(base(true, true, false, false)?.kind, .space)
+        XCTAssertEqual(base(true, true, false, false)?.style, .full)
         XCTAssertNil(base(false, true, false, false))
         XCTAssertNil(base(true, false, false, false))
-        XCTAssertNil(base(true, true, true, false))
+        XCTAssertEqual(base(true, true, true, false)?.style, .fade, "Reduce Motion becomes a quick fade")
         XCTAssertNil(base(true, true, false, true))
-        XCTAssertNil(ThemePacks.activeRefresh(themeID: "ocean", useCustomAccent: false, unlocked: true, animationOn: true, reduceMotion: false))
+        XCTAssertNil(ThemePacks.activeTransition(themeID: "ocean", useCustomAccent: false, unlocked: true, enabled: true,
+                                                 reduceMotion: false, speed: .normal))
+        XCTAssertEqual(ThemePacks.activeTransition(themeID: "jungle", useCustomAccent: false, unlocked: true, enabled: true,
+                                                   reduceMotion: false, speed: .fast)?.kind, .jungle)
     }
 
     func testCustomColorsNeverPickALockedIcon() {
