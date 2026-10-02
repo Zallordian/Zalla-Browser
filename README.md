@@ -15,6 +15,11 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 25
+
+- Quick theme (`ThemePacks.swift` `QuickTheme`, `BrowserView.swift` `selectTheme`, key `quickThemeFullLook`, default on, cleared by Reset the App). The Settings, Appearance swatch row (was "Signature", now "Quick theme"; section header "Theme and accent") applies a whole theme. `QuickTheme.action(for:unlocked:fullLook:)` decides: a locked theme without Zalla Unlock opens the Unlock sheet and changes nothing (Jungle, Volcano, Deep Ocean, Retro Arcade, as `ZallaThemeID.requiresUnlock` already says); an unlocked theme with a pack sets the accent (`themeID`, custom accent off), the app icon (`appIconPreference` plus `applyIcon`), the new tab background (`newTabBackground`), and plays the pack transition in a Settings overlay, the same as Apply in Theme packs; everything else (free accents, Space without Unlock, the switch off) sets the accent and offers the matching icon as before. The Theme packs row is now "Explore theme packs". Footer text updated. Custom accent toggle unchanged.
+- Version bump: `CURRENT_PROJECT_VERSION` 25, fallback strings, Build 25 changelog entry "One Tap Theme", AboutTests ordering.
+
 ## Build 24
 
 - Header Room (`BrowserView.swift`, `PageColor.swift`). Build 23's painted status bar strip covered a site's `position: fixed` header (YouTube's logo and search icon), because the page layer still started at y = 0. While a strip is painted (`PageColor.StatusBarPlan.startsBelowStatusBar`: immersive layout plus a loaded page; the fill is `.page` or `.fallback`) the page layer ignores only the bottom and horizontal safe areas (`webSurfaceIgnoredEdges`), so the web view frame starts below the clock and the scroll view's automatic top inset is 0. `topChromeHeight` (banner plus top bar, measured without the safe area) is still the only top content inset, so there is no doubled gap. Immersive layout off, or the new tab page, behaves exactly as in Build 23. The edge set does not change when the page color arrives (`.fallback` to `.page`), so the web view does not move. No new storage key.

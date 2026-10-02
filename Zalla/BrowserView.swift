@@ -2724,8 +2724,22 @@ private struct SettingsView: View {
     @State private var blueSlider = 0.31
     @State private var suggestIconForTheme: ZallaThemeID?
     @State private var showThemeUpsell = false
+    @AppStorage(QuickTheme.storageKey) private var quickThemeFullLook = QuickTheme.defaultEnabled
+    @AppStorage(NewTabBackground.storageKey) private var newTabBackgroundRaw = NewTabBackground.standard.storageValue
+    @AppStorage(ThemePacks.transitionsKey) private var themeTransitionsOn = true
+    @AppStorage(ThemeTransitionSpeed.storageKey) private var themeTransitionSpeedRaw = ThemeTransitionSpeed.normal.rawValue
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var quickThemeKind: ThemeTransitionKind = .jungle
+    @State private var quickThemePulse = 0
     @ObservedObject private var unlock = ZallaUnlock.shared
     @Environment(\.colorScheme) private var colorScheme
+
+    private var quickThemePlan: ThemeTransitionPlan? {
+        ThemeTransitionPlan.make(
+            kind: quickThemeKind, unlocked: unlock.isUnlocked, enabled: themeTransitionsOn,
+            reduceMotion: reduceMotion, speed: ThemeTransitionSpeed(stored: themeTransitionSpeedRaw)
+        )
+    }
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(
@@ -2737,7 +2751,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "24"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "25"
         return "\(marketing) (\(build))"
     }
 
@@ -2812,6 +2826,10 @@ private struct SettingsView: View {
             Button("OK") { bookmarkMessage = nil }
         } message: { Text(bookmarkMessage ?? "") }
         .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
+        .overlay {
+            // Plays the theme's transition when a swatch applies it, like Apply in Theme packs.
+            ThemeTransitionOverlay(plan: quickThemePlan, pulse: quickThemePulse)
+        }
         .tint(theme.primary)
         .onAppear { loadCustomControls() }
     }
@@ -2879,12 +2897,13 @@ private struct SettingsView: View {
                     theme: theme
                 )
                 .padding(.vertical, 6)
-                themeRow(title: "Signature", ids: ZallaThemeID.featured)
+                themeRow(title: "Quick theme", ids: ZallaThemeID.featured)
                 NavigationLink {
                     ThemePacksView()
                 } label: {
-                    Label("Theme packs", systemImage: "sparkles")
+                    Label("Explore theme packs", systemImage: "sparkles")
                 }
+                Toggle("Themes apply the full look", isOn: $quickThemeFullLook)
                 DisclosureGroup("More accents") {
                     themeRow(title: nil, ids: ZallaThemeID.secondary)
                 }
@@ -2918,9 +2937,9 @@ private struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("Accent")
+                Text("Theme and accent")
             } footer: {
-                Text("Accents are optional. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
+                Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, and Retro Arcade need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
             }
 
             Section {
@@ -3189,13 +3208,7 @@ private struct SettingsView: View {
                 ForEach(ids) { id in
                     let swatch = ZallaTheme.theme(for: id)
                     Button {
-                        if id.requiresUnlock && !unlock.isUnlocked {
-                            showThemeUpsell = true
-                            return
-                        }
-                        useCustomAccent = false
-                        themeID = id.rawValue
-                        suggestIconForTheme = id
+                        selectTheme(id)
                     } label: {
                         VStack(spacing: 6) {
                             Circle()
@@ -3228,6 +3241,27 @@ private struct SettingsView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// A swatch tap. Packs apply the whole look, plain accents set the color, locked themes open Zalla Unlock.
+    /// Either way the custom accent is switched off, as before.
+    private func selectTheme(_ id: ZallaThemeID) {
+        switch QuickTheme.action(for: id, unlocked: unlock.isUnlocked, fullLook: quickThemeFullLook) {
+        case .needsUnlock:
+            showThemeUpsell = true
+        case .accentOnly:
+            useCustomAccent = false
+            themeID = id.rawValue
+            suggestIconForTheme = id
+        case .fullPack(let pack):
+            useCustomAccent = false
+            themeID = pack.themeID.rawValue
+            appIconPreference = pack.icon.rawValue
+            applyIcon(pack.icon)
+            newTabBackgroundRaw = NewTabBackground.preset(pack.backgroundPresetID).storageValue
+            quickThemeKind = pack.transition
+            quickThemePulse += 1
+        }
     }
 
     private func labeledSlider(_ title: String, value: Binding<Double>) -> some View {

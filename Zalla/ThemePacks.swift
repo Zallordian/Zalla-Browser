@@ -13,6 +13,30 @@ struct ThemePack: Identifiable, Equatable {
     let symbolName: String
 }
 
+/// What tapping a swatch in Settings, Appearance does. A theme with a pack applies the whole look (accent, app icon,
+/// new tab background, and refresh transition); a plain accent only sets the color and offers the matching icon.
+enum QuickTheme {
+    /// Settings, Appearance: swatches apply the whole theme. On by default; off makes every swatch set the accent only.
+    static let storageKey = "quickThemeFullLook"
+    static let defaultEnabled = true
+
+    enum Action: Equatable {
+        /// A locked theme without Zalla Unlock: show the Unlock sheet and change nothing.
+        case needsUnlock
+        /// Set the accent and offer the matching icon, as swatches always did.
+        case accentOnly
+        /// Set accent, icon, new tab background, and play the transition.
+        case fullPack(ThemePack)
+    }
+
+    static func action(for id: ZallaThemeID, unlocked: Bool, fullLook: Bool) -> Action {
+        if id.requiresUnlock && !unlocked { return .needsUnlock }
+        // The pack's backgrounds and transition are part of Zalla Unlock, so without it only the accent is set.
+        if fullLook, unlocked, let pack = ThemePacks.pack(for: id.rawValue) { return .fullPack(pack) }
+        return .accentOnly
+    }
+}
+
 enum ThemePacks {
     /// Turns theme transitions off. It is on by default; Reduce Motion turns them into a quick fade.
     /// The key keeps its Build 14 name, so anyone who switched the old animation off stays off.

@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 25",
+            name: "One Tap Theme",
+            highlights: [
+                "Tapping a theme in Settings, Appearance now changes the whole theme, not just the color. Pick Volcano, Deep Ocean, Retro Arcade, Jungle, or Space and you get its accent, app icon, new tab background, and refresh transition in one go, with the transition playing right away. Locked themes show a lock and open Zalla Unlock instead of changing anything",
+                "The row below is now Explore theme packs, for looking around the premium themes. The section is called Theme and accent, and the old Signature row is Quick theme"
+            ],
+            improvements: "Settings, Appearance, Themes apply the full look turns it off, so a tap only sets the accent like before. Free accents, Zalla Red as the default, and the custom accent still work the same, and picking a theme turns the custom accent off.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 24",
             name: "Header Room",
             highlights: [
