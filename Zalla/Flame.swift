@@ -42,23 +42,3 @@ extension View {
         }
     }
 }
-
-/// Shown while Burn It All works, so nobody wonders whether the tap registered.
-struct FlameProgressOverlay: View {
-    var body: some View {
-        ZStack {
-            Color(uiColor: .systemBackground).opacity(0.94).ignoresSafeArea()
-            VStack(spacing: 14) {
-                FlameMark(size: 64)
-                Text("Clearing everything")
-                    .font(.headline)
-                Text("Zalla will close in a moment. Open it again for a clean slate.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(32)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}

@@ -46,6 +46,8 @@ final class BrowserStore: ObservableObject {
     @Published var clearingData = false
     /// True from the moment Burn It All is confirmed until the app closes.
     @Published private(set) var isBurning = false
+    /// Which effect the Burn It All overlay plays. Set together with `isBurning`.
+    @Published private(set) var burnPlan: BurnEffectPlan?
     @Published var imageExport: ImageExportRequest?
     private let fileURL: URL
     private var activeDownloadDelegates: [UUID: TabDownloadSession] = [:]
@@ -87,6 +89,10 @@ final class BrowserStore: ObservableObject {
         ShieldRuntime.applyEncryptedDNS()
         refreshProxy()
         privateLocked = PrivateTabLock.isRequired(unlocked: ZallaUnlock.shared.isUnlocked)
+        // Zalla was closed in the middle of Burn It All: finish the wipe and restore nothing.
+        if UserDefaults.standard.bool(forKey: BurnEffectPlan.pendingKey) {
+            finishInterruptedBurn()
+        }
         if !restoreSession() {
             addTab()
         }
@@ -436,10 +442,18 @@ final class BrowserStore: ObservableObject {
         save()
     }
 
-    /// Burn It All: close every tab, erase history, cookies, and site data (private tabs included),
+    /// Burn It All: play the fire, close every tab, erase history, cookies, and site data (private tabs included),
     /// then close the app. Bookmarks and downloads are kept.
+    /// The wipe does not depend on the animation: everything that must not survive is cleared or started up front,
+    /// site data is erased once before and once after the tabs go, and a flag makes the next launch finish the job
+    /// if Zalla is closed halfway. Nothing is restored on the next launch.
     func burnEverythingAndClose() async {
         guard !isBurning else { return }
+        let defaults = UserDefaults.standard
+        defaults.set(true, forKey: BurnEffectPlan.pendingKey)
+        let plan = BurnEffectPlan.make(reduceMotion: UIAccessibility.isReduceMotionEnabled)
+        let started = Date()
+        burnPlan = plan
         isBurning = true
         clearingData = true
         sessionSavingEnabled = false
@@ -450,12 +464,27 @@ final class BrowserStore: ObservableObject {
         HTTPSOnlySession.exceptions.removeAll()
         PageZoom.save([:])
         PrivacyReport.clearHosts()
-        UserDefaults.standard.removeObject(forKey: DesktopSitePreference.storageKey)
+        defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         speaker.stop()
         tabs.forEach { $0.webView.stopLoading() }
+        clearHistory()
+        await eraseSiteData(in: privateStores)
+        // Let the effect finish with the browser still on screen, then take the tabs away behind the ash.
+        let remaining = plan.duration - Date().timeIntervalSince(started)
+        if remaining > 0 {
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+        }
         tabs.removeAll()
         selectedID = nil
-        clearHistory()
+        // A second pass, in case a page wrote something while the fire was going.
+        await eraseSiteData(in: privateStores)
+        // Leave the confirmation on screen for a beat, then close.
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        defaults.removeObject(forKey: BurnEffectPlan.pendingKey)
+        exit(0)
+    }
+
+    private func eraseSiteData(in privateStores: [WKWebsiteDataStore]) async {
         let types = WKWebsiteDataStore.allWebsiteDataTypes()
         for store in privateStores {
             await store.removeData(ofTypes: types, modifiedSince: .distantPast)
@@ -463,9 +492,16 @@ final class BrowserStore: ObservableObject {
         await WKWebsiteDataStore.default().removeData(ofTypes: types, modifiedSince: .distantPast)
         URLCache.shared.removeAllCachedResponses()
         HTTPCookieStorage.shared.removeCookies(since: .distantPast)
-        // Leave the confirmation on screen for a beat, then close. Nothing is restored on the next launch.
-        try? await Task.sleep(nanoseconds: 900_000_000)
-        exit(0)
+    }
+
+    /// Runs at launch when the last Burn It All never finished. Opens clean: no saved tabs, no history, no site data.
+    private func finishInterruptedBurn() {
+        clearSavedSession()
+        clearHistory()
+        Task { @MainActor in
+            await eraseSiteData(in: [])
+            UserDefaults.standard.removeObject(forKey: BurnEffectPlan.pendingKey)
+        }
     }
 
     func clearBrowsingData() async {

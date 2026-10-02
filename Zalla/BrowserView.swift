@@ -53,7 +53,7 @@ struct BrowserView: View {
             }
         }
         .overlay {
-            if browser.isBurning { FlameProgressOverlay() }
+            if browser.isBurning { BurnOverlay(plan: browser.burnPlan ?? BurnEffectPlan.make(reduceMotion: false)) }
         }
         .sheet(item: $browser.imageExport) { request in
             ImageExportSheet(request: request)
