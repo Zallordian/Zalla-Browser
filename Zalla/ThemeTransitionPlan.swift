@@ -81,6 +81,14 @@ struct LeafSpec: Equatable {
     var width: Double
     /// Radians. 0 points toward the middle of the screen, positive tilts down.
     var angle: Double
+    /// How far the leaf bows sideways, -1 to 1. Zero is a straight leaf.
+    var curve: Double = 0
+    /// Ratio of one side's bulge to the other's, so leaves are not mirror images. About 1.
+    var asymmetry: Double = 1
+    /// Radians. Offsets the sway so leaves do not move together.
+    var phase: Double = 0
+    /// 0 to 1. Picks between the two greens of the layer.
+    var tone: Double = 0
 
     /// Where the tip lands, as a fraction of the layer width.
     var tipX: Double { rootX + length * cos(angle) }
@@ -104,10 +112,127 @@ enum JungleLeaves {
             // Keep every tip inside the layer.
             length = min(length, (0.98 - rootX) / cos(tilt))
             let width = length * Double.random(in: 0.3...0.42, using: &generator)
-            result.append(LeafSpec(rootX: rootX, rootY: rootY, length: length, width: width, angle: tilt))
+            // Drawn after the original values, so leaf positions stay as they were.
+            let curve = Double.random(in: -0.8...0.8, using: &generator)
+            let asymmetry = Double.random(in: 0.72...1.32, using: &generator)
+            let phase = Double.random(in: 0...(2 * Double.pi), using: &generator)
+            let tone = Double.random(in: 0...1, using: &generator)
+            result.append(LeafSpec(
+                rootX: rootX, rootY: rootY, length: length, width: width, angle: tilt,
+                curve: curve, asymmetry: asymmetry, phase: phase, tone: tone
+            ))
         }
         return result
     }
+
+    /// A slow rotation around the root while the curtain moves, in radians. Bigger for the front layers.
+    static func sway(_ leaf: LeafSpec, progress: Double, layer: Int) -> Double {
+        let amplitude = 0.04 + 0.02 * Double(min(max(layer, 0), layerCount - 1))
+        return amplitude * sin(leaf.phase + progress * 2 * Double.pi * 1.25)
+    }
+}
+
+/// Easing and timing for the full-screen theme transitions. Progress runs from 0 to 1 over the whole transition.
+/// Plain math, so it is easy to test.
+enum TransitionCurve {
+    static func clamp(_ value: Double) -> Double { min(max(value, 0), 1) }
+
+    static func smooth(_ value: Double) -> Double {
+        let x = clamp(value)
+        return x * x * (3 - 2 * x)
+    }
+
+    static func easeOutCubic(_ value: Double) -> Double { 1 - pow(1 - clamp(value), 3) }
+
+    static func easeInCubic(_ value: Double) -> Double { pow(clamp(value), 3) }
+
+    /// How far a jungle layer has slid in, 0 (off screen) to 1 (in place). Back layers (0) move first going in and
+    /// last going out, so the curtain has depth. Every layer is in place between 0.50 and 0.55.
+    static func curtain(_ progress: Double, layer: Int, of count: Int) -> Double {
+        let x = clamp(progress)
+        let step = 0.05
+        let index = Double(min(max(layer, 0), max(count, 1) - 1))
+        let enterStart = step * index
+        let enterLength = 0.40
+        let leaveStart = 0.55 + step * (Double(max(count, 1) - 1) - index)
+        let leaveLength = 0.35
+        if x < enterStart + enterLength {
+            return easeOutCubic((x - enterStart) / enterLength)
+        }
+        if x < leaveStart { return 1 }
+        return 1 - easeInCubic((x - leaveStart) / leaveLength)
+    }
+
+    /// The Reduce Motion fade: the screen tints up to 0.85 at the middle and clears again.
+    static func fadeOpacity(_ progress: Double) -> Double {
+        0.85 * smooth(1 - abs(2 * clamp(progress) - 1))
+    }
+}
+
+/// Timing and scenery for the Space launch.
+enum SpaceFlight {
+    /// The ship is gone off the top by this point; the glow lifts away after it.
+    static let flightEnd = 0.74
+    /// The glow starts to lift away upward here.
+    static let liftStart = 0.62
+
+    /// How far up the ship has climbed, 0 to 1. It eases off the pad and keeps accelerating, like a real launch.
+    static func thrust(_ progress: Double) -> Double {
+        let x = TransitionCurve.clamp(progress / flightEnd)
+        return 0.3 * TransitionCurve.smooth(x) + 0.7 * pow(x, 2.2)
+    }
+
+    /// How far the glow has lifted away, 0 (still covering) to 1 (gone).
+    static func lift(_ progress: Double) -> Double {
+        let x = TransitionCurve.clamp((progress - liftStart) / (1 - liftStart))
+        return TransitionCurve.smooth(x)
+    }
+
+    /// A puff of smoke left behind at one moment of the climb. Sizes and offsets are fractions of the screen width.
+    struct Puff: Equatable {
+        /// Progress at which it leaves the engine.
+        var spawn: Double
+        var offsetX: Double
+        var driftX: Double
+        var radius: Double
+    }
+
+    /// How long a puff lasts, as a fraction of the whole transition.
+    static let puffLife = 0.34
+
+    static let puffs: [Puff] = {
+        var generator = SeededGenerator(seed: 4242)
+        return (0..<14).map { i in
+            Puff(
+                spawn: 0.03 + 0.46 * (Double(i) + Double.random(in: 0...0.8, using: &generator)) / 14,
+                offsetX: Double.random(in: -0.025...0.025, using: &generator),
+                driftX: Double.random(in: -0.1...0.1, using: &generator),
+                radius: Double.random(in: 0.035...0.07, using: &generator)
+            )
+        }
+    }()
+
+    /// A thin line of passing air that streaks down as the ship climbs. Fractions of the screen.
+    struct Streak: Equatable {
+        var x: Double
+        var y: Double
+        var length: Double
+        var speed: Double
+        var alpha: Double
+    }
+
+    static let streaks: [Streak] = {
+        var generator = SeededGenerator(seed: 777)
+        return (0..<14).map { _ in
+            Streak(
+                x: Double.random(in: 0.04...0.96, using: &generator),
+                y: Double.random(in: 0...1, using: &generator),
+                length: Double.random(in: 0.05...0.14, using: &generator),
+                speed: Double.random(in: 1.2...2.4, using: &generator),
+                alpha: Double.random(in: 0.12...0.3, using: &generator)
+            )
+        }
+    }()
 }
 
 /// Burn It All: the fire effect, or a quick fade when Reduce Motion is on or the effect is switched off.

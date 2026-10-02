@@ -127,7 +127,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             ]
         case .themeTransitions:
             return [
-                "Jungle sweeps a leafy curtain across the screen. Space sends a rocket up. They play when you refresh and when you apply a theme.",
+                "Jungle sweeps layers of leaves across the screen. Space launches a rocket with a long flame and a trail of smoke. They play when you refresh and when you apply a theme.",
                 "Open Settings, Theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
                 "With Reduce Motion on, you get a quick fade instead.",
                 "Theme packs are part of Zalla Unlock."
