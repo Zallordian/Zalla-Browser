@@ -14,6 +14,15 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 24",
+            name: "Header Room",
+            highlights: [
+                "Fixed: a site's own header at the top of the page, like the YouTube logo and search icon, was hidden under the colored status bar strip. The page now starts right below the clock, so headers show up on a normal load"
+            ],
+            improvements: "Nothing changes with Immersive layout off, and the new tab page keeps its full bleed wallpaper.",
+            fixes: "YouTube's top header no longer disappears on a normal load."
+        ),
+        ChangelogEntry(
             version: "Build 23",
             name: "Float On",
             highlights: [

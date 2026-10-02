@@ -15,6 +15,11 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 24
+
+- Header Room (`BrowserView.swift`, `PageColor.swift`). Build 23's painted status bar strip covered a site's `position: fixed` header (YouTube's logo and search icon), because the page layer still started at y = 0. While a strip is painted (`PageColor.StatusBarPlan.startsBelowStatusBar`: immersive layout plus a loaded page; the fill is `.page` or `.fallback`) the page layer ignores only the bottom and horizontal safe areas (`webSurfaceIgnoredEdges`), so the web view frame starts below the clock and the scroll view's automatic top inset is 0. `topChromeHeight` (banner plus top bar, measured without the safe area) is still the only top content inset, so there is no doubled gap. Immersive layout off, or the new tab page, behaves exactly as in Build 23. The edge set does not change when the page color arrives (`.fallback` to `.page`), so the web view does not move. No new storage key.
+- Version bump: `CURRENT_PROJECT_VERSION` 24, fallback strings, Build 24 changelog entry "Header Room", AboutTests ordering.
+
 ## Build 23
 
 - Floating bottom bar (`BrowserView.swift`, `ImmersiveLayout.swift`). With Immersive layout on there is no container behind the controls: Classic nav items are individual glass circles (`FloatingCircle`), the address is its own glass capsule (`ClassicAddressSurface`), Quick Action uses its pill (`QuickActionPillSurface`) and circles, Compact keeps its circles and pill. Gaps between controls pass touches to the page (`solidHitArea(!immersive)`). Sizes are scaled by `ImmersiveLayout.barScale` (0.88) through `scaled(_)` and `size(_:immersive:)`; the 12 pt bottom gap rule is unchanged. Immersive layout off restores the solid bars. No new storage key.

@@ -180,6 +180,12 @@ private struct TabContent: View {
             appearance: appearance
         )
     }
+    /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted. The
+    /// scroll view then adds no automatic top inset of its own, so the chrome height alone keeps the page clear of
+    /// the banner and top bar.
+    private var webSurfaceIgnoredEdges: Edge.Set {
+        statusBarPlan.startsBelowStatusBar ? [.bottom, .horizontal] : .all
+    }
     /// A control dimension: a little smaller in the immersive layout, unchanged for the solid bars.
     private func barSize(_ value: CGFloat) -> CGFloat {
         ImmersiveLayout.size(value, immersive: immersiveLayout)
@@ -205,8 +211,10 @@ private struct TabContent: View {
                     webView: tab.webView,
                     chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomContentInset, right: 0)
                 )
-                // Container only: the keyboard still resizes the page like before.
-                .ignoresSafeArea(.container, edges: .all)
+                // Container only: the keyboard still resizes the page like before. While the status bar strip is
+                // painted the page frame starts below the clock (top safe area respected), so a site's fixed
+                // header is not hidden under the strip. Otherwise edge to edge, as in Build 23.
+                .ignoresSafeArea(.container, edges: webSurfaceIgnoredEdges)
             } else {
                 NewTabView(
                     browser: browser,
@@ -1740,8 +1748,9 @@ private struct WebSurface: UIViewRepresentable {
     }
 
     /// Lets pages scroll fully clear of the translucent chrome. The scroll view keeps its automatic
-    /// adjustment, which already adds the notch and home indicator insets now that the web view is
-    /// full-bleed, so only the bar heights are added here.
+    /// adjustment, which adds whichever notch and home indicator insets the web view frame overlaps (none at the
+    /// top while the status bar strip is painted, since the frame then starts below it), so only the bar heights
+    /// are added here.
     private static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
         let scrollView = webView.scrollView
         // While the pull to refresh spinner is out, UIKit owns the top inset.
@@ -2728,7 +2737,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "23"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "24"
         return "\(marketing) (\(build))"
     }
 

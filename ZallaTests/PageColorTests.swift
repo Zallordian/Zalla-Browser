@@ -127,4 +127,22 @@ final class PageColorTests: XCTestCase {
         XCTAssertFalse(PageColor.script.contains("XMLHttpRequest"))
         XCTAssertFalse(PageColor.script.contains("\u{2014}"))
     }
+
+    func testWebViewStartsBelowTheStatusBarOnlyWhileAStripIsPainted() {
+        func plan(immersive: Bool, match: Bool, page: Bool, sample: PageRGB?) -> PageColor.StatusBarPlan {
+            PageColor.plan(immersive: immersive, matchPage: match, hasPage: page, sample: sample, appearance: "System")
+        }
+        XCTAssertTrue(plan(immersive: true, match: true, page: true, sample: .white).startsBelowStatusBar)
+        XCTAssertTrue(plan(immersive: true, match: true, page: true, sample: nil).startsBelowStatusBar, "Fallback strip still pushes the page down")
+        XCTAssertTrue(plan(immersive: true, match: false, page: true, sample: .white).startsBelowStatusBar)
+        XCTAssertFalse(plan(immersive: false, match: true, page: true, sample: .white).startsBelowStatusBar, "Solid bars: unchanged")
+        XCTAssertFalse(plan(immersive: true, match: true, page: false, sample: .white).startsBelowStatusBar, "New tab page keeps its wallpaper")
+    }
+
+    func testFrameDoesNotMoveWhenThePageColorArrives() {
+        let before = PageColor.plan(immersive: true, matchPage: true, hasPage: true, sample: nil, appearance: "System")
+        let after = PageColor.plan(immersive: true, matchPage: true, hasPage: true, sample: .black, appearance: "System")
+        XCTAssertNotEqual(before.fill, after.fill)
+        XCTAssertEqual(before.startsBelowStatusBar, after.startsBelowStatusBar)
+    }
 }

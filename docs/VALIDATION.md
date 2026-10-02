@@ -57,6 +57,9 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Header Room (Build 24)
+Needs a physical iPhone. Check: on m.youtube.com the logo and search icon show on a normal load, after a refresh, and while scrolling up and down (the header sits right under the clock, the strip color matches it); other fixed or sticky headers (Reddit, Amazon, news sites) are visible too; no extra gap between the clock and the page top, and none under a top address bar or the app banner; pull down to refresh still shows the spinner and reloads; opening a page from the new tab page and the strip color changing as the page color arrives does not make the page jump; Reader, error pages, and private tabs look right; Immersive layout off, and Status bar matches the page off, still behave as in Build 23.
+
 ## Floating bottom bar (Build 23)
 Needs a physical iPhone. Check: with Immersive layout on there is no frosted box behind the bottom controls; in Classic, Back, Forward, Share, Tabs, the address, and the menu are separate glass shapes with the page showing between them; in Compact and Quick Action the circles and pill float the same way; taps in the gaps go to the page (scroll, tap a link right above the bar); everything is a bit smaller than Build 22 and the bottom gap is still about 12 pt above the home indicator; the keyboard, landscape, and a bar on top still work; Immersive layout off brings back the solid bars.
 

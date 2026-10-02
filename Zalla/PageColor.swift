@@ -169,6 +169,15 @@ enum PageColor {
         var fill: Fill
         /// Set while the system appearance is in use and the page color calls for light or dark status bar text.
         var schemeOverride: SchemeChoice?
+
+        /// True when the web view must start below the status bar, so fixed and sticky page elements (a site's
+        /// header) sit under the clock instead of beneath the painted strip. Exactly when a strip is painted.
+        var startsBelowStatusBar: Bool {
+            switch fill {
+            case .none: return false
+            case .page, .fallback: return true
+            }
+        }
     }
 
     /// `appearance` is the Settings value: "System", "Light", or "Dark". An explicit choice is respected, so a page
