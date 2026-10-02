@@ -1492,6 +1492,8 @@ private struct WebSurface: UIViewRepresentable {
     /// full-bleed, so only the bar heights are added here.
     private static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
         let scrollView = webView.scrollView
+        // While the pull to refresh spinner is out, UIKit owns the top inset.
+        if scrollView.refreshControl?.isRefreshing == true { return }
         guard scrollView.contentInset != insets else { return }
         let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
         scrollView.contentInset = insets
@@ -2378,6 +2380,7 @@ private struct SettingsView: View {
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
     @AppStorage(SwipeNavigation.storageKey) private var swipeNavigation = true
+    @AppStorage(PullToRefresh.storageKey) private var pullToRefresh = true
     @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
     @State private var confirmClear = false
@@ -2515,6 +2518,10 @@ private struct SettingsView: View {
                     .onChange(of: swipeNavigation) { _, newValue in
                         browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
                     }
+                Toggle("Pull down to refresh", isOn: $pullToRefresh)
+                    .onChange(of: pullToRefresh) { _, newValue in
+                        browser.tabs.forEach { $0.setPullToRefresh(newValue) }
+                    }
                 Button {
                     exportBookmarks()
                 } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
@@ -2522,7 +2529,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Browsing")
             } footer: {
-                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari.")
+                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it.")
             }
 
             Section("Tools") {

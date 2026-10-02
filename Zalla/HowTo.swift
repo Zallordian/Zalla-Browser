@@ -5,6 +5,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
     case quickAction
     case historyPeek
     case edgeSwipe
+    case pullToRefresh
     case newTabPage
     case addToDashboard
     case flame
@@ -22,6 +23,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .quickAction: return "Quick Action"
         case .historyPeek: return "Peek at history"
         case .edgeSwipe: return "Swipe to go back"
+        case .pullToRefresh: return "Pull down to refresh"
         case .newTabPage: return "Your new tab page"
         case .addToDashboard: return "Add to Dashboard"
         case .flame: return "Burn It All"
@@ -39,6 +41,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .quickAction: return "circle.grid.cross"
         case .historyPeek: return "clock.arrow.circlepath"
         case .edgeSwipe: return "arrow.left.and.right"
+        case .pullToRefresh: return "arrow.clockwise"
         case .newTabPage: return "square.grid.2x2"
         case .addToDashboard: return "plus.square.on.square"
         case .flame: return "flame"
@@ -57,6 +60,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .quickAction: return "One button, six controls."
         case .historyPeek: return "Hold Back or Forward to see where you were."
         case .edgeSwipe: return "Swipe in from the screen edge."
+        case .pullToRefresh: return "Drag a page down to reload it."
         case .newTabPage: return "Shortcuts, backgrounds, and a search bar."
         case .addToDashboard: return "Press and hold any link."
         case .flame: return "Erase everything and close the app."
@@ -91,6 +95,14 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Swipe back from the first page you opened and you land on your new tab page. Swipe forward to return.",
                 "A small arrow follows your finger. Let go past it to turn the page, or let go early to stay put.",
                 "If it gets in the way, turn it off in Settings, Browsing."
+            ]
+        case .pullToRefresh:
+            return [
+                "Scroll to the top of a page, then pull down and let go.",
+                "A little spinner shows while the page reloads and stops when it finishes.",
+                "Only a pull from the very top counts, so scrolling around a page never reloads it.",
+                "With the keyboard up, pulling down just puts the keyboard away.",
+                "To switch it off, open Settings, Browsing."
             ]
         case .newTabPage:
             return [

@@ -581,6 +581,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: PrivateTabLock.storageKey)
         defaults.removeObject(forKey: TabSleep.storageKey)
         defaults.removeObject(forKey: SwipeNavigation.storageKey)
+        defaults.removeObject(forKey: PullToRefresh.storageKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)
         defaults.removeObject(forKey: CookieBannerDismiss.storageKey)
@@ -764,6 +765,11 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var hasPage = false
     /// Where the new tab page sits in this tab's history, so back and forward can reach it.
     private var newTabHistory = NewTabHistory()
+    /// The spinner a pull down at the top of the page shows. Nil while pull to refresh is switched off.
+    private var pullRefreshControl: UIRefreshControl?
+    /// True from a pull's reload until the page finishes, so the spinner stops when the load does.
+    private var pullRefreshPending = false
+    private var pullRefreshToken = 0
     @Published var errorMessage: String?
     /// A failed page load, shown as a full-page message instead of a small banner.
     @Published var pageError: FriendlyError?
@@ -858,6 +864,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         EdgeNavigation.install(on: webView, tab: self, enabled: SwipeNavigation.isEnabled)
         // Swiping down on the page drags the keyboard away, like Safari.
         webView.scrollView.keyboardDismissMode = .interactive
+        setPullToRefresh(PullToRefresh.isEnabled)
         // Avoid black flash behind page chrome and during empty/transient loads. The web view stays opaque so
         // pages that never set a background keep their normal white or dark canvas. The live blur behind the bars
         // is handled by chromeScrim in BrowserView, which no longer masks or fades its material.
@@ -935,6 +942,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         isLoading = webView.isLoading
         canGoBack = canNavigateBack
         canGoForward = canNavigateForward
+        if pullRefreshPending, !webView.isLoading { endPullRefresh() }
         hasOnlySecureContent = webView.hasOnlySecureContent
     }
 
@@ -1405,6 +1413,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        endPullRefresh()
         // The blank page a sleeping tab shows is not worth a preview, a history entry, or a session save.
         guard pendingRestore == nil else { return }
         refresh()
@@ -1418,6 +1427,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        endPullRefresh()
         if let original = pendingHTTPSUpgrade {
             if HTTPSOnly.isUpgradeFailure(error) {
                 showHTTPSFallback(for: original)
@@ -1432,6 +1442,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        endPullRefresh()
         show(error)
     }
 
@@ -1787,9 +1798,59 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         if isLoading {
             webView.stopLoading()
         } else {
-            refreshPulse += 1
-            webView.reload()
+            reloadForUser()
         }
+    }
+
+    /// The reload the person asked for. Bumping the pulse is what plays a theme pack transition.
+    private func reloadForUser() {
+        refreshPulse += 1
+        webView.reload()
+    }
+
+    /// Turns pull to refresh on or off for this tab. The system refresh control only reacts to an overscroll at the
+    /// very top of the page, so it does not compete with scrolling, the edge swipes, or the toolbar gestures.
+    func setPullToRefresh(_ enabled: Bool) {
+        if enabled {
+            guard pullRefreshControl == nil else { return }
+            _ = KeyboardVisibility.shared
+            let control = UIRefreshControl()
+            control.addTarget(self, action: #selector(pullToRefreshTriggered), for: .valueChanged)
+            webView.scrollView.refreshControl = control
+            pullRefreshControl = control
+        } else {
+            pullRefreshPending = false
+            pullRefreshControl?.endRefreshing()
+            webView.scrollView.refreshControl = nil
+            pullRefreshControl = nil
+        }
+    }
+
+    @objc private func pullToRefreshTriggered() {
+        guard !isReaderActive,
+              PullToRefresh.shouldReload(
+                enabled: PullToRefresh.isEnabled,
+                keyboardVisible: KeyboardVisibility.shared.isVisible,
+                hasPage: hasPage
+              ) else {
+            pullRefreshControl?.endRefreshing()
+            return
+        }
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        pullRefreshPending = true
+        reloadForUser()
+        // A page that never reports back must not leave the spinner turning.
+        pullRefreshToken += 1
+        let token = pullRefreshToken
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(PullToRefresh.giveUpAfter * 1_000_000_000))
+            if let self, self.pullRefreshToken == token { self.endPullRefresh() }
+        }
+    }
+
+    private func endPullRefresh() {
+        pullRefreshPending = false
+        if pullRefreshControl?.isRefreshing == true { pullRefreshControl?.endRefreshing() }
     }
 
     /// Applies the Settings toggle for edge swipes to this tab.

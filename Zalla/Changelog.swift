@@ -17,6 +17,7 @@ enum Changelog {
             version: "Build 19",
             name: "Pull Down, Burn Up",
             highlights: [
+                "Pull down at the top of any page to reload it, with a spinner that stops when the page is done. It is on by default and has a switch in Settings, Browsing",
                 "The new tab page is now the first page of every tab's history. Swipe back from your first site and you land on it, and swipe forward to return. The Back and Forward buttons and the history peek know about it too"
             ],
             improvements: "",
