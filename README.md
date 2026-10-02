@@ -15,6 +15,12 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 21
+
+- Settings redesign. The single-scroll Form is now a tab strip (`SettingsTabs.swift`, a horizontally scrolling row with icon, label, an accent-colored underline, and the selected trait) above a page-style `TabView` with one `Form` per tab, so you can tap or swipe between categories. The last tab is remembered in `@AppStorage("settingsCategory")` and cleared by Reset the App. Reduce Motion turns off the strip's scrolling and underline animations and the tap-to-switch slide.
+- Grouping lives in pure `SettingsCategory.swift` with tests (every section under exactly one tab): Appearance (Appearance, Accent, App icon), Privacy (the old Privacy section), Browsing, Tools (How to, Network Speed, Downloads), Premium (new Zalla Unlock row that opens the Unlock sheet, Theme packs, and Face ID for private tabs and Auto-clear, which moved out of Privacy), About (Our promise, Support Zalla, Privacy and support, Version).
+- The sections were moved intact into per-tab computed properties in `SettingsView`, so behavior, storage keys, alerts, importers, and sheets are unchanged. The only content edits: the long Privacy footnote is now a "What these do" disclosure row (with a pointer to the Premium tab), and the Premium tab's new header and footer.
+
 ## Build 20
 
 - Burn It All no longer replays. Cause (most likely): when the wipe removed the tabs, `BrowserView` switched to its empty-state branch and the overlay was rebuilt, resetting its `@State` start time, so the fire ran again from the bottom with the plain label beneath. Now `BurnEffectPlan.startedAt` is the clock (`BurnFire.progress(startedAt:now:duration:)`), the overlay keeps no state, `t >= 1` draws only black and the label, and the empty-state branch is plain black (or the system background for the fade) while `isBurning`, so there is one label. The wipe is unchanged.

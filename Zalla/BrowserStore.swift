@@ -585,6 +585,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: TabSleep.storageKey)
         defaults.removeObject(forKey: SwipeNavigation.storageKey)
         defaults.removeObject(forKey: PullToRefresh.storageKey)
+        defaults.removeObject(forKey: SettingsCategory.storageKey)
         defaults.removeObject(forKey: BurnEffectPlan.animationKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)

@@ -2388,6 +2388,7 @@ private struct SettingsView: View {
     @AppStorage(PullToRefresh.storageKey) private var pullToRefresh = true
     @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
+    @AppStorage(SettingsCategory.storageKey) private var selectedCategory = SettingsCategory.default.rawValue
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -2415,12 +2416,107 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "20"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "21"
         return "\(marketing) (\(build))"
     }
 
     var body: some View {
-        Form {
+        VStack(spacing: 0) {
+            SettingsTabStrip(selection: categoryBinding, accent: theme.primary)
+            Divider()
+            // Swipe sideways or tap a tab. Each page is its own Form, so the sections keep their normal look.
+            TabView(selection: categoryBinding) {
+                ForEach(SettingsCategory.allCases) { category in
+                    Form { content(for: category) }
+                        .tag(category)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+        }
+        .navigationTitle("Settings")
+        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        .alert("Clear browsing data and close all tabs?", isPresented: $confirmClear) {
+            Button("Clear browsing data", role: .destructive) {
+                Task { await browser.clearBrowsingData(); dismiss() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Reset the App? Bookmarks are kept.", isPresented: $confirmReset) {
+            Button("Reset the App", role: .destructive) {
+                Task {
+                    await browser.resetApp(keepingBookmarks: true)
+                    hasCompletedOnboarding = false
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert(
+            "Use a matching app icon?",
+            isPresented: Binding(
+                get: { suggestIconForTheme != nil },
+                set: { if !$0 { suggestIconForTheme = nil } }
+            )
+        ) {
+            if let id = suggestIconForTheme {
+                let suggested = id.suggestedAppIcon
+                Button("Use \(suggested.rawValue) icon") {
+                    appIconPreference = suggested.rawValue
+                    applyIcon(suggested)
+                    suggestIconForTheme = nil
+                }
+                Button("Keep current icon", role: .cancel) { suggestIconForTheme = nil }
+            }
+        } message: {
+            if let id = suggestIconForTheme {
+                Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
+            }
+        }
+        .fileImporter(
+            isPresented: $showImporter,
+            allowedContentTypes: [.html, .text],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImport(result)
+        }
+        .sheet(isPresented: $showExporter) {
+            if let exportURL {
+                ActivityShareSheet(items: [exportURL])
+            }
+        }
+        .alert("Bookmarks", isPresented: Binding(
+            get: { bookmarkMessage != nil },
+            set: { if !$0 { bookmarkMessage = nil } }
+        )) {
+            Button("OK") { bookmarkMessage = nil }
+        } message: { Text(bookmarkMessage ?? "") }
+        .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
+        .tint(theme.primary)
+        .onAppear { loadCustomControls() }
+    }
+
+    private var categoryBinding: Binding<SettingsCategory> {
+        Binding(
+            get: { SettingsCategory.stored(selectedCategory) },
+            set: { selectedCategory = $0.rawValue }
+        )
+    }
+
+    @ViewBuilder
+    private func content(for category: SettingsCategory) -> some View {
+        switch category {
+        case .appearance: appearanceTab
+        case .privacy: privacyTab
+        case .browsing: browsingTab
+        case .tools: toolsTab
+        case .premium: premiumTab
+        case .about: aboutTab
+        }
+    }
+
+    @ViewBuilder
+    private var appearanceTab: some View {
+        Group {
             Section {
                 Picker("Appearance", selection: $appearance) {
                     ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
@@ -2512,49 +2608,12 @@ private struct SettingsView: View {
             } footer: {
                 Text("Every accent has a matching icon, plus Dark and Tinted.")
             }
+        }
+    }
 
-            Section {
-                SearchEngineSettingsRows()
-                Button {
-                    showImporter = true
-                } label: { Label("Import bookmarks from Safari or Chrome", systemImage: "square.and.arrow.down") }
-                Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
-                Toggle("Swipe from edges to go back", isOn: $swipeNavigation)
-                    .onChange(of: swipeNavigation) { _, newValue in
-                        browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
-                    }
-                Toggle("Pull down to refresh", isOn: $pullToRefresh)
-                    .onChange(of: pullToRefresh) { _, newValue in
-                        browser.tabs.forEach { $0.setPullToRefresh(newValue) }
-                    }
-                Button {
-                    exportBookmarks()
-                } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
-                .disabled(browser.bookmarks.isEmpty)
-            } header: {
-                Text("Browsing")
-            } footer: {
-                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it.")
-            }
-
-            Section("Tools") {
-                NavigationLink {
-                    HowToListView()
-                } label: {
-                    Label("How to", systemImage: "questionmark.bubble")
-                }
-                NavigationLink {
-                    NetworkSpeedView()
-                } label: {
-                    Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
-                }
-                NavigationLink {
-                    DownloadsView(browser: browser, showsDone: false)
-                } label: {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-            }
-
+    @ViewBuilder
+    private var privacyTab: some View {
+        Group {
             Section {
                 NavigationLink("Content Blocking") {
                     ContentBlockingView()
@@ -2581,15 +2640,112 @@ private struct SettingsView: View {
                 }
                 Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
                 Toggle("Burn It All fire effect", isOn: $burnAnimation)
-                PremiumPrivacyRows()
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
-            } header: { Text("Privacy") } footer: {
-                Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Burn It All plays a fire effect before it closes Zalla; turn the fire effect off for a quick fade instead. Face ID for private tabs and Auto-clear are part of Zalla Unlock. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                DisclosureGroup("What these do") {
+                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Burn It All plays a fire effect before it closes Zalla; turn the fire effect off for a quick fade instead. Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Privacy")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var browsingTab: some View {
+        Group {
+            Section {
+                SearchEngineSettingsRows()
+                Button {
+                    showImporter = true
+                } label: { Label("Import bookmarks from Safari or Chrome", systemImage: "square.and.arrow.down") }
+                Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
+                Toggle("Swipe from edges to go back", isOn: $swipeNavigation)
+                    .onChange(of: swipeNavigation) { _, newValue in
+                        browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
+                    }
+                Toggle("Pull down to refresh", isOn: $pullToRefresh)
+                    .onChange(of: pullToRefresh) { _, newValue in
+                        browser.tabs.forEach { $0.setPullToRefresh(newValue) }
+                    }
+                Button {
+                    exportBookmarks()
+                } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
+                .disabled(browser.bookmarks.isEmpty)
+            } header: {
+                Text("Browsing")
+            } footer: {
+                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it.")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var toolsTab: some View {
+        Group {
+            Section("Tools") {
+                NavigationLink {
+                    HowToListView()
+                } label: {
+                    Label("How to", systemImage: "questionmark.bubble")
+                }
+                NavigationLink {
+                    NetworkSpeedView()
+                } label: {
+                    Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
+                }
+                NavigationLink {
+                    DownloadsView(browser: browser, showsDone: false)
+                } label: {
+                    Label("Downloads", systemImage: "arrow.down.circle")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var premiumTab: some View {
+        Group {
+            Section {
+                Button {
+                    showThemeUpsell = true
+                } label: {
+                    HStack {
+                        Label("Zalla Unlock", systemImage: "sparkles")
+                        Spacer()
+                        Text(unlock.isUnlocked ? "Unlocked" : "Locked")
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Zalla Unlock")
+                NavigationLink {
+                    ThemePacksView()
+                } label: {
+                    Label("Theme packs", systemImage: "sparkles")
+                }
+            } header: {
+                Text("Zalla Unlock")
+            } footer: {
+                Text("Zalla Unlock is optional. Core browsing, blocking, Privacy Shield, and Burn It All stay free.")
             }
 
+            Section {
+                PremiumPrivacyRows()
+            } header: {
+                Text("Private tabs and auto-clear")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var aboutTab: some View {
+        Group {
             Section("Our promise") {
                 Label("No Zalla account required", systemImage: "person.crop.circle.badge.checkmark")
                 Label("No built-in analytics or advertising SDKs", systemImage: "hand.raised")
@@ -2637,67 +2793,6 @@ private struct SettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
-
-        .navigationTitle("Settings")
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        .alert("Clear browsing data and close all tabs?", isPresented: $confirmClear) {
-            Button("Clear browsing data", role: .destructive) {
-                Task { await browser.clearBrowsingData(); dismiss() }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert("Reset the App? Bookmarks are kept.", isPresented: $confirmReset) {
-            Button("Reset the App", role: .destructive) {
-                Task {
-                    await browser.resetApp(keepingBookmarks: true)
-                    hasCompletedOnboarding = false
-                    dismiss()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert(
-            "Use a matching app icon?",
-            isPresented: Binding(
-                get: { suggestIconForTheme != nil },
-                set: { if !$0 { suggestIconForTheme = nil } }
-            )
-        ) {
-            if let id = suggestIconForTheme {
-                let suggested = id.suggestedAppIcon
-                Button("Use \(suggested.rawValue) icon") {
-                    appIconPreference = suggested.rawValue
-                    applyIcon(suggested)
-                    suggestIconForTheme = nil
-                }
-                Button("Keep current icon", role: .cancel) { suggestIconForTheme = nil }
-            }
-        } message: {
-            if let id = suggestIconForTheme {
-                Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
-            }
-        }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.html, .text],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImport(result)
-        }
-        .sheet(isPresented: $showExporter) {
-            if let exportURL {
-                ActivityShareSheet(items: [exportURL])
-            }
-        }
-        .alert("Bookmarks", isPresented: Binding(
-            get: { bookmarkMessage != nil },
-            set: { if !$0 { bookmarkMessage = nil } }
-        )) {
-            Button("OK") { bookmarkMessage = nil }
-        } message: { Text(bookmarkMessage ?? "") }
-        .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
-        .tint(theme.primary)
-        .onAppear { loadCustomControls() }
     }
 
     private var previewIsDark: Bool {

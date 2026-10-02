@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 21",
+            name: "Settings, Sorted",
+            highlights: [
+                "Settings is now a row of tabs across the top: Appearance, Privacy, Browsing, Tools, Premium, and About. Tap a tab or swipe sideways. Zalla remembers the one you were on",
+                "The long explanation under Privacy now folds away under What these do. Face ID for private tabs and Auto-clear moved to the new Premium tab, next to a Zalla Unlock row and Theme packs"
+            ],
+            improvements: "Nothing was removed or renamed, and every switch keeps its setting. The tab names read aloud with the selected one announced, the strip scrolls at large text sizes, and Reduce Motion skips the sliding.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 20",
             name: "One Burn Is Enough",
             highlights: [
