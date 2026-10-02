@@ -113,6 +113,70 @@ final class BurnFireTests: XCTestCase {
         XCTAssertGreaterThan(glowing.count, 5)
     }
 
+    func testSmoothSegmentsRoundTheOutlineWithoutLeavingIt() {
+        let tongue = BurnFire.tongues[0]
+        let points = BurnFire.outline(of: tongue, time: 0.7)
+        let segments = BurnFire.smoothSegments(points)
+        XCTAssertEqual(segments.count, points.count - 2)
+        XCTAssertEqual(segments.last?.end, points.last, "The curve finishes on the last base corner")
+        let minX = points.map(\.x).min() ?? 0
+        let maxX = points.map(\.x).max() ?? 0
+        let maxY = points.map(\.y).max() ?? 0
+        for segment in segments {
+            XCTAssertTrue(points.contains(segment.control), "Every curve bends toward one of the corners")
+            XCTAssertGreaterThanOrEqual(segment.end.x, minX - 0.0001)
+            XCTAssertLessThanOrEqual(segment.end.x, maxX + 0.0001)
+            XCTAssertGreaterThanOrEqual(segment.end.y, 0)
+            XCTAssertLessThanOrEqual(segment.end.y, maxY + 0.0001)
+        }
+        // The curve cuts the corners, so the passing points sit between the corners, not on them.
+        if segments.count > 2 {
+            XCTAssertEqual(segments[0].end, BurnFire.midpoint(points[1], points[2]))
+        }
+    }
+
+    func testSmoothSegmentsHandleTinyOutlines() {
+        XCTAssertTrue(BurnFire.smoothSegments([]).isEmpty)
+        XCTAssertTrue(BurnFire.smoothSegments([BurnFire.Point(x: 0, y: 0)]).isEmpty)
+        let three = [BurnFire.Point(x: 0, y: 0), BurnFire.Point(x: 1, y: 2), BurnFire.Point(x: 2, y: 0)]
+        let segments = BurnFire.smoothSegments(three)
+        XCTAssertEqual(segments.count, 1)
+        XCTAssertEqual(segments[0].control, three[1])
+        XCTAssertEqual(segments[0].end, three[2])
+    }
+
+    func testFlameEdgesFlutterOverTimeWithoutBreakingTheShape() {
+        let tongue = BurnFire.tongues[3]
+        var previous: [BurnFire.Point] = []
+        for step in 0..<12 {
+            let points = BurnFire.outline(of: tongue, time: Double(step) * 0.13)
+            XCTAssertEqual(points.count, 19)
+            XCTAssertEqual(points.first?.y ?? 1, 0, accuracy: 0.0001)
+            XCTAssertEqual(points.last?.y ?? 1, 0, accuracy: 0.0001)
+            XCTAssertTrue(points.allSatisfy { $0.x.isFinite && $0.y.isFinite && $0.y >= 0 })
+            XCTAssertNotEqual(points, previous)
+            previous = points
+        }
+    }
+
+    func testEmbersComeInSeveralKinds() {
+        let kinds = Set(BurnFire.embers.map(\.kind))
+        XCTAssertEqual(kinds, [0, 1, 2], "Dots, sparks, and ash flakes")
+        XCTAssertGreaterThan(BurnFire.embers.filter { $0.kind == 0 }.count, 10)
+        for ember in BurnFire.embers {
+            XCTAssertTrue((0...2).contains(ember.kind))
+            XCTAssertGreaterThan(ember.wobble, 0)
+        }
+    }
+
+    func testTimingAndStructureAreUnchanged() {
+        XCTAssertEqual(BurnFire.riseEnd, 0.30)
+        XCTAssertEqual(BurnFire.blazeEnd, 0.55)
+        XCTAssertEqual(BurnFire.breakEnd, 0.78)
+        XCTAssertEqual(BurnFire.tongues.count, 22)
+        XCTAssertEqual(BurnFire.embers.count, 44)
+    }
+
     func testProgressComesFromTheStartTimeAndNeverRestarts() {
         let start = Date(timeIntervalSince1970: 1_000)
         XCTAssertEqual(BurnFire.progress(startedAt: start, now: start, duration: 2.4), 0, accuracy: 0.0001)

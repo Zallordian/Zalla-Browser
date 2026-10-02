@@ -145,20 +145,25 @@ enum BurnFire {
     }
 
     /// The outline of one tongue in its own space: x across the base from -0.5 to 0.5 (plus swirl), y from 0 at the base
-    /// to about 1 at the tip. Straight edges with sawtooth teeth give the sharp, jagged look. It starts and ends on the
-    /// base line, and the tip is the highest point. `time` is in seconds and drives the swirl and flicker.
+    /// to about 1 at the tip. The corner points are teeth along each edge; the drawing rounds them with curves (see
+    /// `smoothSegments`) so the flame reads as soft and organic. The teeth change depth as the flame flickers. It starts
+    /// and ends on the base line, and the tip is the highest point. `time` is in seconds and drives the swirl and flicker.
     static func outline(of tongue: Tongue, time: Double, segments: Int = 9) -> [Point] {
         let n = max(segments, 3)
         let flicker = 1 + 0.05 * sin(time * tongue.speed * 1.7 + tongue.phase)
         func bend(_ s: Double) -> Double {
             let swirl = 0.26 * sin(tongue.phase + time * tongue.speed * 0.5 + s * 2.6)
-            return (tongue.lean * pow(s, 1.5) + swirl * s)
+            // A faster, smaller flutter on top of the slow swirl, so the flame never moves in a clean sine.
+            let flutter = 0.05 * sin(tongue.phase * 1.7 + time * tongue.speed * 1.3 + s * 7.0)
+            return (tongue.lean * pow(s, 1.5) + (swirl + flutter) * s)
         }
         func side(_ i: Int, sign: Double) -> Point {
             let s = Double(i) / Double(n)
             let half = 0.5 * pow(1 - s, 0.85)
             let odd = sign < 0 ? (i % 2 == 1) : (i % 2 == 0)
-            let cut = (odd && i > 0 && i < n) ? tongue.jag : 0
+            // Each tooth breathes a little on its own, so the edges stay lively instead of repeating.
+            let breathe = 0.78 + 0.22 * sin(tongue.phase + Double(i) * 1.7 + time * tongue.speed * 0.9)
+            let cut = (odd && i > 0 && i < n) ? tongue.jag * breathe : 0
             // Teeth also sit a touch lower, so the edge reads as a saw blade leaning up.
             let y = (s - (cut > 0 ? 0.035 : 0)) * flicker
             return Point(x: sign * half * (1 - cut) + bend(s), y: max(y, 0))
@@ -171,6 +176,33 @@ enum BurnFire {
             i -= 1
         }
         return points
+    }
+
+    /// One curved piece of a smoothed outline: a quadratic curve to `end` that bends toward `control`.
+    struct CurveSegment: Equatable {
+        var control: Point
+        var end: Point
+    }
+
+    static func midpoint(_ a: Point, _ b: Point) -> Point {
+        Point(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+    }
+
+    /// Turns the outline's corner points into quadratic curves. The path starts on the first point, bends toward each
+    /// corner in turn, passes through the midpoints between corners, and finishes on the last point. The base corners
+    /// stay put, the saw teeth become soft scallops, and the curve never leaves the shape the corners make.
+    /// There is one segment for every corner except the first and last.
+    static func smoothSegments(_ points: [Point]) -> [CurveSegment] {
+        guard points.count >= 3 else {
+            return points.dropFirst().map { CurveSegment(control: $0, end: $0) }
+        }
+        let last = points.count - 1
+        var result: [CurveSegment] = []
+        for i in 1..<last {
+            let end = i == last - 1 ? points[last] : midpoint(points[i], points[i + 1])
+            result.append(CurveSegment(control: points[i], end: end))
+        }
+        return result
     }
 
     // MARK: - Embers
@@ -190,24 +222,40 @@ enum BurnFire {
         var delay: Double
         /// 0 for red, 1 for orange.
         var warmth: Double
+        /// 0 round glowing dot, 1 thin spark streak, 2 tumbling ash flake.
+        var kind: Int
+        /// Radians. The tilt of a spark or flake.
+        var angle: Double
+        /// Small side to side wobble as it floats, in fractions of the screen width.
+        var wobble: Double
     }
 
     static let embers: [Ember] = makeEmbers()
 
     private static func makeEmbers() -> [Ember] {
         var generator = SeededGenerator(seed: 2025)
-        return (0..<44).map { _ in
-            Ember(
-                x: Double.random(in: 0.03...0.97, using: &generator),
-                y: Double.random(in: 0.25...1.0, using: &generator),
-                radius: Double.random(in: 1.2...3.4, using: &generator),
-                rise: Double.random(in: 0.08...0.3, using: &generator),
-                sway: Double.random(in: -0.05...0.05, using: &generator),
-                twinkle: Double.random(in: 0...(2 * Double.pi), using: &generator),
-                delay: Double.random(in: 0...1, using: &generator),
-                warmth: Double.random(in: 0...1, using: &generator)
-            )
+        var result: [Ember] = []
+        for _ in 0..<44 {
+            let x = Double.random(in: 0.03...0.97, using: &generator)
+            let y = Double.random(in: 0.25...1.0, using: &generator)
+            let radius = Double.random(in: 1.2...3.4, using: &generator)
+            let rise = Double.random(in: 0.08...0.3, using: &generator)
+            let sway = Double.random(in: -0.05...0.05, using: &generator)
+            let twinkle = Double.random(in: 0...(2 * Double.pi), using: &generator)
+            let delay = Double.random(in: 0...1, using: &generator)
+            let warmth = Double.random(in: 0...1, using: &generator)
+            // About half are round glowing dots, the rest are thin sparks and tumbling ash flakes.
+            let roll = Int.random(in: 0...5, using: &generator)
+            let flip = Bool.random(using: &generator)
+            let kind = roll < 3 ? 0 : (flip ? 1 : 2)
+            let angle = Double.random(in: 0...(2 * Double.pi), using: &generator)
+            let wobble = Double.random(in: 0.004...0.016, using: &generator)
+            result.append(Ember(
+                x: x, y: y, radius: radius, rise: rise, sway: sway, twinkle: twinkle,
+                delay: delay, warmth: warmth, kind: kind, angle: angle, wobble: wobble
+            ))
         }
+        return result
     }
 
     struct EmberState: Equatable {
@@ -223,7 +271,7 @@ enum BurnFire {
         let envelope = clamp(life * 6) * pow(1 - life, 0.8)
         let flicker = 0.65 + 0.35 * sin(ember.twinkle + life * 14)
         return EmberState(
-            x: ember.x + ember.sway * life,
+            x: ember.x + ember.sway * life + ember.wobble * sin(ember.twinkle * 1.3 + life * 9),
             y: ember.y - ember.rise * life,
             alpha: clamp(envelope * flicker)
         )
