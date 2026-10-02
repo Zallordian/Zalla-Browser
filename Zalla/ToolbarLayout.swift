@@ -125,7 +125,10 @@ struct ToolbarLayout: Equatable, Codable {
     var quickActionFan: [ToolbarItemKind]
 
     static let defaultClassic: [ToolbarItemKind] = [.back, .forward, .share, .tabs, .menu]
-    static let defaultCompact: [ToolbarItemKind] = [.back, .forward, .address, .share, .menu]
+    /// Build 26: Tabs replaces Share on the right of the address pill. The pill then drops its own tabs icon.
+    static let defaultCompact: [ToolbarItemKind] = [.back, .forward, .address, .tabs, .menu]
+    /// The compact bar before Build 26, used only by the one-time migration below.
+    static let legacyDefaultCompact: [ToolbarItemKind] = [.back, .forward, .address, .share, .menu]
     /// Menu sits beside Tabs, on the outer edge.
     static let defaultQuickActionBar: [ToolbarItemKind] = [.tabs, .menu]
     static var defaultQuickActionFan: [ToolbarItemKind] {
@@ -306,6 +309,30 @@ struct ToolbarLayout: Equatable, Codable {
 
     func encoded() -> Data {
         (try? JSONEncoder().encode(self)) ?? Data()
+    }
+
+    // MARK: - Build 26 default migration
+
+    /// Set once the Build 26 default swap has been looked at, so later choices are never rewritten.
+    static let migrationKey = "toolbarDefaultsBuild26"
+
+    /// Stored data whose Compact bar is still the old default (Share on the right) gets the new default (Tabs).
+    /// Nil means nothing to change: nothing stored, unreadable data, or a Compact bar the user really changed.
+    /// Nothing stored already means the new default.
+    static func migratedLegacyDefaults(_ data: Data) -> Data? {
+        guard !data.isEmpty, var layout = try? JSONDecoder().decode(ToolbarLayout.self, from: data),
+              layout.compact == legacyDefaultCompact else { return nil }
+        layout.setItems(defaultCompact, for: .compact)
+        return layout == .default ? Data() : layout.encoded()
+    }
+
+    /// Runs the migration once per install.
+    static func migrateLegacyDefaults(in defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        defaults.set(true, forKey: migrationKey)
+        if let data = defaults.data(forKey: storageKey), let updated = migratedLegacyDefaults(data) {
+            defaults.set(updated, forKey: storageKey)
+        }
     }
 }
 

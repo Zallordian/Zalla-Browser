@@ -7,7 +7,7 @@ final class QuickThemeTests: XCTestCase {
     }
 
     func testLockedPremiumThemesOpenUnlockAndApplyNothing() {
-        for id in [ZallaThemeID.volcano, .deepOcean, .arcade, .jungle] {
+        for id in [ZallaThemeID.volcano, .deepOcean, .arcade, .jungle, .neonCity, .arctic, .cherryBlossom] {
             XCTAssertEqual(action(id, unlocked: false), .needsUnlock, id.rawValue)
             XCTAssertEqual(action(id, unlocked: false, fullLook: false), .needsUnlock, id.rawValue)
         }
@@ -15,7 +15,8 @@ final class QuickThemeTests: XCTestCase {
 
     func testUnlockedPackThemesApplyTheWholePack() {
         let cases: [(ZallaThemeID, String)] = [
-            (.volcano, "volcano"), (.deepOcean, "deepocean"), (.arcade, "arcade"), (.jungle, "jungle"), (.space, "space")
+            (.volcano, "volcano"), (.deepOcean, "deepocean"), (.arcade, "arcade"), (.jungle, "jungle"), (.space, "space"),
+            (.neonCity, "neoncity"), (.arctic, "arctic"), (.cherryBlossom, "cherryblossom")
         ]
         for (id, pack) in cases {
             guard case .fullPack(let applied) = action(id, unlocked: true) else {
@@ -53,6 +54,17 @@ final class QuickThemeTests: XCTestCase {
             case .needsUnlock: XCTFail("Unlocked never needs Unlock: \(id.rawValue)")
             case .accentOnly, .fullPack: break
             }
+        }
+    }
+
+    func testTheFeaturedSwatchGridHasElevenThemes() {
+        XCTAssertEqual(ZallaThemeID.featured.count, 11)
+        XCTAssertEqual(Set(ZallaThemeID.featured).count, 11, "No swatch is listed twice")
+        XCTAssertEqual(ZallaThemeID.featured.suffix(3), [.neonCity, .arctic, .cherryBlossom])
+        XCTAssertTrue(Set(ZallaThemeID.featured).isDisjoint(with: ZallaThemeID.secondary))
+        // Every pack theme is reachable from the grid.
+        for pack in ThemePacks.all {
+            XCTAssertTrue(ZallaThemeID.featured.contains(pack.themeID), pack.id)
         }
     }
 

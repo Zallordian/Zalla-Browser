@@ -1313,6 +1313,11 @@ private struct TabContent: View {
             compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page") {
                 showShare = true
             }
+        case .tabs:
+            compactCircle(icon: "square.on.square", enabled: true, label: "Tabs, \(browser.tabs.count) open") {
+                sheet = .tabs
+            }
+            .contextMenu { tabsContextMenu }
         case .menu:
             compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu") {
                 sheet = .menu
@@ -1353,7 +1358,10 @@ private struct TabContent: View {
                 .accessibilityLabel("Cancel address editing")
                 .frame(minWidth: 44, minHeight: 44)
             } else {
-                tabsButtonCompact
+                // Tabs sits beside the pill when it is one of the bar buttons, so the pill does not repeat it.
+                if !toolbarLayout.compact.contains(.tabs) {
+                    tabsButtonCompact
+                }
                 VStack(alignment: .leading, spacing: 1) {
                     Text(compactTitle)
                         .font(.subheadline.weight(.semibold))
@@ -1926,7 +1934,7 @@ private struct BrowserMenuSheet: View {
     }
 }
 
-/// The customizable top row of the menu sheet. Default: Back, Forward, Reload, Tabs, Settings.
+/// The customizable top row of the menu sheet. Default: Back, Forward, Reload, Share, Settings.
 private struct MenuNavigationRow: View {
     @ObservedObject var tab: BrowserTab
     let items: [MenuTopRowItem]
@@ -2751,7 +2759,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "25"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "26"
         return "\(marketing) (\(build))"
     }
 
@@ -2939,7 +2947,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Theme and accent")
             } footer: {
-                Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, and Retro Arcade need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
+                Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
             }
 
             Section {
@@ -3137,7 +3145,7 @@ private struct SettingsView: View {
 
             Section("Version") {
                 Text("Zalla \(versionString)")
-                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, and Retro Arcade theme packs.")
+                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         }
@@ -3204,7 +3212,7 @@ private struct SettingsView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 12) {
                 ForEach(ids) { id in
                     let swatch = ZallaTheme.theme(for: id)
                     Button {
@@ -3226,6 +3234,7 @@ private struct SettingsView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
                                 if id.requiresUnlock && !unlock.isUnlocked {
                                     Image(systemName: "lock.fill")
                                         .font(.system(size: 8))

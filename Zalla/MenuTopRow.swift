@@ -70,7 +70,12 @@ struct MenuTopRow: Equatable {
     static let maxItems = 6
     static let minItems = 1
 
-    static let defaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .tabs, .settings]
+    /// Build 26 default: Back, Forward, Reload, Share, Settings. Tabs lives in the bottom bar by default now and is
+    /// still one tap away in the editor. The editor stores an unchanged row as empty data, so anyone who never
+    /// customized it picks up this default on its own, and a real customization is never touched.
+    static let defaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .share, .settings]
+    /// The row before Build 26, for tests and docs.
+    static let legacyDefaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .tabs, .settings]
 
     private(set) var items: [MenuTopRowItem]
 

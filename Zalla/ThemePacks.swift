@@ -1,7 +1,7 @@
 import Foundation
 
 /// A theme pack bundles an accent, a matching app icon, a new tab background, and an optional full-screen transition.
-/// Packs are part of Zalla Unlock. The Space accent and icon stay free on their own, as they always were. Jungle, Volcano, Deep Ocean, and Retro Arcade are locked as a whole.
+/// Packs are part of Zalla Unlock. The Space accent and icon stay free on their own, as they always were. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom are locked as a whole.
 struct ThemePack: Identifiable, Equatable {
     let id: String
     let name: String
@@ -92,6 +92,36 @@ enum ThemePacks {
             backgroundPresetID: "cabinet",
             transition: .arcade,
             symbolName: "gamecontroller"
+        ),
+        ThemePack(
+            id: "neoncity",
+            name: "Neon City",
+            tagline: "Magenta and cyan glow, flickering tubes, and a neon wipe with glow streaks on refresh.",
+            themeID: .neonCity,
+            icon: .neonCity,
+            backgroundPresetID: "neonnight",
+            transition: .neon,
+            symbolName: "building.2"
+        ),
+        ThemePack(
+            id: "arctic",
+            name: "Arctic",
+            tagline: "Ice blue, snow sparkle, and frost that spreads across the screen on refresh.",
+            themeID: .arctic,
+            icon: .arctic,
+            backgroundPresetID: "iceberg",
+            transition: .arctic,
+            symbolName: "snowflake"
+        ),
+        ThemePack(
+            id: "cherryblossom",
+            name: "Cherry Blossom",
+            tagline: "Soft pinks, drifting petals, and a swirl of blossoms that sweeps across on refresh.",
+            themeID: .cherryBlossom,
+            icon: .cherryBlossom,
+            backgroundPresetID: "hanami",
+            transition: .blossom,
+            symbolName: "leaf.circle"
         )
     ]
 

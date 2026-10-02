@@ -1,6 +1,6 @@
 import Foundation
 
-// Timing and scenery for the Volcano, Deep Ocean, and Retro Arcade transitions.
+// Timing and scenery for the Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom transitions.
 // Plain math on fractions of the screen, with seeded random numbers, so the drawing is the same every time
 // and everything here can be tested without a screen. The drawing lives in ThemeTransitionViews.swift.
 
@@ -305,5 +305,268 @@ enum ArcadeDissolve {
     /// Stars show while the screen is covered.
     static func starAlpha(_ progress: Double) -> Double {
         TransitionCurve.smooth((cover(progress) - 0.5) / 0.5)
+    }
+}
+
+// MARK: - Neon City
+
+enum NeonCity {
+    /// Where the leading edge of the neon wipe is, in screen widths from the left. Passes 1 before the middle.
+    static func front(_ progress: Double) -> Double {
+        1.15 * TransitionCurve.smooth(progress / 0.55)
+    }
+
+    /// Where the trailing edge is. It follows the front and clears the screen to the right.
+    static func back(_ progress: Double) -> Double {
+        1.2 * TransitionCurve.smooth((progress - 0.45) / 0.55)
+    }
+
+    /// A neon sign that stutters: 1 most of the time, with brief dips. Always between `flickerFloor` and 1, so the
+    /// wipe never disappears while it covers the page.
+    static let flickerFloor = 0.5
+
+    static func flicker(_ progress: Double) -> Double {
+        let x = TransitionCurve.clamp(progress)
+        let stutter = sin(x * 61.0) * sin(x * 37.0 + 0.6)
+        return stutter > 0.72 ? flickerFloor : 1.0
+    }
+
+    /// Fractions of the screen height where the horizontal neon tubes sit, and which color each takes (0 magenta, 1 cyan).
+    struct Tube: Equatable {
+        var y: Double
+        var tone: Int
+    }
+
+    static let tubes: [Tube] = [
+        Tube(y: 0.14, tone: 0), Tube(y: 0.33, tone: 1), Tube(y: 0.52, tone: 0), Tube(y: 0.71, tone: 1), Tube(y: 0.9, tone: 0)
+    ]
+
+    /// A streak of light that races across behind the front.
+    struct Streak: Equatable {
+        /// Fraction of the screen height.
+        var y: Double
+        /// Fraction of the screen width.
+        var length: Double
+        /// Progress at which it sets off.
+        var delay: Double
+        /// How much progress it takes to cross.
+        var travel: Double
+        /// Points.
+        var thickness: Double
+        /// 0 magenta, 1 cyan.
+        var tone: Int
+    }
+
+    static let streakCount = 18
+
+    static let streaks: [Streak] = {
+        var generator = SeededGenerator(seed: 2077)
+        return (0..<streakCount).map { i in
+            Streak(
+                y: Double.random(in: 0.03...0.97, using: &generator),
+                length: Double.random(in: 0.15...0.45, using: &generator),
+                delay: Double.random(in: 0...0.4, using: &generator),
+                travel: Double.random(in: 0.25...0.45, using: &generator),
+                thickness: Double.random(in: 1.5...4.5, using: &generator),
+                tone: i % 2
+            )
+        }
+    }()
+
+    /// Where the head of a streak is, in screen widths from the left. Nil before it sets off and after it has crossed.
+    static func head(of streak: Streak, progress: Double) -> Double? {
+        let u = (progress - streak.delay) / streak.travel
+        guard u >= 0, u <= 1 else { return nil }
+        return -0.05 + (1.1 + streak.length) * TransitionCurve.easeOutCubic(u)
+    }
+
+    /// Streaks fade in and out over their crossing.
+    static func streakAlpha(of streak: Streak, progress: Double) -> Double {
+        let u = TransitionCurve.clamp((progress - streak.delay) / streak.travel)
+        return sin(Double.pi * u)
+    }
+
+    /// Points between scanlines.
+    static let scanlineSpacing = 3.0
+    static let scanlineAlpha = 0.16
+}
+
+// MARK: - Arctic
+
+enum ArcticFrost {
+    /// How much of the screen is frozen, 0 to just over 1: spreads by the middle, holds a beat, then melts back.
+    static func cover(_ progress: Double) -> Double {
+        let x = TransitionCurve.clamp(progress)
+        if x < 0.5 { return 1.04 * TransitionCurve.easeOutCubic(x / 0.5) }
+        if x < 0.58 { return 1.04 }
+        return 1.04 * (1 - TransitionCurve.smooth((x - 0.58) / 0.42))
+    }
+
+    /// Radius of the ice growing from each corner, as a fraction of the screen diagonal. The soft edge takes the
+    /// outer quarter, so the screen is solid ice once the cover passes 1.
+    static let radiusPerCover = 0.7
+
+    static func radius(_ progress: Double) -> Double {
+        radiusPerCover * cover(progress)
+    }
+
+    /// The fraction of the radius that is fully opaque.
+    static let solidFraction = 0.75
+
+    /// A line of frost growing from a corner. Angle is within the quarter pointing into the screen.
+    struct Arm: Equatable {
+        /// 0 top left, 1 top right, 2 bottom left, 3 bottom right.
+        var corner: Int
+        /// Radians from the screen edge, 0 to pi/2.
+        var angle: Double
+        /// Fraction of the diagonal at full growth.
+        var length: Double
+        /// A short branch halfway along, as a fraction of the arm.
+        var branch: Double
+    }
+
+    static let armCount = 28
+
+    static let arms: [Arm] = {
+        var generator = SeededGenerator(seed: 273)
+        return (0..<armCount).map { i in
+            Arm(
+                corner: i % 4,
+                angle: Double.random(in: 0.08...1.5, using: &generator),
+                length: Double.random(in: 0.18...0.5, using: &generator),
+                branch: Double.random(in: 0.25...0.5, using: &generator)
+            )
+        }
+    }()
+
+    /// A glint of light on the ice.
+    struct Sparkle: Equatable {
+        var x: Double
+        var y: Double
+        /// Points from the center to the tip.
+        var size: Double
+        var phase: Double
+    }
+
+    static let sparkleCount = 26
+
+    static let sparkles: [Sparkle] = {
+        var generator = SeededGenerator(seed: 5150)
+        return (0..<sparkleCount).map { _ in
+            Sparkle(
+                x: Double.random(in: 0.04...0.96, using: &generator),
+                y: Double.random(in: 0.03...0.97, using: &generator),
+                size: Double.random(in: 4...12, using: &generator),
+                phase: Double.random(in: 0...(2 * Double.pi), using: &generator)
+            )
+        }
+    }()
+
+    /// How bright a sparkle is, 0 to 1. Each one twinkles at its own time and only while there is ice.
+    static func glint(_ sparkle: Sparkle, progress: Double) -> Double {
+        let pulse = max(0, sin(sparkle.phase + progress * 2 * Double.pi * 3))
+        return pulse * TransitionCurve.smooth((cover(progress) - 0.4) / 0.6)
+    }
+
+    /// A snow speck drifting down.
+    struct Flake: Equatable {
+        var x: Double
+        var startY: Double
+        /// Screen heights fallen over the whole transition.
+        var fall: Double
+        var sway: Double
+        var phase: Double
+        var size: Double
+    }
+
+    static let flakeCount = 30
+
+    static let flakes: [Flake] = {
+        var generator = SeededGenerator(seed: 1212)
+        return (0..<flakeCount).map { _ in
+            Flake(
+                x: Double.random(in: 0.02...0.98, using: &generator),
+                startY: Double.random(in: -0.2...0.6, using: &generator),
+                fall: Double.random(in: 0.3...0.7, using: &generator),
+                sway: Double.random(in: 0.01...0.035, using: &generator),
+                phase: Double.random(in: 0...(2 * Double.pi), using: &generator),
+                size: Double.random(in: 1.2...3.2, using: &generator)
+            )
+        }
+    }()
+
+    static func position(of flake: Flake, progress: Double) -> (x: Double, y: Double) {
+        let x = flake.x + flake.sway * sin(flake.phase + progress * 2 * Double.pi * 2)
+        let y = flake.startY + flake.fall * TransitionCurve.clamp(progress)
+        return (x, y)
+    }
+}
+
+// MARK: - Cherry Blossom
+
+enum BlossomSwirl {
+    /// A petal on its way across. Positions are fractions of the screen.
+    struct Petal: Equatable {
+        /// Vertical center of its path.
+        var baseY: Double
+        /// How far it swings up and down.
+        var amplitude: Double
+        /// Swings over the crossing.
+        var turns: Double
+        var phase: Double
+        /// Progress at which it sets off.
+        var delay: Double
+        /// How much progress it takes to cross.
+        var travel: Double
+        /// Points, the long side of the petal.
+        var size: Double
+        /// Radians of spin over the crossing.
+        var spin: Double
+        /// 0 to 1. Picks between pale and deeper pink.
+        var tone: Double
+    }
+
+    static let petalCount = 64
+
+    static let petals: [Petal] = {
+        var generator = SeededGenerator(seed: 1603)
+        return (0..<petalCount).map { _ in
+            Petal(
+                baseY: Double.random(in: 0.0...1.0, using: &generator),
+                amplitude: Double.random(in: 0.04...0.2, using: &generator),
+                turns: Double.random(in: 0.8...2.2, using: &generator),
+                phase: Double.random(in: 0...(2 * Double.pi), using: &generator),
+                delay: Double.random(in: 0...0.4, using: &generator),
+                travel: Double.random(in: 0.4...0.6, using: &generator),
+                size: Double.random(in: 14...30, using: &generator),
+                spin: Double.random(in: 2...9, using: &generator),
+                tone: Double.random(in: 0...1, using: &generator)
+            )
+        }
+    }()
+
+    struct PetalState: Equatable {
+        var x: Double
+        var y: Double
+        var angle: Double
+        var alpha: Double
+    }
+
+    /// Where a petal is, or nil before it sets off and after it has left. It travels left to right while it swirls.
+    static func state(of petal: Petal, progress: Double) -> PetalState? {
+        let u = (progress - petal.delay) / petal.travel
+        guard u >= 0, u <= 1 else { return nil }
+        let travelled = TransitionCurve.smooth(u)
+        let x = -0.15 + 1.3 * travelled
+        let y = petal.baseY + petal.amplitude * sin(petal.phase + u * 2 * Double.pi * petal.turns)
+        let alpha = min(1, min(u / 0.1, (1 - u) / 0.1))
+        return PetalState(x: x, y: y, angle: petal.phase + u * petal.spin, alpha: alpha)
+    }
+
+    /// A soft pink wash behind the petals, strongest at the middle so the page is covered, then it clears.
+    static let veilPeak = 0.88
+
+    static func veil(_ progress: Double) -> Double {
+        veilPeak * TransitionCurve.smooth(1 - abs(2 * TransitionCurve.clamp(progress) - 1))
     }
 }

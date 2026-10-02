@@ -127,7 +127,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             ]
         case .themeTransitions:
             return [
-                "Jungle sweeps layers of leaves across the screen. Space launches a rocket with a long flame and a trail of smoke. Volcano floods the screen with lava and sparks. Deep Ocean rolls a wave across with bubbles and light, then pulls it back. Retro Arcade dissolves the screen into pixels behind CRT scanlines. They play when you refresh and when you apply a theme.",
+                "Jungle sweeps layers of leaves across the screen. Space launches a rocket with a long flame and a trail of smoke. Volcano floods the screen with lava and sparks. Deep Ocean rolls a wave across with bubbles and light, then pulls it back. Retro Arcade dissolves the screen into pixels behind CRT scanlines. Neon City sweeps a flickering neon wipe with glow streaks. Arctic spreads frost with snow sparkle. Cherry Blossom swirls petals across. They play when you refresh and when you apply a theme.",
                 "Open Settings, Theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
                 "With Reduce Motion on, you get a quick fade instead.",
                 "Theme packs are part of Zalla Unlock."

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Settings screen for the Space, Jungle, Volcano, Deep Ocean, and Retro Arcade theme packs.
+/// Settings screen for the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs.
 struct ThemePacksView: View {
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
@@ -47,7 +47,7 @@ struct ThemePacksView: View {
             } footer: {
                 Text(reduceMotion
                      ? "Reduce Motion is on, so transitions are a quick fade."
-                     : "A leafy curtain for Jungle, a rocket for Space, lava for Volcano, a wave for Deep Ocean, and pixels for Retro Arcade. They play for about a second when you refresh and when you apply a theme.")
+                     : "A leafy curtain for Jungle, a rocket for Space, lava for Volcano, a wave for Deep Ocean, pixels for Retro Arcade, a neon wipe for Neon City, frost for Arctic, and petals for Cherry Blossom. They play for about a second when you refresh and when you apply a theme.")
             }
             if let message {
                 Section { Text(message).font(.footnote).foregroundStyle(.secondary) }

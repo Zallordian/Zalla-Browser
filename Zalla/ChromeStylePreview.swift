@@ -186,9 +186,11 @@ struct ChromeStylePreview: View {
                 miniCircle(previewSymbol(kind, classic: false))
             }
             HStack(spacing: 6) {
-                Image(systemName: "square.on.square")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(muted)
+                if !toolbarItems.compact.contains(.tabs) {
+                    Image(systemName: "square.on.square")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(muted)
+                }
                 Text("Zalla")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(strong)

@@ -4,7 +4,8 @@ import SwiftUI
 /// Jungle slides layered, softly shaded leaves in from both sides and back out. Space launches a rocket up the screen
 /// with a long tapering flame, smoke puffs, and a glow that washes over the page and lifts away. Volcano floods lava up
 /// the screen with sparks and embers. Deep Ocean rolls a wave across with bubbles and light, then pulls it back.
-/// Retro Arcade dissolves the screen into pixels behind CRT scanlines. Each one is a single
+/// Retro Arcade dissolves the screen into pixels behind CRT scanlines. Neon City sweeps a flickering neon wipe with glow
+/// streaks, Arctic spreads frost with snow sparkle, and Cherry Blossom swirls petals across. Each one is a single
 /// Canvas in a TimelineView capped at 60 frames a second, with no assets and no timers. The view removes itself when
 /// it is done. The timing and scenery live in ThemeTransitionPlan.swift.
 struct ThemeTransitionOverlay: View {
@@ -47,6 +48,9 @@ struct ThemeTransitionOverlay: View {
             case .volcano: VolcanoCanvas(progress: progress)
             case .ocean: OceanCanvas(progress: progress)
             case .arcade: ArcadeCanvas(progress: progress)
+            case .neon: NeonCanvas(progress: progress)
+            case .arctic: ArcticCanvas(progress: progress)
+            case .blossom: BlossomCanvas(progress: progress)
             }
         }
     }
@@ -59,6 +63,9 @@ struct ThemeTransitionOverlay: View {
         case .volcano: return Color(red: 0.32, green: 0.06, blue: 0.04)
         case .ocean: return Color(red: 0.03, green: 0.26, blue: 0.34)
         case .arcade: return Color(red: 0.16, green: 0.05, blue: 0.3)
+        case .neon: return Color(red: 0.12, green: 0.03, blue: 0.24)
+        case .arctic: return Color(red: 0.55, green: 0.8, blue: 0.93)
+        case .blossom: return Color(red: 0.93, green: 0.55, blue: 0.7)
         }
     }
 
@@ -789,5 +796,267 @@ private struct ArcadeCanvas: View {
                 endPoint: CGPoint(x: 0, y: y + barHeight)
             )
         )
+    }
+}
+
+// MARK: - Neon City
+
+/// A dark city-night wipe sweeps across behind a magenta leading edge and a cyan trailing edge. Neon tubes stutter
+/// on it, glow streaks race across, and scanlines sit over everything.
+private struct NeonCanvas: View {
+    let progress: Double
+
+    private static let magenta = Color(red: 1.0, green: 0.2, blue: 0.75)
+    private static let cyan = Color(red: 0.2, green: 0.92, blue: 1.0)
+
+    var body: some View {
+        Canvas { context, size in
+            draw(&context, size: size)
+        }
+    }
+
+    private func tone(_ index: Int) -> Color {
+        index == 0 ? Self.magenta : Self.cyan
+    }
+
+    private func draw(_ context: inout GraphicsContext, size: CGSize) {
+        let width = Double(size.width)
+        let height = Double(size.height)
+        let front = NeonCity.front(progress) * width
+        let back = min(NeonCity.back(progress) * width, front)
+        let flicker = NeonCity.flicker(progress)
+
+        if front - back > 1 {
+            let body = CGRect(x: back, y: 0, width: front - back, height: height)
+            context.fill(
+                Path(body),
+                with: .linearGradient(
+                    Gradient(colors: [
+                        Color(red: 0.05, green: 0.02, blue: 0.14).opacity(0.97 * flicker),
+                        Color(red: 0.1, green: 0.03, blue: 0.22).opacity(0.97 * flicker)
+                    ]),
+                    startPoint: CGPoint(x: 0, y: 0),
+                    endPoint: CGPoint(x: 0, y: height)
+                )
+            )
+            drawTubes(&context, from: back, to: front, height: height)
+            drawScanlines(&context, body: body)
+        }
+        drawStreaks(&context, width: width, height: height)
+        drawEdge(&context, x: front, height: height, color: Self.magenta, strength: sin(Double.pi * min(progress / 0.6, 1)))
+        drawEdge(&context, x: back, height: height, color: Self.cyan, strength: sin(Double.pi * TransitionCurve.clamp((progress - 0.4) / 0.6)))
+    }
+
+    private func drawTubes(_ context: inout GraphicsContext, from left: Double, to right: Double, height: Double) {
+        for (index, tube) in NeonCity.tubes.enumerated() {
+            let level = NeonCity.flicker(progress + Double(index) * 0.07)
+            let y = tube.y * height
+            var line = Path()
+            line.move(to: CGPoint(x: left, y: y))
+            line.addLine(to: CGPoint(x: right, y: y))
+            context.stroke(line, with: .color(tone(tube.tone).opacity(0.28 * level)), lineWidth: 10)
+            context.stroke(line, with: .color(tone(tube.tone).opacity(0.95 * level)), lineWidth: 2.5)
+        }
+    }
+
+    private func drawScanlines(_ context: inout GraphicsContext, body: CGRect) {
+        var lines = Path()
+        var y = Double(body.minY)
+        while y < Double(body.maxY) {
+            lines.addRect(CGRect(x: body.minX, y: y, width: body.width, height: 1))
+            y += NeonCity.scanlineSpacing
+        }
+        context.fill(lines, with: .color(Color.black.opacity(NeonCity.scanlineAlpha)))
+    }
+
+    private func drawStreaks(_ context: inout GraphicsContext, width: Double, height: Double) {
+        for streak in NeonCity.streaks {
+            guard let head = NeonCity.head(of: streak, progress: progress) else { continue }
+            let alpha = NeonCity.streakAlpha(of: streak, progress: progress)
+            let color = tone(streak.tone)
+            let headX = head * width
+            let tailX = headX - streak.length * width
+            let y = streak.y * height
+            let halo = CGRect(x: tailX, y: y - streak.thickness * 2.5, width: headX - tailX, height: streak.thickness * 5)
+            let core = CGRect(x: tailX, y: y - streak.thickness / 2, width: headX - tailX, height: streak.thickness)
+            context.fill(
+                Path(halo),
+                with: .linearGradient(
+                    Gradient(colors: [color.opacity(0), color.opacity(0.25 * alpha)]),
+                    startPoint: CGPoint(x: tailX, y: y),
+                    endPoint: CGPoint(x: headX, y: y)
+                )
+            )
+            context.fill(
+                Path(core),
+                with: .linearGradient(
+                    Gradient(colors: [color.opacity(0), Color.white.opacity(0.95 * alpha)]),
+                    startPoint: CGPoint(x: tailX, y: y),
+                    endPoint: CGPoint(x: headX, y: y)
+                )
+            )
+        }
+    }
+
+    private func drawEdge(_ context: inout GraphicsContext, x: Double, height: Double, color: Color, strength: Double) {
+        guard strength > 0.02 else { return }
+        context.fill(Path(CGRect(x: x - 12, y: 0, width: 24, height: height)), with: .color(color.opacity(0.22 * strength)))
+        context.fill(Path(CGRect(x: x - 1.5, y: 0, width: 3, height: height)), with: .color(color.opacity(0.95 * strength)))
+    }
+}
+
+// MARK: - Arctic
+
+/// Ice grows in from all four corners with branching frost lines, glints, and drifting snow, holds for a beat, then melts
+/// back toward the corners.
+private struct ArcticCanvas: View {
+    let progress: Double
+
+    var body: some View {
+        Canvas { context, size in
+            draw(&context, size: size)
+        }
+    }
+
+    private func draw(_ context: inout GraphicsContext, size: CGSize) {
+        let width = Double(size.width)
+        let height = Double(size.height)
+        let diagonal = (width * width + height * height).squareRoot()
+        let radius = ArcticFrost.radius(progress) * diagonal
+        guard radius > 1 else { return }
+
+        let corners = [CGPoint(x: 0, y: 0), CGPoint(x: width, y: 0), CGPoint(x: 0, y: height), CGPoint(x: width, y: height)]
+        let gradient = Gradient(stops: [
+            .init(color: Color(red: 0.86, green: 0.96, blue: 1.0).opacity(0.97), location: 0),
+            .init(color: Color(red: 0.7, green: 0.89, blue: 0.98).opacity(0.96), location: ArcticFrost.solidFraction),
+            .init(color: Color(red: 0.6, green: 0.84, blue: 0.96).opacity(0), location: 1)
+        ])
+        for corner in corners {
+            let rect = CGRect(x: corner.x - radius, y: corner.y - radius, width: radius * 2, height: radius * 2)
+            context.fill(
+                Path(ellipseIn: rect),
+                with: .radialGradient(gradient, center: corner, startRadius: 0, endRadius: radius)
+            )
+        }
+
+        drawArms(&context, corners: corners, diagonal: diagonal)
+        drawSparkles(&context, width: width, height: height)
+        drawFlakes(&context, width: width, height: height)
+    }
+
+    private func drawArms(_ context: inout GraphicsContext, corners: [CGPoint], diagonal: Double) {
+        let growth = TransitionCurve.clamp(ArcticFrost.cover(progress))
+        var lines = Path()
+        for arm in ArcticFrost.arms {
+            let origin = corners[arm.corner % 4]
+            let sx = arm.corner % 2 == 0 ? 1.0 : -1.0
+            let sy = arm.corner < 2 ? 1.0 : -1.0
+            let length = arm.length * diagonal * growth
+            let dx = sx * cos(arm.angle)
+            let dy = sy * sin(arm.angle)
+            let tip = CGPoint(x: Double(origin.x) + dx * length, y: Double(origin.y) + dy * length)
+            lines.move(to: origin)
+            lines.addLine(to: tip)
+            // A short branch, tilted off the arm.
+            let mid = CGPoint(
+                x: Double(origin.x) + dx * length * arm.branch,
+                y: Double(origin.y) + dy * length * arm.branch
+            )
+            let branchAngle = arm.angle + 0.6
+            let branchLength = length * 0.25
+            lines.move(to: mid)
+            lines.addLine(to: CGPoint(
+                x: Double(mid.x) + sx * cos(branchAngle) * branchLength,
+                y: Double(mid.y) + sy * sin(branchAngle) * branchLength
+            ))
+        }
+        context.stroke(lines, with: .color(Color.white.opacity(0.7)), lineWidth: 1.4)
+    }
+
+    private func drawSparkles(_ context: inout GraphicsContext, width: Double, height: Double) {
+        for sparkle in ArcticFrost.sparkles {
+            let glint = ArcticFrost.glint(sparkle, progress: progress)
+            guard glint > 0.03 else { continue }
+            let center = CGPoint(x: sparkle.x * width, y: sparkle.y * height)
+            let reach = sparkle.size * (0.5 + 0.5 * glint)
+            var star = Path()
+            star.move(to: CGPoint(x: center.x - reach, y: center.y))
+            star.addLine(to: CGPoint(x: center.x + reach, y: center.y))
+            star.move(to: CGPoint(x: center.x, y: center.y - reach))
+            star.addLine(to: CGPoint(x: center.x, y: center.y + reach))
+            context.stroke(star, with: .color(Color.white.opacity(0.95 * glint)), lineWidth: 1.6)
+            let dot = CGRect(x: center.x - 2, y: center.y - 2, width: 4, height: 4)
+            context.fill(Path(ellipseIn: dot), with: .color(Color.white.opacity(glint)))
+        }
+    }
+
+    private func drawFlakes(_ context: inout GraphicsContext, width: Double, height: Double) {
+        let envelope = sin(Double.pi * TransitionCurve.clamp(progress))
+        guard envelope > 0.02 else { return }
+        for flake in ArcticFrost.flakes {
+            let position = ArcticFrost.position(of: flake, progress: progress)
+            let rect = CGRect(
+                x: position.x * width - flake.size, y: position.y * height - flake.size,
+                width: flake.size * 2, height: flake.size * 2
+            )
+            context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(0.85 * envelope)))
+        }
+    }
+}
+
+// MARK: - Cherry Blossom
+
+/// A pink wash rises and a swirl of petals sweeps across, each swinging up and down and spinning on its way.
+private struct BlossomCanvas: View {
+    let progress: Double
+
+    private static let pale = Color(red: 1.0, green: 0.84, blue: 0.9)
+    private static let deep = Color(red: 0.95, green: 0.45, blue: 0.62)
+
+    var body: some View {
+        Canvas { context, size in
+            draw(&context, size: size)
+        }
+    }
+
+    private func draw(_ context: inout GraphicsContext, size: CGSize) {
+        let width = Double(size.width)
+        let height = Double(size.height)
+        let veil = BlossomSwirl.veil(progress)
+        if veil > 0.005 {
+            context.fill(
+                Path(CGRect(x: 0, y: 0, width: width, height: height)),
+                with: .linearGradient(
+                    Gradient(colors: [
+                        Color(red: 1.0, green: 0.8, blue: 0.87).opacity(veil),
+                        Color(red: 0.98, green: 0.62, blue: 0.76).opacity(veil)
+                    ]),
+                    startPoint: CGPoint(x: 0, y: 0),
+                    endPoint: CGPoint(x: width, y: height)
+                )
+            )
+        }
+        for petal in BlossomSwirl.petals {
+            guard let state = BlossomSwirl.state(of: petal, progress: progress) else { continue }
+            var layer = context
+            layer.translateBy(x: state.x * width, y: state.y * height)
+            layer.rotate(by: .radians(state.angle))
+            let color = petal.tone < 0.5 ? Self.pale : Self.deep
+            layer.fill(Self.petalPath(length: petal.size), with: .color(color.opacity(state.alpha)))
+        }
+    }
+
+    /// A rounded petal with a small notch at the tip, centered on the origin.
+    private static func petalPath(length: Double) -> Path {
+        let half = length / 2
+        let wide = length * 0.32
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: half))
+        path.addQuadCurve(to: CGPoint(x: -length * 0.06, y: -half), control: CGPoint(x: -wide * 1.6, y: 0))
+        path.addLine(to: CGPoint(x: 0, y: -half * 0.82))
+        path.addLine(to: CGPoint(x: length * 0.06, y: -half))
+        path.addQuadCurve(to: CGPoint(x: 0, y: half), control: CGPoint(x: wide * 1.6, y: 0))
+        path.closeSubpath()
+        return path
     }
 }

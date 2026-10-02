@@ -321,8 +321,8 @@ struct NewTabBackgroundSheet: View {
     }
 }
 
-/// Stars for the Space pack, leaves for Jungle, embers for Volcano, bubbles for Deep Ocean, and pixel stars for Retro
-/// Arcade. Drawn once, never animated.
+/// Stars for the Space pack, leaves for Jungle, embers for Volcano, bubbles for Deep Ocean, pixel stars for Retro
+/// Arcade, neon tubes for Neon City, frost for Arctic, and petals for Cherry Blossom. Drawn once, never animated.
 struct NewTabDecorView: View {
     let decor: NewTabPreset.Decor
 
@@ -423,6 +423,88 @@ struct NewTabDecorView: View {
                     let side = unit * (next() > 0.8 ? 2 : 1)
                     let alpha = 0.35 + next() * 0.6
                     context.fill(Path(CGRect(x: x, y: y, width: side, height: side)), with: .color(colors[i % 3].opacity(alpha)))
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .neon:
+            Canvas { context, size in
+                var seed: UInt64 = 0x2077C0DE5EED1234
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                let magenta = Color(red: 1.0, green: 0.2, blue: 0.75)
+                let cyan = Color(red: 0.2, green: 0.92, blue: 1.0)
+                for i in 0..<5 {
+                    let y = (0.12 + 0.19 * Double(i) + next() * 0.04) * size.height
+                    var line = Path()
+                    line.move(to: CGPoint(x: 0, y: y))
+                    line.addLine(to: CGPoint(x: size.width, y: y))
+                    let color = i % 2 == 0 ? magenta : cyan
+                    context.stroke(line, with: .color(color.opacity(0.12)), lineWidth: 8)
+                    context.stroke(line, with: .color(color.opacity(0.4)), lineWidth: 1.5)
+                }
+                for _ in 0..<10 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let length = 24 + next() * 70
+                    let color = next() > 0.5 ? magenta : cyan
+                    var bar = Path()
+                    bar.move(to: CGPoint(x: x, y: y))
+                    bar.addLine(to: CGPoint(x: x, y: y + length))
+                    context.stroke(bar, with: .color(color.opacity(0.35)), lineWidth: 2)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .frost:
+            Canvas { context, size in
+                var seed: UInt64 = 0x1CEBE46F20ABCDEF
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                for _ in 0..<44 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let r = 0.8 + next() * 2.2
+                    let alpha = 0.25 + next() * 0.5
+                    let rect = CGRect(x: x, y: y, width: r * 2, height: r * 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(Color.white.opacity(alpha)))
+                }
+                for _ in 0..<6 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let reach = 5 + next() * 8
+                    var star = Path()
+                    star.move(to: CGPoint(x: x - reach, y: y))
+                    star.addLine(to: CGPoint(x: x + reach, y: y))
+                    star.move(to: CGPoint(x: x, y: y - reach))
+                    star.addLine(to: CGPoint(x: x, y: y + reach))
+                    context.stroke(star, with: .color(Color.white.opacity(0.55)), lineWidth: 1)
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        case .petals:
+            Canvas { context, size in
+                var seed: UInt64 = 0xC4E881055011ABCD
+                func next() -> Double {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double((seed >> 33) & 0xFFFF) / 65535.0
+                }
+                for _ in 0..<22 {
+                    let x = next() * size.width
+                    let y = next() * size.height
+                    let length = 10 + next() * 16
+                    let angle = next() * Double.pi * 2
+                    let alpha = 0.18 + next() * 0.32
+                    var layer = context
+                    layer.translateBy(x: x, y: y)
+                    layer.rotate(by: .radians(angle))
+                    let rect = CGRect(x: -length * 0.3, y: -length / 2, width: length * 0.6, height: length)
+                    layer.fill(Path(ellipseIn: rect), with: .color(Color(red: 1.0, green: 0.78, blue: 0.86).opacity(alpha)))
                 }
             }
             .allowsHitTesting(false)

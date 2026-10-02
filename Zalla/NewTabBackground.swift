@@ -15,6 +15,9 @@ struct NewTabPreset: Identifiable, Equatable {
         case embers
         case bubbles
         case pixels
+        case neon
+        case frost
+        case petals
     }
 
     let id: String
@@ -51,7 +54,10 @@ enum NewTabCatalog {
         NewTabPack(id: "jungle", name: "Jungle Pack"),
         NewTabPack(id: "volcano", name: "Volcano Pack"),
         NewTabPack(id: "deepocean", name: "Deep Ocean Pack"),
-        NewTabPack(id: "arcade", name: "Arcade Pack")
+        NewTabPack(id: "arcade", name: "Arcade Pack"),
+        NewTabPack(id: "neoncity", name: "Neon City Pack"),
+        NewTabPack(id: "arctic", name: "Arctic Pack"),
+        NewTabPack(id: "cherryblossom", name: "Cherry Blossom Pack")
     ]
 
     static let packed: [NewTabPreset] = [
@@ -82,7 +88,16 @@ enum NewTabCatalog {
         NewTabPreset(id: "reef", name: "Reef", colors: ["1FB5BD", "0A5C73"], style: .linear, isDark: true, pack: "deepocean", decor: .bubbles),
         NewTabPreset(id: "cabinet", name: "Cabinet", colors: ["FF4FB0", "5B1F8F", "0D0B2E"], style: .linear, isDark: true, pack: "arcade", decor: .pixels),
         NewTabPreset(id: "synthgrid", name: "Synthgrid", colors: ["4F7BFF", "241A66", "0A0820"], style: .linear, isDark: true, pack: "arcade", decor: .pixels),
-        NewTabPreset(id: "pixelsky", name: "Pixel Sky", colors: ["1B1450", "07051A"], style: .radial, isDark: true, pack: "arcade", decor: .pixels)
+        NewTabPreset(id: "pixelsky", name: "Pixel Sky", colors: ["1B1450", "07051A"], style: .radial, isDark: true, pack: "arcade", decor: .pixels),
+        NewTabPreset(id: "neonnight", name: "Neon Night", colors: ["3A1070", "120628", "05030F"], style: .radial, isDark: true, pack: "neoncity", decor: .neon),
+        NewTabPreset(id: "afterhours", name: "Afterhours", colors: ["FF2E93", "4A1070", "0A0614"], style: .linear, isDark: true, pack: "neoncity", decor: .neon),
+        NewTabPreset(id: "skyline", name: "Skyline", colors: ["1FA8E0", "0A1F4D", "05040F"], style: .linear, isDark: true, pack: "neoncity", decor: .neon),
+        NewTabPreset(id: "tundra", name: "Tundra", colors: ["F2FBFF", "B6DDF2"], style: .linear, isDark: false, pack: "arctic", decor: .frost),
+        NewTabPreset(id: "iceberg", name: "Iceberg", colors: ["58BBE0", "1B5E86", "07243D"], style: .linear, isDark: true, pack: "arctic", decor: .frost),
+        NewTabPreset(id: "polar", name: "Polar Night", colors: ["12456E", "03111E"], style: .radial, isDark: true, pack: "arctic", decor: .frost),
+        NewTabPreset(id: "sakura", name: "Sakura", colors: ["FFE2EB", "F7A8C2"], style: .linear, isDark: false, pack: "cherryblossom", decor: .petals),
+        NewTabPreset(id: "hanami", name: "Hanami", colors: ["F27AA5", "7A2D5C", "2A0F2A"], style: .linear, isDark: true, pack: "cherryblossom", decor: .petals),
+        NewTabPreset(id: "blossomdusk", name: "Blossom Dusk", colors: ["6A2F68", "1C0B26"], style: .radial, isDark: true, pack: "cherryblossom", decor: .petals)
     ]
 
     static var all: [NewTabPreset] { free + packed }

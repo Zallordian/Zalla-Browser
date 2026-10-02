@@ -61,6 +61,8 @@ final class BrowserStore: ObservableObject {
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
 
     init() {
+        // Build 26 moved Tabs into the default Compact bar; carry over anyone who never changed that bar.
+        ToolbarLayout.migrateLegacyDefaults()
         let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Zalla", isDirectory: true)
         fileURL = directory.appendingPathComponent("library.json")

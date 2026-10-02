@@ -2,8 +2,10 @@ import XCTest
 @testable import Zalla
 
 final class MenuTopRowTests: XCTestCase {
-    func testDefaultRowHasSettingsAfterTabs() {
-        XCTAssertEqual(MenuTopRow.default.items, [.back, .forward, .reload, .tabs, .settings])
+    func testDefaultRowHasShareBeforeSettings() {
+        XCTAssertEqual(MenuTopRow.default.items, [.back, .forward, .reload, .share, .settings])
+        XCTAssertEqual(MenuTopRow.legacyDefaultItems, [.back, .forward, .reload, .tabs, .settings])
+        XCTAssertFalse(MenuTopRow.default.items.contains(.tabs))
         XCTAssertTrue(MenuTopRow.default.isDefault)
         XCTAssertEqual(MenuTopRow.storageKey, "menuTopRow")
     }
@@ -55,27 +57,27 @@ final class MenuTopRowTests: XCTestCase {
     func testRemoveAtOffsets() {
         var row = MenuTopRow.default
         row.remove(atOffsets: IndexSet([0, 2]))
-        XCTAssertEqual(row.items, [.forward, .tabs, .settings])
+        XCTAssertEqual(row.items, [.forward, .share, .settings])
         row.remove(atOffsets: IndexSet(integer: 99))
-        XCTAssertEqual(row.items, [.forward, .tabs, .settings])
+        XCTAssertEqual(row.items, [.forward, .share, .settings])
     }
 
     func testAvailableListsWhatIsMissing() {
         let row = MenuTopRow.default
-        XCTAssertEqual(row.available, [.share, .bookmark, .find, .newTab, .burn, .downloads, .home])
+        XCTAssertEqual(row.available, [.tabs, .bookmark, .find, .newTab, .burn, .downloads, .home])
         XCTAssertEqual(MenuTopRow.default.available.count + MenuTopRow.default.items.count, MenuTopRowItem.allCases.count)
     }
 
     func testMoveMatchesSwiftUISemantics() {
         var row = MenuTopRow.default
         row.move(fromOffsets: IndexSet(integer: 0), toOffset: 3)
-        XCTAssertEqual(row.items, [.forward, .reload, .back, .tabs, .settings])
+        XCTAssertEqual(row.items, [.forward, .reload, .back, .share, .settings])
         row.move(fromOffsets: IndexSet(integer: 4), toOffset: 0)
-        XCTAssertEqual(row.items, [.settings, .forward, .reload, .back, .tabs])
+        XCTAssertEqual(row.items, [.settings, .forward, .reload, .back, .share])
         row.move(fromOffsets: IndexSet(integer: 1), toOffset: 5)
-        XCTAssertEqual(row.items, [.settings, .reload, .back, .tabs, .forward])
+        XCTAssertEqual(row.items, [.settings, .reload, .back, .share, .forward])
         row.move(fromOffsets: IndexSet(integer: 2), toOffset: 2)
-        XCTAssertEqual(row.items, [.settings, .reload, .back, .tabs, .forward])
+        XCTAssertEqual(row.items, [.settings, .reload, .back, .share, .forward])
     }
 
     func testResetRestoresDefault() {
@@ -97,5 +99,19 @@ final class MenuTopRowTests: XCTestCase {
         XCTAssertEqual(MenuTopRow.decode(Data("[\"nope\"]".utf8)), .default)
         let mixed = Data("[\"share\",\"future\",\"back\",\"share\"]".utf8)
         XCTAssertEqual(MenuTopRow.decode(mixed).items, [.share, .back])
+    }
+
+    func testNeverCustomizedRowsGetTheNewDefaultAndRealChoicesStay() {
+        // The editor stores an unchanged row as empty data, so anyone on the old default has nothing stored.
+        XCTAssertEqual(MenuTopRow.decode(Data()).items, [.back, .forward, .reload, .share, .settings])
+        // Someone who chose the old row on purpose after the change keeps it.
+        let chosen = MenuTopRow(MenuTopRow.legacyDefaultItems)
+        XCTAssertFalse(chosen.isDefault)
+        XCTAssertEqual(MenuTopRow.decode(chosen.encoded()).items, MenuTopRow.legacyDefaultItems)
+        // Tabs is still available to add back.
+        XCTAssertTrue(MenuTopRow.default.available.contains(.tabs))
+        var row = MenuTopRow.default
+        row.reset()
+        XCTAssertTrue(row.isDefault)
     }
 }

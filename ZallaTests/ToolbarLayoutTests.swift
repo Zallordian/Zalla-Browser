@@ -5,9 +5,9 @@ final class ToolbarLayoutTests: XCTestCase {
     func testDefaultsMatchBuiltInLayouts() {
         let layout = ToolbarLayout.default
         XCTAssertEqual(layout.classic, [.back, .forward, .share, .tabs, .menu])
-        XCTAssertEqual(layout.compact, [.back, .forward, .address, .share, .menu])
+        XCTAssertEqual(layout.compact, [.back, .forward, .address, .tabs, .menu])
         XCTAssertEqual(layout.compactLeading, [.back, .forward])
-        XCTAssertEqual(layout.compactTrailing, [.share, .menu])
+        XCTAssertEqual(layout.compactTrailing, [.tabs, .menu])
         XCTAssertEqual(layout.quickActionBar, [.tabs, .menu])
         XCTAssertEqual(layout.quickActionFan, [.back, .forward, .reload, .tabs, .newTab, .share])
         XCTAssertFalse(layout.quickActionFan.contains(.menu), "Menu has its own button beside Tabs")
@@ -63,7 +63,7 @@ final class ToolbarLayoutTests: XCTestCase {
         layout.move(fromOffsets: IndexSet(integer: 4), toOffset: 0, in: .classic)
         XCTAssertEqual(layout.classic, [.menu, .back, .forward, .share, .tabs])
         layout.move(fromOffsets: IndexSet(integer: 0), toOffset: 3, in: .compact)
-        XCTAssertEqual(layout.compact, [.forward, .address, .back, .share, .menu])
+        XCTAssertEqual(layout.compact, [.forward, .address, .back, .tabs, .menu])
         XCTAssertEqual(layout.compactLeading, [.forward])
         layout.reset(.classic)
         layout.reset(.compact)
@@ -90,5 +90,60 @@ final class ToolbarLayoutTests: XCTestCase {
         let decoded = ToolbarLayout.decode(partial)
         XCTAssertEqual(decoded.classic, [.reload, .menu])
         XCTAssertEqual(decoded.compact, ToolbarLayout.defaultCompact)
+    }
+
+    func testCompactDefaultSwapsShareForTabsAndKeepsEverythingElse() {
+        XCTAssertEqual(ToolbarLayout.legacyDefaultCompact, [.back, .forward, .address, .share, .menu])
+        XCTAssertEqual(ToolbarLayout.defaultCompact, [.back, .forward, .address, .tabs, .menu])
+        XCTAssertEqual(ToolbarLayout.default.buttonCount(for: .compact), 4)
+        XCTAssertEqual(ToolbarLayout.defaultClassic, [.back, .forward, .share, .tabs, .menu], "Classic is unchanged")
+        XCTAssertEqual(ToolbarLayout.defaultQuickActionBar, [.tabs, .menu])
+        XCTAssertEqual(ToolbarLayout.sanitized(ToolbarLayout.defaultCompact, for: .compact), ToolbarLayout.defaultCompact)
+    }
+
+    func testMigrationMovesAnUntouchedOldCompactBarOnly() {
+        var old = ToolbarLayout.default
+        old.setItems(ToolbarLayout.legacyDefaultCompact, for: .compact)
+        old.add(.find, to: .classic)
+        let migrated = ToolbarLayout.migratedLegacyDefaults(old.encoded())
+        XCTAssertNotNil(migrated)
+        let layout = ToolbarLayout.decode(migrated ?? Data())
+        XCTAssertEqual(layout.compact, ToolbarLayout.defaultCompact)
+        XCTAssertEqual(layout.classic, old.classic, "Other bars keep the user's choices")
+
+        var custom = ToolbarLayout.default
+        custom.setItems([.back, .address, .share, .reload, .menu], for: .compact)
+        XCTAssertNil(ToolbarLayout.migratedLegacyDefaults(custom.encoded()), "A real customization is left alone")
+        XCTAssertNil(ToolbarLayout.migratedLegacyDefaults(Data()), "Nothing stored already means the new default")
+        XCTAssertNil(ToolbarLayout.migratedLegacyDefaults(Data("not json".utf8)))
+    }
+
+    func testMigrationRunsOnceAndOnlyFromStoredOldDefaults() {
+        let suite = "ToolbarLayoutTests.migration"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        var old = ToolbarLayout.default
+        old.setItems(ToolbarLayout.legacyDefaultCompact, for: .compact)
+        old.add(.find, to: .classic)
+        defaults.set(old.encoded(), forKey: ToolbarLayout.storageKey)
+        ToolbarLayout.migrateLegacyDefaults(in: defaults)
+        let first = ToolbarLayout.decode(defaults.data(forKey: ToolbarLayout.storageKey) ?? Data())
+        XCTAssertEqual(first.compact, ToolbarLayout.defaultCompact)
+        XCTAssertTrue(defaults.bool(forKey: ToolbarLayout.migrationKey))
+
+        // A later, deliberate choice of the old bar is not rewritten.
+        var chosen = first
+        chosen.setItems(ToolbarLayout.legacyDefaultCompact, for: .compact)
+        defaults.set(chosen.encoded(), forKey: ToolbarLayout.storageKey)
+        ToolbarLayout.migrateLegacyDefaults(in: defaults)
+        XCTAssertEqual(ToolbarLayout.decode(defaults.data(forKey: ToolbarLayout.storageKey) ?? Data()).compact,
+                       ToolbarLayout.legacyDefaultCompact)
+        defaults.removePersistentDomain(forName: suite)
+    }
+
+    func testMigrationCollapsesToEmptyDataWhenNothingElseDiffers() {
+        var old = ToolbarLayout.default
+        old.setItems(ToolbarLayout.legacyDefaultCompact, for: .compact)
+        XCTAssertEqual(ToolbarLayout.migratedLegacyDefaults(old.encoded()), Data())
     }
 }

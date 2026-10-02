@@ -53,7 +53,7 @@ final class NewTabTests: XCTestCase {
 
 final class ThemePackTests: XCTestCase {
     func testPacksPointAtRealThingsAndNeedUnlock() {
-        XCTAssertEqual(ThemePacks.all.map(\.id), ["space", "jungle", "volcano", "deepocean", "arcade"])
+        XCTAssertEqual(ThemePacks.all.map(\.id), ["space", "jungle", "volcano", "deepocean", "arcade", "neoncity", "arctic", "cherryblossom"])
         for pack in ThemePacks.all {
             let preset = NewTabCatalog.preset(id: pack.backgroundPresetID)
             XCTAssertNotNil(preset, pack.id)
@@ -64,7 +64,7 @@ final class ThemePackTests: XCTestCase {
         XCTAssertTrue(ZallaThemeID.jungle.requiresUnlock)
         XCTAssertTrue(AppIconPreference.jungle.requiresUnlock)
         XCTAssertFalse(ZallaThemeID.space.requiresUnlock)
-        for id in [ZallaThemeID.volcano, .deepOcean, .arcade] {
+        for id in [ZallaThemeID.volcano, .deepOcean, .arcade, .neonCity, .arctic, .cherryBlossom] {
             XCTAssertTrue(id.requiresUnlock, id.rawValue)
             XCTAssertTrue(id.suggestedAppIcon.requiresUnlock, id.rawValue)
         }
@@ -91,7 +91,7 @@ final class ThemePackTests: XCTestCase {
 
     func testCustomColorsNeverPickALockedIcon() {
         XCTAssertNotEqual(ZallaTheme.closestAppIcon(forCustomHex: "8DB63C"), .jungle)
-        for hex in ["E8481C", "14A3B8", "FF4FB0"] {
+        for hex in ["E8481C", "14A3B8", "FF4FB0", "E83CFF", "5AB8E8", "F0709C"] {
             XCTAssertFalse(ZallaTheme.closestAppIcon(forCustomHex: hex).requiresUnlock, hex)
         }
     }

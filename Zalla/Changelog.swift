@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 26",
+            name: "Neon, Frost, Blossom",
+            highlights: [
+                "Three more theme packs in Zalla Unlock: Neon City (magenta and cyan glow, with a flickering neon wipe and glow streaks), Arctic (ice blue, with frost that spreads in from the corners and snow sparkle), and Cherry Blossom (soft pinks, with a swirl of petals that sweeps across). Each has an accent, an app icon, and three new tab backgrounds, and they show up in Quick theme and Explore theme packs",
+                "Tabs and Share traded places. The Compact bar now has Tabs next to the menu button, instead of Share, and the address pill no longer repeats the Tabs icon. The top row of the Menu now has Share instead of Tabs. If you never changed these, you get the new setup on its own. If you did, nothing moves, and Settings, Appearance still lets you put either one wherever you like"
+            ],
+            improvements: "The theme swatches in Settings, Appearance wrap onto three tidy rows. The new themes follow the same On and Off and Speed switches, and Reduce Motion plays the quick fade.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 25",
             name: "One Tap Theme",
             highlights: [

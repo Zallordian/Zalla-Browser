@@ -12,6 +12,12 @@ enum ThemeTransitionKind: Equatable {
     case ocean
     /// The screen dissolves into big pixels behind CRT scanlines, then clears again.
     case arcade
+    /// A neon scan wipe sweeps across with flickering tubes and glow streaks.
+    case neon
+    /// Frost spreads in from the corners with snow sparkle, then melts away.
+    case arctic
+    /// A swirl of petals sweeps across the screen.
+    case blossom
 }
 
 /// How fast theme transitions play. Normal is about a second.
