@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "28"
+    CURRENT_PROJECT_VERSION: "29"
 targets:
   Zalla:
     type: application
@@ -31,6 +31,29 @@ targets:
           - CFBundleURLName: com.zalla.browser.open
             CFBundleURLSchemes:
               - zalla
+          # Lets Zalla receive web links once it is chosen as the default browser (needs Apple's approval,
+          # see docs/DEFAULT_BROWSER.md). Safari stays the default until then.
+          - CFBundleURLName: com.zalla.browser.web
+            CFBundleURLSchemes:
+              - http
+              - https
+        # Press and hold the app icon. Routed by QuickActions.swift (types are typePrefix + case name).
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.zalla.browser.quickaction.newTab
+            UIApplicationShortcutItemTitle: New Tab
+            UIApplicationShortcutItemIconSymbolName: plus
+          - UIApplicationShortcutItemType: com.zalla.browser.quickaction.newPrivateTab
+            UIApplicationShortcutItemTitle: New Private Tab
+            UIApplicationShortcutItemIconSymbolName: eye.slash
+          - UIApplicationShortcutItemType: com.zalla.browser.quickaction.search
+            UIApplicationShortcutItemTitle: Search
+            UIApplicationShortcutItemIconSymbolName: magnifyingglass
+          - UIApplicationShortcutItemType: com.zalla.browser.quickaction.bookmarks
+            UIApplicationShortcutItemTitle: Bookmarks
+            UIApplicationShortcutItemIconSymbolName: book
+          - UIApplicationShortcutItemType: com.zalla.browser.quickaction.burn
+            UIApplicationShortcutItemTitle: Burn It All
+            UIApplicationShortcutItemIconSymbolName: flame
         NSAppTransportSecurity:
           NSAllowsArbitraryLoadsInWebContent: true
         NSPhotoLibraryAddUsageDescription: Zalla saves exported images to Photos when you choose Save to Photos.

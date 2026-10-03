@@ -3,7 +3,10 @@ import UIKit
 
 @main
 struct ZallaApp: App {
+    @UIApplicationDelegateAdaptor(ZallaAppDelegate.self) private var appDelegate
     @StateObject private var browser = BrowserStore()
+    /// Icon quick actions land here first, then move to the browser once it is on screen.
+    @ObservedObject private var quickActions = QuickActionRouter.shared
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
@@ -35,6 +38,13 @@ struct ZallaApp: App {
         AppIconPreference.apply(.default)
     }
 
+    @MainActor
+    private func handOverQuickAction(_ action: QuickAction?) {
+        guard let action else { return }
+        quickActions.pending = nil
+        browser.pendingQuickAction = action
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -48,7 +58,15 @@ struct ZallaApp: App {
             // Swipe down on any scrolling screen to put the keyboard away.
             .scrollDismissesKeyboard(.interactively)
             .onOpenURL { url in
-                browser.openIncoming(url)
+                // A zalla:// action link (widgets) asks for something. Anything else is a web address.
+                if let action = QuickAction.resolve(url: url) {
+                    browser.pendingQuickAction = action
+                } else {
+                    browser.openIncoming(url)
+                }
+            }
+            .onChange(of: quickActions.pending) { _, action in
+                handOverQuickAction(action)
             }
             .overlay {
                 if scenePhase != .active {
@@ -61,6 +79,8 @@ struct ZallaApp: App {
                 }
             }
             .task {
+                // A quick action that launched Zalla is already waiting.
+                handOverQuickAction(quickActions.pending)
                 // Finish any tip purchases that completed while Zalla was closed or awaiting approval.
                 TipTransactionObserver.start()
                 // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.

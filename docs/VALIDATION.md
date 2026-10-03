@@ -57,6 +57,19 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Quick actions, default browser, Video Saver (Build 29)
+
+- Press and hold the Zalla icon on the Home Screen: New Tab, New Private Tab, Search, Bookmarks, Burn It All appear with their icons.
+- Zalla closed (swipe it away first): choose each action. New Tab shows a blank tab. New Private Tab opens a private tab (Face ID first if the private lock is on). Search opens with the keyboard up in the address bar, in Classic, Compact, and Quick Action toolbars. Bookmarks opens the Library. Burn It All opens the confirmation and never burns until you confirm it. Cancel leaves everything as it was.
+- Zalla running with a sheet open (Settings, Tabs): choose Search and Burn It All from the icon. The sheet closes first, then the bar focuses or the confirmation appears.
+- Settings, Tools, Quick actions on the app icon off: the menu items just open Zalla and do nothing else.
+- Tap a link to a website from Messages or Notes: with Safari still default nothing changes. Settings, Tools, Make Zalla your default browser opens the Zalla page in the Settings app. The footer says the default browser choice depends on Apple's approval.
+- After the entitlement is approved and enabled (docs/DEFAULT_BROWSER.md): Default Browser App lists Zalla. Links from other apps open in a new Zalla tab, with Zalla closed and with it running, and only web (http, https) links open.
+- Video Saver, Zalla Unlock on: open a page with a plain MP4 (a direct file URL in a video tag). The Menu shows Save video, the page list shows the file, Save starts a download that appears in Downloads, then Open and Share work. Without Unlock the row shows a lock and opens Zalla Unlock.
+- A page whose player is protected (a streaming service) shows no saveable file. If the page reports a key system only, Save video shows "This video is protected and can't be saved." Nothing is downloaded.
+- An HLS (m3u8) link: Check stream explains it (stream, live, or protected) and downloads nothing.
+- Settings, Premium, Video Saver off: the Save video row never appears. Private tabs: a saved video is marked Private in Downloads.
+
 ## Smooth motion (Build 28)
 
 Compare against Safari side by side where you can. Run once normally, then once with Settings, Accessibility, Motion, Reduce Motion on.

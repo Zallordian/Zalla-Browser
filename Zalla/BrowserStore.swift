@@ -49,6 +49,12 @@ final class BrowserStore: ObservableObject {
     /// Which effect the Burn It All overlay plays. Set together with `isBurning`.
     @Published private(set) var burnPlan: BurnEffectPlan?
     @Published var imageExport: ImageExportRequest?
+    /// An action that arrived from the app icon menu or a widget link, waiting for the screen to carry it out.
+    @Published var pendingQuickAction: QuickAction?
+    /// Bumped to ask the address bar to take focus (the Search action). Whichever bar style is showing reacts.
+    @Published var addressFocusRequest = 0
+    /// Bumped to ask for the Burn It All confirmation. Burn never starts without that confirmation.
+    @Published var burnConfirmRequest = 0
     private let fileURL: URL
     private var activeDownloadDelegates: [UUID: TabDownloadSession] = [:]
     private var sessionSaveTask: Task<Void, Never>?
@@ -171,6 +177,15 @@ final class BrowserStore: ObservableObject {
     func openPrivateTab(url: URL? = nil) async {
         guard await unlockPrivateTabs() else { return }
         addTab(isPrivate: true, url: url)
+    }
+
+    /// A New Tab action: the current tab when it is already blank and regular, otherwise a fresh one.
+    func openNewTabFromQuickAction() {
+        let current = selected
+        if QuickAction.reusesCurrentTab(
+            hasSelected: current != nil, hasPage: current?.hasPage ?? false, isPrivate: current?.isPrivate ?? false
+        ) { return }
+        addTab()
     }
 
     /// Opens an address another app sent to Zalla. It reuses a blank new tab, otherwise starts a fresh one.
@@ -601,6 +616,8 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ThemePacks.transitionsKey)
         defaults.removeObject(forKey: ThemeTransitionSpeed.storageKey)
         defaults.removeObject(forKey: LogoStyle.storageKey)
+        defaults.removeObject(forKey: QuickAction.storageKey)
+        defaults.removeObject(forKey: VideoSaver.storageKey)
         PrivacyReport.reset(in: defaults)
         AutoClear.resetSettings()
         groups = []
@@ -803,6 +820,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageColor: PageRGB?
     /// Whether the status bar color counts as dark, with hysteresis so the clock text does not flip near mid gray.
     private(set) var pageColorIsDark: Bool?
+    /// Plain video files and playlists the current page offers (Video Saver), and whether its player uses a key system.
+    @Published private(set) var videoCandidates: [VideoSaver.Candidate] = []
+    @Published private(set) var videoProtected = false
     /// The host (without www or m.) that `pageInfo` was read from, so a stale tag is never shown for another site.
     private(set) var pageInfoHost: String?
 
@@ -883,6 +903,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             newController.add(scriptHandlerProxy, name: "zallaImage")
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
             newController.add(scriptHandlerProxy, name: PageColor.messageName)
+            newController.add(scriptHandlerProxy, name: VideoSaver.messageName)
         }
         if newController != nil {
             applyPageScripts(for: nil)
@@ -924,6 +945,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             controller.addUserScript(WKUserScript(
                 source: PageColor.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
             ))
+            // Video Saver only looks for plain video files the page offers, and only while its switch is on.
+            if VideoSaver.isEnabled() {
+                controller.addUserScript(WKUserScript(
+                    source: VideoSaver.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
+                ))
+            }
         }
         if !isPrivate, CookieBannerDismiss.isEnabled, ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
             controller.addUserScript(WKUserScript(
@@ -1424,6 +1451,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             }
             return
         }
+        if message.name == VideoSaver.messageName {
+            if let report = VideoSaver.report(from: message.body) {
+                if videoCandidates != report.candidates { videoCandidates = report.candidates }
+                if videoProtected != report.protectedMedia { videoProtected = report.protectedMedia }
+            }
+            return
+        }
         if message.name == CookieBannerDismiss.messageName {
             if !isPrivate { PrivacyReport.record(.cookieBannerDismissed, host: webView.url?.host) }
             return
@@ -1466,6 +1500,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         stripCount = 0
         applyStoredPageZoom()
         easePageIn()
+        // A new page reports its own videos. Nothing from the last page carries over.
+        if !videoCandidates.isEmpty { videoCandidates = [] }
+        if videoProtected { videoProtected = false }
         // A new site does not inherit the last site's banner. The page script reads its own on load.
         if pageInfoHost != AppBanner.hostKey(webView.url?.host) {
             pageInfo = nil
@@ -1927,6 +1964,42 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Applies the Settings toggle for edge swipes to this tab.
     func setSwipeNavigation(_ enabled: Bool) {
         EdgeNavigation.install(on: webView, enabled: enabled)
+    }
+
+    /// Saves a video file the page offers, through the same download manager as any other download. A stream is only
+    /// checked and explained for now. Protected video is never saved.
+    func saveVideo(_ candidate: VideoSaver.Candidate) {
+        switch candidate.kind {
+        case .file:
+            guard let handler = onDownloadDecision else { return }
+            let url = candidate.url
+            webView.startDownload(using: URLRequest(url: url)) { [weak self] download in
+                guard let self else { return }
+                let response = URLResponse(url: url, mimeType: nil, expectedContentLength: -1, textEncodingName: nil)
+                handler(self, download, response, url)
+            }
+            showToast(VideoSaver.savingMessage)
+        case .hls:
+            explainStream(candidate)
+        case .unsupported:
+            showToast(VideoSaver.noVideoMessage)
+        }
+    }
+
+    /// Reads the playlist once, because the person asked, to tell them why a stream cannot be saved yet.
+    private func explainStream(_ candidate: VideoSaver.Candidate) {
+        var request = URLRequest(url: candidate.url)
+        request.timeoutInterval = 10
+        Task { @MainActor [weak self] in
+            var text: String?
+            do {
+                let (data, _) = try await URLSession(configuration: .ephemeral).data(for: request)
+                if data.count <= 2_000_000 { text = String(data: data, encoding: .utf8) }
+            } catch {
+                text = nil
+            }
+            self?.showToast(VideoSaver.message(forStream: text.flatMap(VideoSaver.parseHLS)))
+        }
     }
 
     func showToast(_ message: String) {

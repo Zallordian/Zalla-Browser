@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		NOT ACTIVE. Nothing in project.yml points at this file.
+		Apple has to approve this entitlement for Zalla first. Adding it to a build before then makes the
+		provisioning profile fail and breaks signing. See docs/DEFAULT_BROWSER.md for how to switch it on.
+	-->
+	<key>com.apple.developer.web-browser</key>
+	<true/>
+</dict>
+</plist>

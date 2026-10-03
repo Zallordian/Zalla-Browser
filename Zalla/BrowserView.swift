@@ -51,6 +51,12 @@ struct BrowserView: View {
             .presentationDetents(detents(for: item))
             .presentationDragIndicator(.visible)
         }
+        .onChange(of: browser.pendingQuickAction) { _, action in
+            if let action { runQuickAction(action) }
+        }
+        .onAppear {
+            if let action = browser.pendingQuickAction { runQuickAction(action) }
+        }
         .overlay {
             if browser.privateLocked, browser.selected?.isPrivate == true {
                 PrivateLockView(browser: browser)
@@ -73,6 +79,27 @@ struct BrowserView: View {
 }
 
 extension BrowserView {
+    /// Carries out an app icon quick action or widget link. Anything open on top (a sheet) is put away first,
+    /// then the step runs. Burn only opens its confirmation.
+    private func runQuickAction(_ action: QuickAction) {
+        browser.pendingQuickAction = nil
+        let hadSheet = sheet != nil
+        if action.step != .openLibrary { sheet = nil }
+        Task { @MainActor in
+            // Give a closing sheet a moment before the address bar or the confirmation takes over.
+            if hadSheet, action.step == .focusAddressBar || action.step == .confirmBurn {
+                try? await Task.sleep(nanoseconds: 450_000_000)
+            }
+            switch action.step {
+            case .newTab: browser.openNewTabFromQuickAction()
+            case .newPrivateTab: await browser.openPrivateTab()
+            case .focusAddressBar: browser.addressFocusRequest += 1
+            case .openLibrary: sheet = .library
+            case .confirmBurn: browser.burnConfirmRequest += 1
+            }
+        }
+    }
+
     private func detents(for item: BrowserSheet) -> Set<PresentationDetent> {
         switch item {
         case .menu: return [.medium, .large]
@@ -346,6 +373,8 @@ private struct TabContent: View {
                 isEditingClassicAddress = false
             }
         }
+        .onChange(of: browser.addressFocusRequest) { _, _ in focusAddressBarFromOutside() }
+        .onChange(of: browser.burnConfirmRequest) { _, _ in confirmBurn = true }
         .onChange(of: addressFocused) { _, focused in
             if focused {
                 if toolbarStyle == .classic {
@@ -1019,6 +1048,16 @@ private struct TabContent: View {
                 .accessibilityLabel("Not Secure")
         case .none:
             EmptyView()
+        }
+    }
+
+    /// The Search quick action: puts the cursor in whichever address bar this toolbar style has.
+    private func focusAddressBarFromOutside() {
+        guard !addressFocused else { return }
+        switch toolbarStyle {
+        case .compact: beginCompactAddressEditing()
+        case .quickAction: beginQuickActionAddressEditing()
+        case .classic: beginClassicAddressEditing()
         }
     }
 
@@ -1878,6 +1917,7 @@ private struct BrowserMenuSheet: View {
                 .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
                 if let tab = browser.selected, tab.hasPage {
                     PageZoomControl(tab: tab)
+                    VideoSaverMenuRow(tab: tab, browser: browser, sheet: $sheet)
                     SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
                     SiteToolsMenuRows(tab: tab)
                     NavigationLink {
@@ -2791,6 +2831,8 @@ private struct SettingsView: View {
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
     @AppStorage(SwipeNavigation.storageKey) private var swipeNavigation = true
     @AppStorage(PullToRefresh.storageKey) private var pullToRefresh = true
+    @AppStorage(QuickAction.storageKey) private var quickActionsOn = QuickAction.defaultEnabled
+    @AppStorage(VideoSaver.storageKey) private var videoSaverOn = VideoSaver.defaultEnabled
     @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
     @AppStorage(AppBanner.storageKey) private var appBanners = AppBanner.defaultEnabled
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
@@ -2836,7 +2878,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "28"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "29"
         return "\(marketing) (\(build))"
     }
 
@@ -3140,6 +3182,30 @@ private struct SettingsView: View {
                     Label("Downloads", systemImage: "arrow.down.circle")
                 }
             }
+
+            Section {
+                Toggle("Quick actions on the app icon", isOn: $quickActionsOn)
+                Button {
+                    if let settings = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settings)
+                    }
+                } label: {
+                    HStack {
+                        Label("Make Zalla your default browser", systemImage: "safari")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens Zalla in the Settings app")
+            } header: {
+                Text("Icon and default browser")
+            } footer: {
+                Text(DefaultBrowser.settingsFooter + " " + DefaultBrowser.quickActionsFooter)
+            }
         }
     }
 
@@ -3175,6 +3241,17 @@ private struct SettingsView: View {
                 PremiumPrivacyRows()
             } header: {
                 Text("Private tabs and auto-clear")
+            }
+
+            Section {
+                Toggle("Video Saver", isOn: $videoSaverOn)
+                    .onChange(of: videoSaverOn) { _, _ in
+                        NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
+                    }
+            } header: {
+                Text("Video Saver")
+            } footer: {
+                Text(VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
             }
         }
     }
