@@ -618,6 +618,8 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: LogoStyle.storageKey)
         defaults.removeObject(forKey: QuickAction.storageKey)
         defaults.removeObject(forKey: VideoSaver.storageKey)
+        defaults.removeObject(forKey: WidgetShared.shareKey)
+        WidgetSync.clear()
         PrivacyReport.reset(in: defaults)
         AutoClear.resetSettings()
         groups = []

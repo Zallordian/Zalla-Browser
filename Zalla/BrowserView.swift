@@ -3181,6 +3181,11 @@ private struct SettingsView: View {
                 } label: {
                     Label("Downloads", systemImage: "arrow.down.circle")
                 }
+                NavigationLink {
+                    WidgetsSettingsView(browser: browser)
+                } label: {
+                    Label("Widgets", systemImage: "square.grid.2x2")
+                }
             }
 
             Section {

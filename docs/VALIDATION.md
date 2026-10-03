@@ -57,6 +57,20 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Widgets (Build 29)
+
+Needs the Apple Developer portal steps in docs/WIDGETS.md done first, then a TestFlight build on a device.
+
+- Open Zalla once so it writes its snapshot, then add each widget from the gallery: Search (small, medium), Favorites (medium, large), Burn It All (small), Privacy Report (small, medium). Lock Screen: Search (circular, rectangular), Privacy Report (rectangular).
+- Search: tapping opens Zalla with the address bar focused and the keyboard up, Zalla closed and running. Lock Screen versions open Zalla after unlock.
+- Favorites: shows your home shortcuts, tapping a tile opens that site in a new Zalla tab. Edit Widget: switch Favorites to Bookmarks, change how many (large shows up to 8, medium up to 4), hide titles. With none, it shows "No favorites yet".
+- Burn It All: tapping opens the Burn It All confirmation. Cancel leaves everything. It never burns without confirming.
+- Privacy Report: counts match Settings, Privacy Report totals after you open and background Zalla. Before any data exists, a plain "Open Zalla to start your report" shows.
+- Accent: change the accent or custom color in Settings, Appearance, background Zalla, and the widgets (set to Follow Zalla) update. A fixed color in Edit Widget ignores the app accent. Soft look is tinted, Filled is solid, a light accent such as yellow uses dark text.
+- Settings, Tools, Widgets: steps are shown, previews match the widgets, "Share with widgets" off erases the snapshot (widgets show empty states), on restores it.
+- Private tabs: open a private tab and visit sites. No widget shows any address or count from it. Reset Zalla clears the snapshot.
+- Airplane mode: widgets look the same (they never use the network).
+
 ## Quick actions, default browser, Video Saver (Build 29)
 
 - Press and hold the Zalla icon on the Home Screen: New Tab, New Private Tab, Search, Bookmarks, Burn It All appear with their icons.

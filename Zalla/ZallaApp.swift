@@ -45,6 +45,11 @@ struct ZallaApp: App {
         browser.pendingQuickAction = action
     }
 
+    @MainActor
+    private func syncWidgets() {
+        WidgetSync.refresh(bookmarks: browser.bookmarks)
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -81,6 +86,7 @@ struct ZallaApp: App {
             .task {
                 // A quick action that launched Zalla is already waiting.
                 handOverQuickAction(quickActions.pending)
+                syncWidgets()
                 // Finish any tip purchases that completed while Zalla was closed or awaiting approval.
                 TipTransactionObserver.start()
                 // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.
@@ -95,6 +101,8 @@ struct ZallaApp: App {
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
                 if phase != .active {
                     browser.saveSession()
+                    // Widgets pick up the latest accent, favorites, and Privacy Report totals.
+                    syncWidgets()
                 }
                 // Only .background, not .inactive: the Face ID sheet itself makes the app inactive.
                 if phase == .background {

@@ -18,6 +18,7 @@ enum Changelog {
             name: "Press and Hold",
             highlights: [
                 "Press and hold the Zalla icon for quick actions: New Tab, New Private Tab, Search, Bookmarks, and Burn It All. Burn It All only opens its usual confirmation, it never burns on its own. There is a switch in Settings, Tools if you would rather the icon menu just open Zalla",
+                "Widgets for the Home Screen and Lock Screen: Search, Favorites, Burn It All, and Privacy Report. They follow your Zalla accent by default, and in the widget editor you can pick another color, a softer look, and which favorites to show. Widgets never use the network and never see your history. Settings, Tools, Widgets explains how to add them, and has a switch to stop sharing",
                 "Video Saver, in Zalla Unlock: when a page offers a plain video file, the Menu gets a Save video row that saves it to Downloads, ready to open or share. Protected video is never saved, and Zalla has no special handling for any one website",
                 "Zalla is ready to become your default browser. Settings, Tools has a Make Zalla your default browser row that opens its page in the Settings app, and Zalla opens web links you send it in a new tab. Choosing it as the default browser works only once Apple approves Zalla for it, so the choice may not appear yet"
             ],

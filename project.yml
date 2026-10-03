@@ -13,7 +13,16 @@ targets:
   Zalla:
     type: application
     platform: iOS
-    sources: [Zalla]
+    sources: [Zalla, Shared]
+    dependencies:
+      - target: ZallaWidgets
+    # App Group shared with the widgets (group.com.zalla.browser). The default browser entitlement is NOT here
+    # on purpose, Apple has to approve it first, see docs/DEFAULT_BROWSER.md.
+    entitlements:
+      path: config/Zalla.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.zalla.browser
     info:
       path: Zalla/Info.plist
       properties:
@@ -148,6 +157,29 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconDark AppIconTinted AppIconOrange AppIconYellow AppIconGreen AppIconBlue AppIconIndigo AppIconViolet AppIconOcean AppIconForest AppIconSpace AppIconJungle AppIconVolcano AppIconDeepOcean AppIconRetroArcade AppIconNeonCity AppIconArctic AppIconCherryBlossom
+  # Widgets (Build 29). Own bundle ID, own provisioning profile, same App Group as the app.
+  # To drop widgets entirely: remove this target, the ZallaWidgets dependency above, and the ZallaWidgets folder.
+  # See docs/WIDGETS.md for the Apple Developer portal steps this target needs before it can be signed.
+  ZallaWidgets:
+    type: app-extension
+    platform: iOS
+    sources: [ZallaWidgets, Shared]
+    entitlements:
+      path: config/ZallaWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.zalla.browser
+    info:
+      path: ZallaWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Zalla
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zalla.browser.widgets
+        SKIP_INSTALL: YES
+        TARGETED_DEVICE_FAMILY: "1"
   ZallaTests:
     type: bundle.unit-test
     platform: iOS
