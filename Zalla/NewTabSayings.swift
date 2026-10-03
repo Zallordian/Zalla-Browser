@@ -7,7 +7,7 @@ enum NewTabSayings {
         "Browse quietly.",
         "Nothing here but you.",
         "Start somewhere.",
-        "No trackers were invited.",
+        "Tracker blocking is on.",
         "Your corner of the internet.",
         "Private by default.",
         "Go wander.",
@@ -15,10 +15,10 @@ enum NewTabSayings {
         "Clean slate.",
         "Just you and the web.",
         "Curiosity welcome.",
-        "Search without being followed.",
+        "Fewer trackers tagging along.",
         "Pick a door.",
         "Fresh tab, clear head.",
-        "Stays on your phone.",
+        "Your history stays on your phone.",
         "Look something up.",
         "Take the long way.",
         "No ads came with this tab.",
@@ -26,7 +26,7 @@ enum NewTabSayings {
         "The internet, minus the noise.",
         "What's on your mind?",
         "Built around you.",
-        "Quiet mode, always.",
+        "Quiet by default.",
         "Find something good."
     ]
 
