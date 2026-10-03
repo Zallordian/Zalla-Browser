@@ -44,7 +44,7 @@ final class BrowserStore: ObservableObject {
     @Published private(set) var downloads: [DownloadRecord] = []
     @Published var storageError: String?
     @Published var clearingData = false
-    /// True from the moment Burn It All is confirmed until the app closes.
+    /// True from the moment Burn It All is confirmed until it has wiped everything and opened a fresh tab.
     @Published private(set) var isBurning = false
     /// Which effect the Burn It All overlay plays. Set together with `isBurning`.
     @Published private(set) var burnPlan: BurnEffectPlan?
@@ -468,11 +468,12 @@ final class BrowserStore: ObservableObject {
     }
 
     /// Burn It All: play the fire, close every tab, erase history, cookies, and site data (private tabs included),
-    /// then close the app. Bookmarks and downloads are kept.
+    /// then start over on one fresh new tab. Bookmarks and downloads are kept. The app does not quit.
     /// The wipe does not depend on the animation: everything that must not survive is cleared or started up front,
     /// site data is erased once before and once after the tabs go, and a flag makes the next launch finish the job
     /// if Zalla is closed halfway. Nothing is restored on the next launch.
-    func burnEverythingAndClose() async {
+    /// The old web views are torn down before the new tab is made, so no page, process, or in-memory list survives.
+    func burnEverything() async {
         guard !isBurning else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: BurnEffectPlan.pendingKey)
@@ -502,14 +503,25 @@ final class BrowserStore: ObservableObject {
         if remaining > 0 {
             try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
         }
+        let burned = tabs
         tabs.removeAll()
         selectedID = nil
+        burned.forEach { $0.tearDown() }
+        imageExport = nil
+        AppBannerSession.shared.reset()
         // A second pass, in case a page wrote something while the fire was going.
         await eraseSiteData(in: privateStores)
-        // Leave the "Clearing browsing data..." label on screen for a beat, then close.
+        // Leave the "Clearing browsing data..." label on screen for a beat so the old web views can be freed.
         try? await Task.sleep(nanoseconds: 900_000_000)
         defaults.removeObject(forKey: BurnEffectPlan.pendingKey)
-        exit(0)
+        // Start over: one new tab with a new web view, then lift the effect.
+        addTab()
+        sessionSavingEnabled = true
+        clearingData = false
+        withMotion(.fade, reduceMotion: UIAccessibility.isReduceMotionEnabled) {
+            isBurning = false
+            burnPlan = nil
+        }
     }
 
     private func eraseSiteData(in privateStores: [WKWebsiteDataStore]) async {
@@ -912,7 +924,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             newController.add(scriptHandlerProxy, name: "zallaImage")
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
             newController.add(scriptHandlerProxy, name: PageColor.messageName)
-            newController.add(scriptHandlerProxy, name: VideoSaver.messageName)
+            if FeatureFlags.videoSaverEnabled {
+                newController.add(scriptHandlerProxy, name: VideoSaver.messageName)
+            }
         }
         if newController != nil {
             applyPageScripts(for: nil)
@@ -1363,6 +1377,19 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             if direction == .forward { showParkedPage() }
             goToBackForwardItem(target)
         }
+    }
+
+    /// Lets go of everything this tab's web view holds so WebKit can free the page and its process (Burn It All).
+    /// The tab is not used again afterwards.
+    func tearDown() {
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
+        let controller = webView.configuration.userContentController
+        controller.removeAllScriptMessageHandlers()
+        controller.removeAllUserScripts()
+        webView.removeFromSuperview()
+        previewImage = nil
     }
 
     func capturePreview() {

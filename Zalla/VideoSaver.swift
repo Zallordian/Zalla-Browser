@@ -10,8 +10,10 @@ enum VideoSaver {
     static let messageName = "zallaVideo"
     static let maxCandidates = 6
 
+    /// Off for good while `FeatureFlags.videoSaverEnabled` is false, whatever the stored switch says.
     static func isEnabled(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.object(forKey: storageKey) as? Bool ?? defaultEnabled
+        guard FeatureFlags.videoSaverEnabled else { return false }
+        return defaults.object(forKey: storageKey) as? Bool ?? defaultEnabled
     }
 
     /// Saving needs Zalla Unlock and the setting on.

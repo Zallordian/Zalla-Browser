@@ -14,10 +14,18 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 32",
+            name: "Fresh Start",
+            highlights: [
+                "Burn It All no longer closes Zalla. It plays the fire and erases tabs, history, cookies, and site data exactly as before, then drops you on one fresh tab, ready to use. Bookmarks and downloads stay put"
+            ],
+            improvements: "Burn It All closes any open sheet, lets go of the old pages so nothing from them is kept in memory, and forgets the app banners you dismissed.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 31",
             name: "Paperwork",
             highlights: [
-                "Video Saver now shows up in the Zalla Unlock list, where it belongs. It saves videos that a page serves as plain files, and never protected ones",
                 "Privacy details for Zalla and its widgets are filled in for Apple: the only thing either reads is its own small settings, and the widgets read only the note Zalla shares with them on your phone"
             ],
             improvements: "",
@@ -40,7 +48,6 @@ enum Changelog {
             highlights: [
                 "Press and hold the Zalla icon for quick actions: New Tab, New Private Tab, Search, Bookmarks, and Burn It All. Burn It All only opens its usual confirmation, it never burns on its own. There is a switch in Settings, Tools if you would rather the icon menu just open Zalla",
                 "Widgets for the Home Screen and Lock Screen: Search, Favorites, Burn It All, and Privacy Report. They follow your Zalla accent by default, and in the widget editor you can pick another color, a softer look, and which favorites to show. Widgets never use the network and never see your history. Settings, Tools, Widgets explains how to add them, and has a switch to stop sharing",
-                "Video Saver, in Zalla Unlock: when a page offers a plain video file, the Menu gets a Save video row that saves it to Downloads, ready to open or share. Protected video is never saved, and Zalla has no special handling for any one website",
                 "Zalla is ready to become your default browser. Settings, Tools has a Make Zalla your default browser row that opens its page in the Settings app, and Zalla opens web links you send it in a new tab. Choosing it as the default browser works only once Apple approves Zalla for it, so the choice may not appear yet"
             ],
             improvements: "Links that open Zalla work whether it was closed or already running.",
@@ -316,7 +323,7 @@ enum SafetyOverview {
             ),
             SafetyItem(
                 title: "Burn It All",
-                detail: "Erases tabs, history, cookies, and site data in one confirmed tap, then closes Zalla. Free.",
+                detail: BurnCopy.safetyDetail,
                 status: "Ready", isOn: true
             ),
             SafetyItem(

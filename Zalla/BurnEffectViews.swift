@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Burn It All's full-screen effect: stylized flame tongues in lemon yellow, deep orange, and red rise over the browser
 /// (which chars and darkens underneath), fill the screen, break apart into single licks, and fade into glowing embers
-/// on black. Then a plain "Clearing browsing data..." label shows until Zalla closes. Drawn with one Canvas in a
+/// on black. Then a plain "Clearing browsing data..." label shows while the wipe finishes, then Zalla is back on one fresh tab. Drawn with one Canvas in a
 /// TimelineView capped at 60 frames a second, no assets, no network. With Reduce Motion, or with the effect switched
 /// off in Settings, it is a quick fade.
-/// The timing and shapes live in BurnFire.swift. This view only draws. The wipe and the exit happen in BrowserStore
+/// The timing and shapes live in BurnFire.swift. This view only draws. The wipe and the reset to a fresh tab happen in BrowserStore
 /// whether or not this ever appears.
 struct BurnOverlay: View {
     let plan: BurnEffectPlan
@@ -35,7 +35,7 @@ struct BurnOverlay: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Clearing browsing data. Zalla will close in a moment.")
+        .accessibilityLabel(BurnCopy.overlayAccessibility)
     }
 
     private func clearingLabel(light: Bool) -> some View {

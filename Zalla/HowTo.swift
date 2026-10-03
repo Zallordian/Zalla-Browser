@@ -63,7 +63,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .pullToRefresh: return "Drag a page down to reload it."
         case .newTabPage: return "Shortcuts, backgrounds, and a search bar."
         case .addToDashboard: return "Press and hold any link."
-        case .flame: return "Erase everything and close the app."
+        case .flame: return BurnCopy.howToSummary
         case .themeTransitions: return "A leafy sweep or a rocket on refresh."
         case .httpsOnly: return "Secure connections first, a warning otherwise."
         case .privacyShield: return "Cleaner links and fewer clues about you."
@@ -120,10 +120,10 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .flame:
             return [
                 "Find Burn It All in the Menu, in Tabs, or add it to your Quick Action buttons in Settings.",
-                "Confirm, and Zalla closes every tab and erases history, cookies, and site data.",
-                "Flames rise over the page, break apart into embers, and fade to black. Then a plain Clearing browsing data label shows while it finishes, and Zalla closes.",
+                BurnCopy.howToWipeStep,
+                BurnCopy.howToEffectStep,
                 "Prefer it quiet? Turn off Burn It All fire effect in Settings, Privacy. With Reduce Motion on, the screen just fades.",
-                "Open Zalla again for a clean slate. Bookmarks and downloads stay put."
+                BurnCopy.howToAfterStep
             ]
         case .themeTransitions:
             return [

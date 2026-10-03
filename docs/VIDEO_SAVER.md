@@ -25,3 +25,6 @@ Video Saver (Zalla Unlock, Settings, Premium switch "Video Saver", on by default
 2. A clear-only DASH path, only if there is a real need. Encrypted or live manifests stay out.
 3. Real byte progress in the download manager (it shows a spinner today) and a small pill on the page.
 4. Save to Photos directly from the download row.
+
+## Status in version 1
+Video Saver is switched off for version 1 with `FeatureFlags.videoSaverEnabled = false` in `Zalla/FeatureFlags.swift`. To bring it back, change that one constant to true. It gates the Menu row, the page script and message handler, the Settings section, the Zalla Unlock list line, and `VideoSaver.isEnabled`. The Build 29 and Build 31 changelog lines about it were removed, so add a line to the 1.1 entry.

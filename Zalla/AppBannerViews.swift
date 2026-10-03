@@ -9,6 +9,12 @@ final class AppBannerSession: ObservableObject {
     @Published private(set) var normal = AppBannerDismissals()
     @Published private(set) var privateTabs = AppBannerDismissals()
 
+    /// Forgets every dismissal (Burn It All).
+    func reset() {
+        normal.reset()
+        privateTabs.reset()
+    }
+
     func isDismissed(_ hostKey: String, isPrivate: Bool) -> Bool {
         isPrivate ? privateTabs.isDismissed(hostKey) : normal.isDismissed(hostKey)
     }

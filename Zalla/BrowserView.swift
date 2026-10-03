@@ -51,6 +51,10 @@ struct BrowserView: View {
             .presentationDetents(detents(for: item))
             .presentationDragIndicator(.visible)
         }
+        .onChange(of: browser.isBurning) { _, _ in
+            // Burn It All starts and ends with no sheet open.
+            sheet = nil
+        }
         .onChange(of: browser.pendingQuickAction) { _, action in
             if let action { runQuickAction(action) }
         }
@@ -63,7 +67,10 @@ struct BrowserView: View {
             }
         }
         .overlay {
-            if browser.isBurning { BurnOverlay(plan: browser.burnPlan ?? BurnEffectPlan.make(reduceMotion: false)) }
+            if browser.isBurning {
+                BurnOverlay(plan: browser.burnPlan ?? BurnEffectPlan.make(reduceMotion: false))
+                    .transition(.opacity)
+            }
         }
         .sheet(item: $browser.imageExport) { request in
             ImageExportSheet(request: request)
@@ -1955,7 +1962,9 @@ private struct BrowserMenuSheet: View {
                 .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
                 if let tab = browser.selected, tab.hasPage {
                     PageZoomControl(tab: tab)
-                    VideoSaverMenuRow(tab: tab, browser: browser, sheet: $sheet)
+                    if FeatureFlags.videoSaverEnabled {
+                        VideoSaverMenuRow(tab: tab, browser: browser, sheet: $sheet)
+                    }
                     SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
                     SiteToolsMenuRows(tab: tab)
                     NavigationLink {
@@ -2009,7 +2018,7 @@ private struct BrowserMenuSheet: View {
                     Label { Text("Burn It All") } icon: { FlameMark(size: 22) }
                 }
             } footer: {
-                Text("Closes every tab, erases history, cookies, and site data, then closes Zalla.")
+                Text(BurnCopy.menuFooter)
             }
         }
         .flameConfirmation(isPresented: $confirmFlame, browser: browser, onBurn: { dismiss() })
@@ -2315,7 +2324,7 @@ private struct TabsView: View {
                 } label: {
                     Label { Text("Burn It All") } icon: { FlameMark(size: 22) }
                 }
-                .accessibilityHint("Erases tabs, history, cookies, and site data, then closes Zalla")
+                .accessibilityHint(BurnCopy.accessibilityHint)
             }
             ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
         }
@@ -2916,7 +2925,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "31"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "32"
         return "\(marketing) (\(build))"
     }
 
@@ -3286,15 +3295,17 @@ private struct SettingsView: View {
                 Text("Private tabs and auto-clear")
             }
 
-            Section {
-                Toggle("Video Saver", isOn: $videoSaverOn)
-                    .onChange(of: videoSaverOn) { _, _ in
-                        NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
-                    }
-            } header: {
-                Text("Video Saver")
-            } footer: {
-                Text(VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
+            if FeatureFlags.videoSaverEnabled {
+                Section {
+                    Toggle("Video Saver", isOn: $videoSaverOn)
+                        .onChange(of: videoSaverOn) { _, _ in
+                            NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
+                        }
+                } header: {
+                    Text("Video Saver")
+                } footer: {
+                    Text(VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
+                }
             }
         }
     }

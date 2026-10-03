@@ -423,7 +423,9 @@ struct ZallaUnlockSheet: View {
                     // Grouped so the list stays within the ten rows a ViewBuilder block allows.
                     Group {
                         Label("Listen to page", systemImage: "speaker.wave.2")
-                        Label("Video Saver for plain video files", systemImage: "arrow.down.to.line")
+                        if FeatureFlags.videoSaverEnabled {
+                            Label("Video Saver for plain video files", systemImage: "arrow.down.to.line")
+                        }
                     }
                     Label("Per-site CSS", systemImage: "paintbrush")
                     Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
