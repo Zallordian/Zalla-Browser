@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "30"
+    CURRENT_PROJECT_VERSION: "31"
 targets:
   Zalla:
     type: application
@@ -163,6 +163,7 @@ targets:
   ZallaWidgets:
     type: app-extension
     platform: iOS
+    # ZallaWidgets/PrivacyInfo.xcprivacy is picked up from this folder and copied into the extension as a resource.
     sources: [ZallaWidgets, Shared]
     entitlements:
       path: config/ZallaWidgets.entitlements

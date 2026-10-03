@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 31",
+            name: "Paperwork",
+            highlights: [
+                "Video Saver now shows up in the Zalla Unlock list, where it belongs. It saves videos that a page serves as plain files, and never protected ones",
+                "Privacy details for Zalla and its widgets are filled in for Apple: the only thing either reads is its own small settings, and the widgets read only the note Zalla shares with them on your phone"
+            ],
+            improvements: "",
+            fixes: "App Store checks no longer flag the widgets for a missing privacy declaration."
+        ),
+        ChangelogEntry(
             version: "Build 30",
             name: "Ready to Type",
             highlights: [

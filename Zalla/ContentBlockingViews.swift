@@ -420,7 +420,11 @@ struct ZallaUnlockSheet: View {
                     Label("Custom block and allow rules", systemImage: "list.bullet.rectangle")
                     Label("Face ID for private tabs", systemImage: "faceid")
                     Label("Tab groups", systemImage: "rectangle.stack")
-                    Label("Listen to page", systemImage: "speaker.wave.2")
+                    // Grouped so the list stays within the ten rows a ViewBuilder block allows.
+                    Group {
+                        Label("Listen to page", systemImage: "speaker.wave.2")
+                        Label("Video Saver for plain video files", systemImage: "arrow.down.to.line")
+                    }
                     Label("Per-site CSS", systemImage: "paintbrush")
                     Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
                     Label("Background packs for new tabs", systemImage: "photo.on.rectangle.angled")

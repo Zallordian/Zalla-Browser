@@ -57,6 +57,13 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Privacy manifests and Unlock list (Build 31)
+
+- Upload to App Store Connect (TestFlight): no "missing privacy manifest" or "missing required reason API" warnings for Zalla or ZallaWidgets.
+- Settings, Premium, Zalla Unlock (and any Unlock upsell sheet): the Includes list shows "Video Saver for plain video files" after Listen to page, and every other row is still there.
+- Archive check: `Zalla.app/PrivacyInfo.xcprivacy` and `Zalla.app/PlugIns/ZallaWidgets.appex/PrivacyInfo.xcprivacy` both exist.
+- Widgets still show data (App Group access is unchanged).
+
 ## Ready to type and widget looks (Build 30)
 
 Needs a TestFlight build on a device.
