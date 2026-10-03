@@ -57,6 +57,21 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Smooth motion (Build 28)
+
+Compare against Safari side by side where you can. Run once normally, then once with Settings, Accessibility, Motion, Reduce Motion on.
+
+- Address bar: tap the Compact pill. It expands with a spring and the side buttons slide away. Cancel, submit, and tap outside collapse it the same way. Quick Action and Classic bars behave the same. The bar slides with the keyboard.
+- Reload and Stop swap with a short morph while a page starts and finishes loading. The loading bar eases forward without jumping.
+- Quick Action fan: opens with a spring and fades the dim background, closes smoothly without a pop. Press and hold the search pill: the page info bubble scales in and fades out.
+- Toast (for example after copying a link) fades in with a small drop and fades out. The element picker banner fades.
+- Tabs: open the tab grid. Close a tab: the others shift with a spring and the closed card slides left. Drag a card left: it follows your finger and fades. Release early: it springs back. Flick it quickly: it closes. Swipe up still closes. The Tab closed bar slides up from the bottom and Undo works. New tab: the card scales in.
+- Pages: open a link. The page eases in without a hard swap, the top strip does not jump, and the page does not shift (no change to the web view frame or the safe area). Back and forward by edge swipe: the arrow follows the finger and settles with a spring. Pull to refresh still works.
+- New tab page fades in when you open a tab, switch to one, or close the last page.
+- Settings: tap a category. The page glides across and the underline slides to the tab. Swipe between pages: the underline follows. Turn on Custom accent: the color controls ease open and closed. Tap a Quick theme swatch: it scales up with a checkmark popping in. Tap an app icon: it scales up. Library: Bookmarks and History cross fade.
+- Reduce Motion on: nothing slides, scales, or springs. Quick fades of about a tenth of a second are fine. The status bar strip still follows the page, and the light and dark flip still waits a moment (Build 27).
+- No new haptics. The Burn It All effect and theme transitions look exactly as before.
+
 ## Seamless status bar strip (Build 27)
 
 Run on a device in the default immersive layout with Settings, Appearance, Status bar matches the page on.

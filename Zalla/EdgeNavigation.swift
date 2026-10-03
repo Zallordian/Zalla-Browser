@@ -111,12 +111,28 @@ private final class EdgeSwipeCue: UIView {
     }
 
     func finish(committed: Bool) {
-        UIView.animate(withDuration: committed ? 0.18 : 0.12, animations: {
-            self.alpha = 0
-            self.transform = CGAffineTransform(scaleX: committed ? 1.2 : 0.7, y: committed ? 1.2 : 0.7)
-        }, completion: { _ in
-            self.removeFromSuperview()
-        })
+        // A settling spring (a cue that is let go of shrinks back, a committed one swells and fades). With Reduce
+        // Motion it only fades.
+        guard let spec = MotionSpec.spec(for: .card, reduceMotion: UIAccessibility.isReduceMotionEnabled) else {
+            UIView.animate(withDuration: 0.12, animations: { self.alpha = 0 }, completion: { _ in
+                self.removeFromSuperview()
+            })
+            return
+        }
+        UIView.animate(
+            withDuration: spec.time,
+            delay: 0,
+            usingSpringWithDamping: CGFloat(spec.damping),
+            initialSpringVelocity: 0,
+            options: [.beginFromCurrentState],
+            animations: {
+                self.alpha = 0
+                self.transform = CGAffineTransform(scaleX: committed ? 1.2 : 0.7, y: committed ? 1.2 : 0.7)
+            },
+            completion: { _ in
+                self.removeFromSuperview()
+            }
+        )
     }
 }
 

@@ -1465,10 +1465,21 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         lastStrippedSource = nil
         stripCount = 0
         applyStoredPageZoom()
+        easePageIn()
         // A new site does not inherit the last site's banner. The page script reads its own on load.
         if pageInfoHost != AppBanner.hostKey(webView.url?.host) {
             pageInfo = nil
             pageInfoHost = nil
+        }
+    }
+
+    /// A page that commits eases in from just under full opacity instead of swapping in hard. The web view's frame is
+    /// never touched, and Reduce Motion skips it.
+    private func easePageIn() {
+        guard let spec = MotionSpec.spec(for: .page, reduceMotion: UIAccessibility.isReduceMotionEnabled) else { return }
+        webView.alpha = CGFloat(MotionSpec.pageStartAlpha)
+        UIView.animate(withDuration: spec.time, delay: 0, options: [.allowUserInteraction, .curveEaseOut]) {
+            self.webView.alpha = 1
         }
     }
 

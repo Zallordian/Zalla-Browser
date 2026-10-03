@@ -35,6 +35,7 @@ struct QuickActionFan: View {
     let entries: [QuickActionEntry]
     let onDismiss: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var spread = false
     @State private var heldEntryID: String?
 
@@ -61,7 +62,7 @@ struct QuickActionFan: View {
                             y: center.y + (spread ? offset.height : 0)
                         )
                         .animation(
-                            .spring(response: 0.36, dampingFraction: 0.72).delay(Double(index) * 0.02),
+                            Motion.animation(.pop, reduceMotion: reduceMotion)?.delay(Double(index) * 0.02),
                             value: spread
                         )
                 }
@@ -76,7 +77,7 @@ struct QuickActionFan: View {
         .accessibilityAction(.escape, dismiss)
         .onAppear {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.easeOut(duration: 0.2)) { spread = true }
+            withMotion(.fade, reduceMotion: reduceMotion) { spread = true }
         }
     }
 
@@ -90,8 +91,8 @@ struct QuickActionFan: View {
 
     private func dismiss() {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation(.easeIn(duration: 0.15)) { spread = false }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        withMotion(.fade, reduceMotion: reduceMotion) { spread = false }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
             onDismiss()
         }
     }

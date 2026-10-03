@@ -24,6 +24,7 @@ struct NewTabView: View {
     @AppStorage(NewTabPhotoStore.revisionKey) private var photoRevision = 0
     @ObservedObject private var unlock = ZallaUnlock.shared
     @Environment(\.colorScheme) private var systemColorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var showBackgroundPicker = false
     @State private var homePage = 0
@@ -305,7 +306,7 @@ struct NewTabView: View {
             .overlay(alignment: .topTrailing) {
                 if !hideAddHint {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { hideAddHint = true }
+                        withMotion(.bar, reduceMotion: reduceMotion) { hideAddHint = true }
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.footnote)
@@ -357,7 +358,7 @@ struct NewTabView: View {
                     .font(.headline)
                 Spacer()
                 Button("Done") {
-                    withAnimation(.easeInOut(duration: 0.2)) { isEditing = false }
+                    withMotion(.bar, reduceMotion: reduceMotion) { isEditing = false }
                 }
                 .font(.subheadline.weight(.semibold))
             }
@@ -433,7 +434,7 @@ struct NewTabView: View {
                 Label("Background", systemImage: "photo.on.rectangle.angled")
             }
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) { isEditing = true }
+                withMotion(.bar, reduceMotion: reduceMotion) { isEditing = true }
             } label: {
                 Label("Shortcuts", systemImage: "square.grid.2x2")
             }

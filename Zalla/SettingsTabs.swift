@@ -12,6 +12,8 @@ struct SettingsTabStrip: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var contentWidth: CGFloat = 0
     @State private var viewportWidth: CGFloat = 0
+    /// Lets the underline slide from one tab to the next instead of switching off and on.
+    @Namespace private var indicatorSpace
 
     private static let space = "settingsTabStrip"
 
@@ -59,7 +61,7 @@ struct SettingsTabStrip: View {
                 if SettingsTabHaptics.isEnabled(hapticsOn) {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                withMotion(.indicator, reduceMotion: reduceMotion) {
                     proxy.scrollTo(newValue, anchor: .center)
                 }
             }
@@ -91,7 +93,8 @@ struct SettingsTabStrip: View {
     private func tab(_ category: SettingsCategory) -> some View {
         let selected = selection == category
         return Button {
-            selection = category
+            // Animated so the page below slides across and the underline travels with it.
+            withMotion(.sheet, reduceMotion: reduceMotion) { selection = category }
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: category.symbolName)
@@ -100,10 +103,16 @@ struct SettingsTabStrip: View {
                 Text(category.title)
                     .font(.footnote.weight(.semibold))
                     .lineLimit(1)
-                Capsule()
-                    .fill(selected ? accent : Color.clear)
+                Color.clear
                     .frame(height: 3)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: selected)
+                    .overlay {
+                        if selected {
+                            Capsule()
+                                .fill(accent)
+                                .matchedGeometryEffect(id: "settingsTabIndicator", in: indicatorSpace)
+                        }
+                    }
+                    .motion(.indicator, value: selected)
             }
             .foregroundStyle(selected ? accent : Color.secondary)
             .padding(.horizontal, 16)

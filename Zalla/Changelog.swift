@@ -14,6 +14,17 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 28",
+            name: "Smooth Moves",
+            highlights: [
+                "Everyday motion now feels closer to Safari: springy, quick, and easy to interrupt. The address bar opens and closes with a spring, the Reload and Stop icon swaps with a little morph, the loading bar eases along, pages fade in as they commit, and the new tab page fades in instead of snapping",
+                "Tabs move with a spring. Cards slide into place when one closes, a card follows your finger when you swipe it away (a quick flick works too, and a short swipe springs back), and the Tab closed bar slides up from the bottom",
+                "In Settings, the underline under the category tabs slides to the next tab and the page glides across, the custom accent controls ease open, and a tapped theme swatch or app icon gives a little pop"
+            ],
+            improvements: "Every new animation follows Reduce Motion (no motion, or a short fade) and comes from one shared set of timings. Toasts, the Quick Action fan, and the edge swipe arrow also ease in and out.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 27",
             name: "Seamless Top",
             highlights: [

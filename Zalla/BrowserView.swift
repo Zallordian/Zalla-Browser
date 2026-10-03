@@ -135,8 +135,6 @@ private struct TabContent: View {
     @State private var showSearchPageInfo = false
     @State private var suppressSearchTap = false
     @Namespace private var addressNamespace
-    /// Spring used when the address pill expands to fill the bar for editing and collapses back.
-    private static let addressExpandAnimation = Animation.spring(response: 0.35, dampingFraction: 0.85)
     /// Measured heights of the floating chrome (inside the safe area) so content can scroll clear of it.
     @State private var topChromeHeight: CGFloat = 0
     @State private var bottomChromeHeight: CGFloat = 0
@@ -226,6 +224,7 @@ private struct TabContent: View {
                     onOpenLibrary: { sheet = .library },
                     onOpenTabs: { sheet = .tabs }
                 )
+                .fadesInOnAppear()
                 // Extra safe area so home content starts clear of the bars but still scrolls under them.
                 .safeAreaPadding(.top, topChromeHeight)
                 .safeAreaPadding(.bottom, bottomContentInset)
@@ -264,13 +263,16 @@ private struct TabContent: View {
                 }
             }
 
-            if tab.isPickingElement {
-                ElementPickerBanner(onCancel: { tab.cancelElementPicker() })
-                    .padding(.top, topChromeHeight + 8)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .transition(.opacity)
-                    .zIndex(5)
+            Group {
+                if tab.isPickingElement {
+                    ElementPickerBanner(onCancel: { tab.cancelElementPicker() })
+                        .padding(.top, topChromeHeight + 8)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity)
+                }
             }
+            .motion(.fade, value: tab.isPickingElement)
+            .zIndex(5)
 
             ThemeTransitionOverlay(
                 plan: ThemePacks.activeTransition(
@@ -287,19 +289,22 @@ private struct TabContent: View {
 
             chromeLayer
 
-            if let toast = tab.toast {
-                Text(toast)
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.regularMaterial, in: Capsule())
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
-                    .padding(.top, topChromeHeight + 56)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                    .transition(.opacity)
-                    .allowsHitTesting(false)
-                    .zIndex(6)
+            Group {
+                if let toast = tab.toast {
+                    Text(toast)
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.regularMaterial, in: Capsule())
+                        .shadow(color: .black.opacity(0.2), radius: 8, y: 2)
+                        .padding(.top, topChromeHeight + 56)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity.combined(with: .offset(y: -8)))
+                        .allowsHitTesting(false)
+                }
             }
+            .motion(.pop, value: tab.toast)
+            .zIndex(6)
 
             if holdKind != nil, !holdItems.isEmpty {
                 holdRevealOverlay
@@ -311,7 +316,7 @@ private struct TabContent: View {
                     placement: addressBarPlacement,
                     theme: theme,
                     entries: quickActionEntries,
-                    onDismiss: { quickActionOpen = false }
+                    onDismiss: { withMotion(.fade, reduceMotion: reduceMotion) { quickActionOpen = false } }
                 )
                 .transition(.opacity)
                 .zIndex(15)
@@ -356,7 +361,7 @@ private struct TabContent: View {
             } else {
                 if isEditingCompactAddress {
                     // Collapse Compact chrome when the field resigns (submit, cancel, or blur).
-                    withAnimation(Self.addressExpandAnimation) {
+                    withMotion(.bar, reduceMotion: reduceMotion) {
                         isEditingCompactAddress = false
                     }
                     address = tab.url?.absoluteString ?? ""
@@ -821,6 +826,7 @@ private struct TabContent: View {
         VStack(spacing: 10) {
             if tab.isLoading {
                 ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading")
+                    .motion(.progress, value: tab.progress)
             }
             if tab.hasPage || isEditingClassicAddress || addressFocused {
                 classicAddressField
@@ -861,13 +867,18 @@ private struct TabContent: View {
             }
             Button {
                 tab.reloadOrStop()
-            } label: { Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise") }
+            } label: {
+                Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
+                    .contentTransition(.symbolEffect(.replace))
+                    .motion(.pop, value: tab.isLoading)
+            }
             .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
             .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: barSize(52))
         .modifier(ClassicAddressSurface(immersive: immersiveLayout, isDark: colorScheme == .dark))
         .contentShape(Capsule())
+        .motion(.bar, value: addressFocused || isEditingClassicAddress)
         .onTapGesture {
             if !(addressFocused || isEditingClassicAddress) {
                 beginClassicAddressEditing()
@@ -1041,6 +1052,7 @@ private struct TabContent: View {
         VStack(spacing: 8) {
             if tab.isLoading {
                 ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
+                    .motion(.progress, value: tab.progress)
             }
             if isEditingCompactAddress {
                 // Reuse the Compact editing pill so focus, submit, and cancel behave the same.
@@ -1152,9 +1164,9 @@ private struct TabContent: View {
         guard tab.hasPage else { return }
         suppressSearchTap = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        withAnimation(.easeOut(duration: 0.15)) { showSearchPageInfo = true }
+        withMotion(.pop, reduceMotion: reduceMotion) { showSearchPageInfo = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            withAnimation(.easeIn(duration: 0.2)) { showSearchPageInfo = false }
+            withMotion(.fade, reduceMotion: reduceMotion) { showSearchPageInfo = false }
             // The release after a hold may not reach the button (for example after sliding off).
             suppressSearchTap = false
         }
@@ -1281,7 +1293,7 @@ private struct TabContent: View {
     private func openQuickAction() {
         guard !quickActionOpen else { return }
         if addressFocused { addressFocused = false }
-        withAnimation(.easeOut(duration: 0.18)) {
+        withMotion(.fade, reduceMotion: reduceMotion) {
             quickActionOpen = true
         }
     }
@@ -1295,6 +1307,7 @@ private struct TabContent: View {
         VStack(spacing: 8) {
             if tab.isLoading {
                 ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
+                    .motion(.progress, value: tab.progress)
             }
             HStack(spacing: 12) {
                 // While editing, the side buttons slide away and the pill springs out to fill the row.
@@ -1422,6 +1435,8 @@ private struct TabContent: View {
                     } label: {
                         Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
+                            .contentTransition(.symbolEffect(.replace))
+                            .motion(.pop, value: tab.isLoading)
                     }
                     .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
                 }
@@ -1451,7 +1466,7 @@ private struct TabContent: View {
 
     private func beginCompactAddressEditing() {
         address = CompactAddressChrome.editingPrefill(url: tab.url)
-        withAnimation(Self.addressExpandAnimation) {
+        withMotion(.bar, reduceMotion: reduceMotion) {
             isEditingCompactAddress = true
         }
         // Focus after the TextField is in the hierarchy.
@@ -1460,7 +1475,7 @@ private struct TabContent: View {
 
     private func cancelCompactAddressEditing() {
         addressFocused = false
-        withAnimation(Self.addressExpandAnimation) {
+        withMotion(.bar, reduceMotion: reduceMotion) {
             isEditingCompactAddress = false
         }
         address = tab.url?.absoluteString ?? ""
@@ -1473,7 +1488,7 @@ private struct TabContent: View {
         guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return }
         tab.load(url)
         addressFocused = false
-        withAnimation(Self.addressExpandAnimation) {
+        withMotion(.bar, reduceMotion: reduceMotion) {
             isEditingCompactAddress = false
         }
         isEditingClassicAddress = false
@@ -2144,12 +2159,15 @@ private struct TabsView: View {
                             showUndoClose = true
                         }
                     )
-                    .transition(.asymmetric(insertion: .opacity, removal: .move(edge: .trailing).combined(with: .opacity)))
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.92)),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 18)
-            .animation(.easeInOut(duration: 0.2), value: browser.tabs.map(\.id))
+            .motion(.card, value: browser.tabs.map(\.id))
         }
         .sheet(isPresented: $showGroupEditor) {
             TabGroupEditor(browser: browser, group: editingGroup, onCreated: { created in
@@ -2161,32 +2179,36 @@ private struct TabsView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Your tabs")
         .safeAreaInset(edge: .bottom) {
-            if showUndoClose, let undoClose {
-                HStack {
-                    Text("Tab closed")
-                        .font(.subheadline)
-                    Spacer()
-                    Button("Undo") {
-                        if undoClose.isPrivate {
-                            let url = undoClose.url
-                            Task { await browser.openPrivateTab(url: url) }
-                        } else {
-                            browser.addTab(url: undoClose.url)
+            Group {
+                if showUndoClose, let undoClose {
+                    HStack {
+                        Text("Tab closed")
+                            .font(.subheadline)
+                        Spacer()
+                        Button("Undo") {
+                            if undoClose.isPrivate {
+                                let url = undoClose.url
+                                Task { await browser.openPrivateTab(url: url) }
+                            } else {
+                                browser.addTab(url: undoClose.url)
+                            }
+                            showUndoClose = false
+                            self.undoClose = nil
                         }
-                        showUndoClose = false
-                        self.undoClose = nil
+                        .font(.subheadline.weight(.semibold))
                     }
-                    .font(.subheadline.weight(.semibold))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(.ultraThinMaterial)
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-                        showUndoClose = false
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                            showUndoClose = false
+                        }
                     }
                 }
             }
+            .motion(.bar, value: showUndoClose)
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -2281,6 +2303,9 @@ private struct TabPreviewCard: View {
     let selected: Bool
     let select: () -> Void
     let close: () -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// How far the card is dragged sideways while a swipe is in progress.
+    @State private var dragX: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -2350,12 +2375,30 @@ private struct TabPreviewCard: View {
                 .stroke(selected ? Color.accentColor : Color.clear, lineWidth: 2)
         }
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .offset(x: dragX)
+        .opacity(1 - 0.4 * CardSwipe.progress(translation: Double(dragX)))
         .onTapGesture(perform: select)
         .gesture(
-            DragGesture(minimumDistance: 24)
+            DragGesture(minimumDistance: CGFloat(CardSwipe.startDistance), coordinateSpace: .global)
+                .onChanged { value in
+                    // The card follows the finger sideways, like a card in Safari's tab view.
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    dragX = CGFloat(CardSwipe.followOffset(translation: Double(value.translation.width)))
+                }
                 .onEnded { value in
-                    if value.translation.width < -80 || value.translation.height < -80 {
+                    if CardSwipe.shouldClose(
+                        translationX: Double(value.translation.width),
+                        translationY: Double(value.translation.height),
+                        predictedX: Double(value.predictedEndTranslation.width)
+                    ) {
                         close()
+                        // If the card stays (the last tab is replaced in place), it comes back to rest.
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            withMotion(.card, reduceMotion: reduceMotion) { dragX = 0 }
+                        }
+                    } else {
+                        // A swipe that did not go far enough springs back.
+                        withMotion(.card, reduceMotion: reduceMotion) { dragX = 0 }
                     }
                 }
         )
@@ -2455,6 +2498,7 @@ private struct LibraryView: View {
                 }
             }
         }
+        .motion(.fade, value: history)
         .navigationTitle("Your library")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .fileImporter(
@@ -2792,7 +2836,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "27"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "28"
         return "\(marketing) (\(build))"
     }
 
@@ -2804,6 +2848,9 @@ private struct SettingsView: View {
             TabView(selection: categoryBinding) {
                 ForEach(SettingsCategory.allCases) { category in
                     Form { content(for: category) }
+                        // Rows revealed by a switch (the custom accent controls) ease in instead of popping.
+                        .motion(.bar, value: useCustomAccent)
+                        .motion(.fade, value: iconMessage)
                         .tag(category)
                 }
             }
@@ -3225,6 +3272,8 @@ private struct SettingsView: View {
                         RoundedRectangle(cornerRadius: 15, style: .continuous)
                             .strokeBorder(isSelected ? theme.primary : Color.clear, lineWidth: 2.5)
                     }
+                    .scaleEffect(isSelected ? 1.06 : 1)
+                    .motion(.pop, value: isSelected)
                 Text(option.requiresUnlock && !unlock.isUnlocked ? "\(option.displayName) \u{1F512}" : option.displayName)
                     .font(.caption2)
                     .foregroundStyle(isSelected ? theme.primary : .secondary)
@@ -3248,6 +3297,7 @@ private struct SettingsView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 72), spacing: 8)], spacing: 12) {
                 ForEach(ids) { id in
                     let swatch = ZallaTheme.theme(for: id)
+                    let isChosen = !useCustomAccent && themeID == id.rawValue
                     Button {
                         selectTheme(id)
                     } label: {
@@ -3256,12 +3306,15 @@ private struct SettingsView: View {
                                 .fill(swatch.gradient)
                                 .frame(width: 34, height: 34)
                                 .overlay {
-                                    if !useCustomAccent && themeID == id.rawValue {
+                                    if isChosen {
                                         Image(systemName: "checkmark")
                                             .font(.caption.bold())
                                             .foregroundStyle(.white)
+                                            .transition(.scale.combined(with: .opacity))
                                     }
                                 }
+                                .scaleEffect(isChosen ? 1.1 : 1)
+                                .motion(.pop, value: isChosen)
                             HStack(spacing: 2) {
                                 Text(id.displayName)
                                     .font(.caption2)
