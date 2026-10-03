@@ -1990,8 +1990,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     /// Reads the playlist once, because the person asked, to tell them why a stream cannot be saved yet.
     private func explainStream(_ candidate: VideoSaver.Candidate) {
-        var request = URLRequest(url: candidate.url)
-        request.timeoutInterval = 10
+        var draft = URLRequest(url: candidate.url)
+        draft.timeoutInterval = 10
+        let request = draft
         Task { @MainActor [weak self] in
             var text: String?
             do {

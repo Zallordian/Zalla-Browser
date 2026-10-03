@@ -232,7 +232,8 @@ private struct TabContent: View {
         )
     }
 
-    var body: some View {
+    /// The page, bars, and overlays. Split from `body` so the compiler type-checks the long modifier chain in two parts.
+    private var pageContent: some View {
         ZStack {
             // Page layer runs edge to edge, under the chrome and into the safe areas.
             if tab.hasPage {
@@ -415,6 +416,10 @@ private struct TabContent: View {
             if let url = tab.url { ActivityShareSheet(items: [url]) }
         }
         .flameConfirmation(isPresented: $confirmBurn, browser: browser)
+    }
+
+    var body: some View {
+        pageContent
         .alert("Open another app?", isPresented: Binding(
             get: { tab.externalURL != nil },
             set: { if !$0 { tab.externalURL = nil } }

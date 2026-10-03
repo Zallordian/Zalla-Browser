@@ -50,18 +50,23 @@ struct ZallaApp: App {
         WidgetSync.refresh(bookmarks: browser.bookmarks)
     }
 
+    /// The root screen. Split from the scene body so the compiler type-checks the modifier chain in two parts.
+    private var rootView: some View {
+        Group {
+            if hasCompletedOnboarding {
+                BrowserView(browser: browser)
+            } else {
+                OnboardingView(browser: browser)
+            }
+        }
+        .tint(theme.primary)
+        // Swipe down on any scrolling screen to put the keyboard away.
+        .scrollDismissesKeyboard(.interactively)
+    }
+
     var body: some Scene {
         WindowGroup {
-            Group {
-                if hasCompletedOnboarding {
-                    BrowserView(browser: browser)
-                } else {
-                    OnboardingView(browser: browser)
-                }
-            }
-            .tint(theme.primary)
-            // Swipe down on any scrolling screen to put the keyboard away.
-            .scrollDismissesKeyboard(.interactively)
+            rootView
             .onOpenURL { url in
                 // A zalla:// action link (widgets) asks for something. Anything else is a web address.
                 if let action = QuickAction.resolve(url: url) {
@@ -85,8 +90,8 @@ struct ZallaApp: App {
             }
             .task {
                 // A quick action that launched Zalla is already waiting.
-                handOverQuickAction(quickActions.pending)
-                syncWidgets()
+                await handOverQuickAction(quickActions.pending)
+                await syncWidgets()
                 // Finish any tip purchases that completed while Zalla was closed or awaiting approval.
                 TipTransactionObserver.start()
                 // Confirm Zalla Unlock with StoreKit; the cached answer is used until then.

@@ -173,9 +173,9 @@ enum VideoSaver {
 
     /// Reads an HLS playlist. Returns nil when the text is not a playlist.
     static func parseHLS(_ text: String) -> HLSInfo? {
-        let lines = text.split(whereSeparator: { $0 == "\n" || $0 == "\r" })
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+        let pieces: [Substring] = text.split(whereSeparator: { $0 == "\n" || $0 == "\r" })
+        let trimmed: [String] = pieces.map { $0.trimmingCharacters(in: .whitespaces) }
+        let lines: [String] = trimmed.filter { !$0.isEmpty }
         guard lines.first == "#EXTM3U" else { return nil }
         var info = HLSInfo()
         var pendingVariant: [String: String]?
