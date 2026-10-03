@@ -145,4 +145,90 @@ final class PageColorTests: XCTestCase {
         XCTAssertNotEqual(before.fill, after.fill)
         XCTAssertEqual(before.startsBelowStatusBar, after.startsBelowStatusBar)
     }
+
+    // MARK: - Top edge sampling, loading, hysteresis
+
+    private func info(
+        edge: String? = nil, theme: String? = nil, body: String? = nil, html: String? = nil, ready: Bool = true
+    ) -> PageInfo {
+        PageInfo(
+            themeColor: theme, bodyBackground: body, htmlBackground: html, banner: nil, title: "",
+            edgeBackground: edge, ready: ready
+        )
+    }
+
+    func testSamplePrefersTheTopEdgeThenThemeThenBodyThenHtmlThenCanvas() {
+        let all = info(edge: "rgb(0, 0, 0)", theme: "#111111", body: "#222222", html: "#333333")
+        XCTAssertEqual(PageColor.sample(from: all), PageRGB.black)
+        let noEdge = info(edge: "rgba(0, 0, 0, 0)", theme: "#ff0000", body: "#222222")
+        XCTAssertEqual(PageColor.sample(from: noEdge), PageRGB(red: 1, green: 0, blue: 0))
+        XCTAssertEqual(PageColor.sample(from: info(html: "#00ff00")), PageRGB(red: 0, green: 1, blue: 0))
+        XCTAssertEqual(PageColor.sample(from: info()), PageColor.canvas)
+    }
+
+    func testPageInfoReadsEdgeAndReadyKeys() {
+        let full = PageInfo.from(["edge": " rgb(3, 3, 3) ", "ready": false, "title": "x"] as [String: Any])
+        XCTAssertEqual(full?.edgeBackground, "rgb(3, 3, 3)")
+        XCTAssertEqual(full?.ready, false)
+        let bare = PageInfo.from(["title": "x"] as [String: Any])
+        XCTAssertNil(bare?.edgeBackground)
+        XCTAssertEqual(bare?.ready, true)
+    }
+
+    func testWeakSamplesAreIgnoredWhileThePageIsStillLoading() {
+        let current = PageRGB(red: 0.1, green: 0.1, blue: 0.1)
+        XCTAssertTrue(PageColor.isWeak(info(ready: false)))
+        XCTAssertEqual(PageColor.next(current: current, info: info(ready: false)), current)
+        XCTAssertNil(PageColor.next(current: nil, info: info(ready: false)))
+        // A loaded page that paints nothing really shows the white canvas.
+        XCTAssertEqual(PageColor.next(current: current, info: info(ready: true)), PageColor.canvas)
+        // A real sample is taken even before the load finishes.
+        XCTAssertFalse(PageColor.isWeak(info(theme: "#000000", ready: false)))
+        XCTAssertEqual(PageColor.next(current: current, info: info(theme: "#000000", ready: false)), PageRGB.black)
+    }
+
+    func testDiffersIgnoresTinyShifts() {
+        let a = PageRGB(red: 0.5, green: 0.5, blue: 0.5)
+        XCTAssertFalse(PageColor.differs(a, PageRGB(red: 0.505, green: 0.5, blue: 0.5)))
+        XCTAssertTrue(PageColor.differs(a, PageRGB(red: 0.5, green: 0.52, blue: 0.5)))
+        XCTAssertTrue(PageColor.differs(nil, a))
+        XCTAssertTrue(PageColor.differs(a, nil))
+        XCTAssertFalse(PageColor.differs(nil, nil))
+    }
+
+    func testClockTextHasHysteresisNearMidGray() {
+        let nearBlack = PageRGB(red: 0.05, green: 0.05, blue: 0.05)
+        let nearWhite = PageRGB(red: 0.95, green: 0.95, blue: 0.95)
+        // About 0.18 luminance, inside the band between the two limits.
+        let mid = PageRGB(red: 0.46, green: 0.46, blue: 0.46)
+        XCTAssertGreaterThan(mid.luminance, PageColor.darkBelow)
+        XCTAssertLessThan(mid.luminance, PageColor.lightAbove)
+        XCTAssertTrue(PageColor.isDark(nearBlack, previous: nil))
+        XCTAssertFalse(PageColor.isDark(nearWhite, previous: nil))
+        XCTAssertTrue(PageColor.isDark(mid, previous: true))
+        XCTAssertFalse(PageColor.isDark(mid, previous: false))
+        XCTAssertEqual(PageColor.isDark(mid, previous: nil), mid.prefersLightText)
+        XCTAssertTrue(PageColor.isDark(mid, previous: PageColor.isDark(nearBlack, previous: nil)))
+    }
+
+    func testPlanUsesTheHysteresisChoiceWhenGiven() {
+        let mid = PageRGB(red: 0.46, green: 0.46, blue: 0.46)
+        let held = PageColor.plan(
+            immersive: true, matchPage: true, hasPage: true, sample: mid, appearance: "System", isDark: true
+        )
+        XCTAssertEqual(held.schemeOverride, .dark)
+        let flipped = PageColor.plan(
+            immersive: true, matchPage: true, hasPage: true, sample: mid, appearance: "System", isDark: false
+        )
+        XCTAssertEqual(flipped.schemeOverride, .light)
+    }
+
+    func testScriptLooksAtTheTopEdgeAndStaysQuiet() {
+        XCTAssertTrue(PageColor.script.contains("elementFromPoint"))
+        XCTAssertTrue(PageColor.script.contains("requestAnimationFrame"))
+        XCTAssertTrue(PageColor.script.contains("MutationObserver"))
+        XCTAssertTrue(PageColor.script.contains("prefers-color-scheme"))
+        XCTAssertTrue(PageColor.script.contains("readyState"))
+        XCTAssertFalse(PageColor.script.contains("\u{2013}"))
+    }
 }

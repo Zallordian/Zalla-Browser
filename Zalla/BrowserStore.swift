@@ -801,6 +801,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published private(set) var pageInfo: PageInfo?
     /// The page's own background color, for the status bar area. Kept across navigations so it can animate.
     @Published private(set) var pageColor: PageRGB?
+    /// Whether the status bar color counts as dark, with hysteresis so the clock text does not flip near mid gray.
+    private(set) var pageColorIsDark: Bool?
     /// The host (without www or m.) that `pageInfo` was read from, so a stale tag is never shown for another site.
     private(set) var pageInfoHost: String?
 
@@ -1413,8 +1415,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         if message.name == PageColor.messageName {
             if let info = PageInfo.from(message.body) {
                 pageInfoHost = AppBanner.hostKey(webView.url?.host)
-                pageInfo = info
-                pageColor = PageColor.sample(from: info)
+                if pageInfo != info { pageInfo = info }
+                // Keep the previous color while a loading page has nothing usable yet, and ignore tiny shifts.
+                if let updated = PageColor.next(current: pageColor, info: info), PageColor.differs(updated, pageColor) {
+                    pageColorIsDark = PageColor.isDark(updated, previous: pageColorIsDark)
+                    pageColor = updated
+                }
             }
             return
         }

@@ -142,6 +142,9 @@ private struct TabContent: View {
     @State private var bottomChromeHeight: CGFloat = 0
     /// Home indicator inset of the device, remembered while the keyboard is away (immersive layout).
     @State private var homeIndicatorInset: CGFloat = 0
+    /// The color scheme actually applied for the status bar text. It follows `statusBarScheme`, but a switch between
+    /// light and dark waits a moment so a page that flickers near mid gray does not flip the whole app back and forth.
+    @State private var appliedStatusBarScheme: ColorScheme?
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -177,7 +180,8 @@ private struct TabContent: View {
             matchPage: statusBarMatchesPage,
             hasPage: tab.hasPage,
             sample: tab.isReaderActive ? nil : tab.pageColor,
-            appearance: appearance
+            appearance: appearance,
+            isDark: tab.pageColorIsDark
         )
     }
     /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted. The
@@ -316,7 +320,10 @@ private struct TabContent: View {
         .background(Color(uiColor: .systemBackground).ignoresSafeArea())
         // Light or dark status bar text to suit the page color. Only while Appearance is System; an explicit
         // Light or Dark choice is never overridden.
-        .preferredColorScheme(statusBarScheme)
+        .preferredColorScheme(appliedStatusBarScheme)
+        .task(id: statusBarScheme) { await applyStatusBarScheme() }
+        .onAppear { syncUnderPageColor() }
+        .onChange(of: statusBarPlan.fill) { _, _ in syncUnderPageColor() }
         .background {
             // Reads the device bottom inset (home indicator) for the immersive layout.
             GeometryReader { geo in
@@ -731,7 +738,7 @@ private struct TabContent: View {
                 .background { fill.ignoresSafeArea(.container, edges: .top) }
             Spacer(minLength: 0)
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: statusBarPlan.fill)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: statusBarPlan.fill)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -742,6 +749,32 @@ private struct TabContent: View {
         case .some(.dark): return .dark
         case .some(.light): return .light
         case .none: return nil
+        }
+    }
+
+    /// Moves to the wanted status bar scheme at once when switching to or from "no override", and after a short wait
+    /// when switching between light and dark. A newer wanted scheme cancels the wait.
+    @MainActor
+    private func applyStatusBarScheme() async {
+        let target = statusBarScheme
+        if target == nil || appliedStatusBarScheme == nil {
+            appliedStatusBarScheme = target
+            return
+        }
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        if Task.isCancelled { return }
+        appliedStatusBarScheme = target
+    }
+
+    /// Past the edge of the page (rubber banding) the web view shows its under-page color. While the strip is
+    /// painted that is the strip color, so the overscroll never shows a gap between the strip and the page.
+    private func syncUnderPageColor() {
+        if case .page(let color) = statusBarPlan.fill {
+            tab.webView.underPageBackgroundColor = UIColor(
+                red: CGFloat(color.red), green: CGFloat(color.green), blue: CGFloat(color.blue), alpha: 1
+            )
+        } else {
+            tab.webView.underPageBackgroundColor = .systemBackground
         }
     }
 
@@ -2759,7 +2792,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "26"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "27"
         return "\(marketing) (\(build))"
     }
 

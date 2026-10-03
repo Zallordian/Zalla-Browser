@@ -57,6 +57,21 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Seamless status bar strip (Build 27)
+
+Run on a device in the default immersive layout with Settings, Appearance, Status bar matches the page on.
+
+- Reddit (dark header): the area behind the clock and battery is the same black as the header, with no border or bezel. Scroll down and up: the strip stays solid, with no flicker or jump, and the header scrolls like on a normal website.
+- YouTube in dark mode: the header and the clock area look continuous while scrolling. Open a video and go back, search, and open a channel. The strip follows the page without flashing white.
+- Sites with a header that slides away on scroll down and returns on scroll up (or becomes sticky): the strip color follows what is at the very top of the page within about a tenth of a second.
+- Navigate between a light site and a dark site: the strip eases over in a quick blink (about 0.15 s), with no white or red flash while the new page loads.
+- Show and hide the keyboard (tap a search field): the strip does not change or jump.
+- Pull the page down past its top (rubber band): the strip color shows above the page, no gap or white band.
+- A page with mid gray at the top: the clock text does not flip back and forth while you scroll.
+- Light page: dark clock text. Dark page: light clock text. The whole app does not flicker between light and dark while scrolling.
+- Settings, Appearance, Status bar matches the page off: the strip is the plain Zalla background. Explicit Light or Dark appearance is never overridden.
+- New tab page and the Classic layouts look the same as in Build 26.
+
 ## Neon City, Arctic, and Cherry Blossom (Build 26)
 Needs a physical iPhone. Check: without Zalla Unlock the three packs and their Quick theme swatches show a lock and open the Unlock sheet; with it, a swatch or Apply sets accent, icon, new tab background, and plays the transition; the home screen icons show the Z mark on a neon skyline, in ice with snow, and in blossom pinks; Neon City shows a dark wipe with a magenta front and cyan back edge, stuttering tubes, glow streaks, and scanlines, and the page is fully covered at the middle; Arctic grows ice from the corners until the screen is frozen, glints and snow show, then it melts back; Cherry Blossom shows a pink wash and a swirl of petals crossing left to right; each at Slow, Normal, and Fast, with Theme transitions off, and with Reduce Motion on (quick tinted fade); the Quick theme swatches (11) wrap onto three rows with no clipped names at large Dynamic Type; the new tab backgrounds read well; no dropped frames or heat on an older iPhone.
 

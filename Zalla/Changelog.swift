@@ -14,6 +14,15 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 27",
+            name: "Seamless Top",
+            highlights: [
+                "The strip behind the clock and battery now matches what the page actually shows at its top edge, so a site like Reddit (black header) or YouTube in dark mode looks like one continuous page instead of a border. Pages scroll like a normal website, and the strip follows the page color as headers slide away or stick, without a flash while pages load"
+            ],
+            improvements: "The strip color eases over in a quick blink, tiny color shifts are ignored, and the clock and battery text no longer flip back and forth on mid gray pages. Pulling the page down past its top now shows the strip color instead of a gap.",
+            fixes: "Fixed the top of the page looking off while scrolling on some sites, and the strip flashing white while a page was still loading."
+        ),
+        ChangelogEntry(
             version: "Build 26",
             name: "Neon, Frost, Blossom",
             highlights: [
