@@ -3,14 +3,28 @@ import SwiftUI
 /// Settings, Tools, Widgets: how to add them, what they show, and a live preview in your accent.
 struct WidgetsSettingsView: View {
     @ObservedObject var browser: BrowserStore
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(WidgetShared.shareKey) private var shareData = WidgetShared.defaultShare
+    @AppStorage(SearchFocus.storageKey) private var keyboardReady = SearchFocus.defaultEnabled
     @State private var snapshot = WidgetSnapshot()
+    @State private var previewLook = WidgetLookKey.defaultLook
 
-    private var palette: WidgetPalette { WidgetPalette(hex: snapshot.accentHex, soft: false) }
-    private var softPalette: WidgetPalette { WidgetPalette(hex: snapshot.accentHex, soft: true) }
+    private var palette: WidgetPalette {
+        WidgetPalette(hex: snapshot.accentHex, look: previewLook, isDark: colorScheme == .dark)
+    }
+
+    private var emberPalette: WidgetPalette {
+        WidgetPalette(hex: snapshot.accentHex, look: .gradient, isDark: colorScheme == .dark)
+    }
 
     var body: some View {
         List {
+            Section {
+                Toggle("Open search with keyboard ready", isOn: $keyboardReady)
+            } footer: {
+                Text("Widgets can't take typing on their own, so tapping Search opens Zalla ready to type. This also applies to the Search choice in the app icon menu. Turn it off and Search just opens Zalla.")
+            }
+
             Section {
                 Toggle("Share with widgets", isOn: $shareData)
             } footer: {
@@ -25,25 +39,19 @@ struct WidgetsSettingsView: View {
             }
 
             Section {
-                preview("Search", size: .small, content: AnyView(SearchWidgetView(palette: palette)), background: AnyView(WidgetBackground(palette: palette)))
-                preview("Search, medium", size: .medium, content: AnyView(SearchWidgetView(palette: softPalette, medium: true)), background: AnyView(WidgetBackground(palette: softPalette)))
-                preview(
-                    "Favorites",
-                    size: .medium,
-                    content: AnyView(FavoritesWidgetView(palette: palette, links: Array(favoriteLinks.prefix(4)))),
-                    background: AnyView(WidgetBackground(palette: palette))
-                )
-                preview("Burn It All", size: .small, content: AnyView(BurnWidgetView(palette: palette)), background: AnyView(BurnWidgetBackground()))
-                preview(
-                    "Privacy Report",
-                    size: .small,
-                    content: AnyView(PrivacyWidgetView(palette: palette, counts: snapshot.privacy, hasData: shareData && snapshot.hasData)),
-                    background: AnyView(WidgetBackground(palette: palette))
-                )
+                Picker("Preview look", selection: $previewLook) {
+                    ForEach(WidgetLookKey.allCases, id: \.self) { look in
+                        Text(look.title).tag(look)
+                    }
+                }
+                previewSearch
+                previewFavorites
+                previewBurn
+                previewPrivacy
             } header: {
                 Text("Preview")
             } footer: {
-                Text("Widgets follow your Zalla accent by default. In the widget editor you can pick another color, a softer look, and which favorites to show. Burn It All opens its usual confirmation, it never burns on its own.")
+                Text("Widgets follow your Zalla accent by default. In the widget editor you can pick another color and look, and choose which favorites to show. Burn It All opens its usual confirmation, it never burns on its own.")
             }
         }
         .navigationTitle("Widgets")
@@ -58,8 +66,53 @@ struct WidgetsSettingsView: View {
         snapshot.shortcuts.isEmpty ? snapshot.bookmarks : snapshot.shortcuts
     }
 
-    private enum PreviewSize {
-        case small, medium
+    private var sampleLinks: [WidgetLink] {
+        let own = Array(favoriteLinks.prefix(4))
+        if !own.isEmpty { return own }
+        return [
+            WidgetLink(title: "News", urlString: "https://example.com/1", symbolName: "globe"),
+            WidgetLink(title: "Mail", urlString: "https://example.com/2", symbolName: "envelope"),
+            WidgetLink(title: "Maps", urlString: "https://example.com/3", symbolName: "map"),
+            WidgetLink(title: "Notes", urlString: "https://example.com/4", symbolName: "globe")
+        ]
+    }
+
+    private var previewSearch: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card("Search, small", medium: false, background: WidgetBackdrop(palette: palette)) {
+                SearchWidgetView(palette: palette)
+            }
+            card("Search, medium", medium: true, background: WidgetBackdrop(palette: palette)) {
+                SearchWidgetView(palette: palette, medium: true)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var previewFavorites: some View {
+        card("Favorites, medium", medium: true, background: WidgetBackdrop(palette: palette)) {
+            FavoritesWidgetView(palette: palette, links: sampleLinks)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var previewBurn: some View {
+        card("Burn It All", medium: false, background: BurnWidgetBackdrop()) {
+            BurnWidgetView(palette: emberPalette)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var previewPrivacy: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            card("Privacy Report, small", medium: false, background: WidgetBackdrop(palette: palette)) {
+                PrivacyWidgetView(palette: palette, counts: snapshot.privacy, hasData: shareData && snapshot.hasData)
+            }
+            card("Privacy Report, medium", medium: true, background: WidgetBackdrop(palette: palette)) {
+                PrivacyWidgetView(palette: palette, counts: snapshot.privacy, hasData: shareData && snapshot.hasData, medium: true)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private func step(_ number: Int, _ text: String) -> some View {
@@ -75,19 +128,23 @@ struct WidgetsSettingsView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func preview(_ title: String, size: PreviewSize, content: AnyView, background: AnyView) -> some View {
+    private func card<Content: View, Background: View>(
+        _ title: String,
+        medium: Bool,
+        background: Background,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
-            content
+            content()
                 .padding(16)
-                .frame(maxWidth: size == .small ? CGFloat(158) : CGFloat.infinity)
+                .frame(maxWidth: medium ? CGFloat.infinity : CGFloat(158))
                 .frame(height: 158)
                 .background(background)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
-        .padding(.vertical, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title) widget preview")
     }

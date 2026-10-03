@@ -1,5 +1,36 @@
 import Foundation
 
+/// Rules for the Search action (app icon or widget) putting the cursor in the address bar. The request waits for the
+/// screen, because on a cold launch the bar does not exist yet when the link arrives, and it tries again until the
+/// keyboard is really up. Foundation only.
+enum SearchFocus {
+    /// Settings, Tools, Widgets: "Open search with keyboard ready".
+    static let storageKey = "searchKeyboardReady"
+    static let defaultEnabled = true
+    /// A request this old is dropped, so a tab opened later never grabs the keyboard by surprise.
+    static let window: TimeInterval = 6
+    static let retryNanoseconds: UInt64 = 300_000_000
+    static let maxAttempts = 12
+
+    static func isEnabled(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: storageKey) as? Bool ?? defaultEnabled
+    }
+
+    static func isPending(requestedAt: Date?, now: Date) -> Bool {
+        guard let requestedAt else { return false }
+        let age = now.timeIntervalSince(requestedAt)
+        return age >= 0 && age < window
+    }
+
+    /// Ask for the keyboard only while Zalla is active, since an inactive app cannot show it.
+    static func shouldAsk(pending: Bool, isActive: Bool) -> Bool { pending && isActive }
+
+    /// The request is done once the field has focus and something really holds the keyboard.
+    static func isSatisfied(fieldFocused: Bool, keyboardHolderExists: Bool) -> Bool {
+        fieldFocused && keyboardHolderExists
+    }
+}
+
 /// Things Zalla can do when asked from outside the app: the app icon quick actions (press and hold the icon) and
 /// the `zalla://` links the widgets use. Foundation only, so the routing can be tested without UIKit.
 enum QuickAction: String, CaseIterable, Equatable {

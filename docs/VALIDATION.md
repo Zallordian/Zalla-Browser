@@ -57,6 +57,23 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Ready to type and widget looks (Build 30)
+
+Needs a TestFlight build on a device.
+
+- Search widget, Zalla force quit first: tap it. Zalla opens with the cursor in the address bar and the keyboard up, with no second tap. Repeat with Zalla in the background on the new tab page, and with a page open (the address is selected, typing replaces it). Repeat in Classic, Compact, and Quick Action toolbars, address bar on top and on the bottom.
+- Same checks from the app icon menu, Search.
+- Search while Settings or the Tabs sheet is open: the sheet closes first, then the keyboard comes up.
+- Open Zalla by tapping the Search widget while the phone was locked and unlocked right after: the keyboard still comes up.
+- Settings, Tools, Widgets, "Open search with keyboard ready" off: the Search widget and the icon Search just open Zalla. The explanation line about typing is shown.
+- Wait a few seconds after opening Zalla normally, then open a new tab: the keyboard does not appear on its own.
+- Widget editor: Look offers Accent gradient, Midnight, Aurora, Glass, Paper for Search, Favorites, Privacy Report. Burn It All keeps its ember look. Each is readable (no clipped text) in light and dark, with Larger Text on, and with Reduce Transparency on.
+- Accent gradient follows the app accent (try a yellow custom accent: dark text stays readable). A fixed color in the editor overrides it.
+- Favorites: colored tiles with the saved icon, or the first letter for plain shortcuts. Medium shows 4, large shows up to 8 plus a search bar that opens Zalla ready to type. Empty list shows "Nothing pinned yet".
+- Burn It All: tap opens only the confirmation. Privacy Report: big number and ring match Settings, Privacy Report totals; with no data it says to open Zalla.
+- Home Screen, Customize, Tinted: all widgets still look right (no unreadable shapes). Lock Screen Search and Privacy Report accessories still work.
+- Settings, Tools, Widgets: the Preview look picker redraws the previews.
+
 ## Widgets (Build 29)
 
 Needs the Apple Developer portal steps in docs/WIDGETS.md done first, then a TestFlight build on a device.

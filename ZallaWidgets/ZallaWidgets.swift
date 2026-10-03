@@ -11,6 +11,30 @@ struct ZallaWidgetsBundle: WidgetBundle {
     }
 }
 
+/// The two things every widget view needs from its surroundings: light or dark, and whether the system is tinting it.
+private struct WidgetSurroundings {
+    let isDark: Bool
+    let tinted: Bool
+
+    init(colorScheme: ColorScheme, renderingMode: WidgetRenderingMode) {
+        isDark = colorScheme == .dark
+        tinted = renderingMode != .fullColor
+    }
+}
+
+/// The widget background. A tinted Home Screen widget gets none of ours, the system draws its own.
+private struct WidgetContainer: View {
+    let palette: WidgetPalette
+
+    var body: some View {
+        if palette.tinted {
+            Color.clear
+        } else {
+            WidgetBackdrop(palette: palette)
+        }
+    }
+}
+
 // MARK: - Search
 
 struct ZallaSearchWidget: Widget {
@@ -19,7 +43,7 @@ struct ZallaSearchWidget: Widget {
             SearchEntryView(entry: entry)
         }
         .configurationDisplayName("Search")
-        .description("Search or enter a website in Zalla.")
+        .description("Tap to search or enter a website. Zalla opens with the keyboard ready.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
     }
 }
@@ -27,18 +51,28 @@ struct ZallaSearchWidget: Widget {
 private struct SearchEntryView: View {
     let entry: ZallaEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var palette: WidgetPalette {
+        let around = WidgetSurroundings(colorScheme: colorScheme, renderingMode: renderingMode)
+        return entry.palette(isDark: around.isDark, tinted: around.tinted)
+    }
 
     var body: some View {
         content
             .widgetURL(WidgetShared.searchLink)
-            .containerBackground(for: .widget) {
-                switch family {
-                case .accessoryCircular, .accessoryRectangular:
-                    AccessoryWidgetBackground()
-                default:
-                    WidgetBackground(palette: entry.palette)
-                }
-            }
+            .containerBackground(for: .widget) { background }
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        switch family {
+        case .accessoryCircular, .accessoryRectangular:
+            AccessoryWidgetBackground()
+        default:
+            WidgetContainer(palette: palette)
+        }
     }
 
     @ViewBuilder
@@ -46,11 +80,13 @@ private struct SearchEntryView: View {
         switch family {
         case .accessoryCircular:
             Image(systemName: "magnifyingglass")
-                .font(.title2.weight(.semibold))
+                .font(.title2.weight(.bold))
+                .widgetAccentable()
         case .accessoryRectangular:
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .font(.title3.weight(.semibold))
+                    .font(.title3.weight(.bold))
+                    .widgetAccentable()
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Zalla")
                         .font(.headline)
@@ -61,9 +97,9 @@ private struct SearchEntryView: View {
                 Spacer(minLength: 0)
             }
         case .systemMedium:
-            SearchWidgetView(palette: entry.palette, medium: true)
+            SearchWidgetView(palette: palette, medium: true)
         default:
-            SearchWidgetView(palette: entry.palette)
+            SearchWidgetView(palette: palette)
         }
     }
 }
@@ -84,24 +120,31 @@ struct ZallaFavoritesWidget: Widget {
 private struct FavoritesEntryView: View {
     let entry: ZallaEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var palette: WidgetPalette {
+        let around = WidgetSurroundings(colorScheme: colorScheme, renderingMode: renderingMode)
+        return entry.palette(isDark: around.isDark, tinted: around.tinted)
+    }
 
     private var links: [WidgetLink] {
-        let count = WidgetShared.favoriteCount(family: family == .systemLarge ? .large : .medium, setting: entry.limit)
+        let size: WidgetShared.FavoritesFamily = family == .systemLarge ? .large : .medium
+        let count = WidgetShared.favoriteCount(family: size, setting: entry.limit)
         return Array(entry.favorites.prefix(count))
     }
 
     var body: some View {
         FavoritesWidgetView(
-            palette: entry.palette,
+            palette: palette,
             links: links,
             columns: 4,
             showTitles: entry.showTitles,
+            large: family == .systemLarge,
             interactive: true
         )
         .widgetURL(WidgetShared.appLink)
-        .containerBackground(for: .widget) {
-            WidgetBackground(palette: entry.palette)
-        }
+        .containerBackground(for: .widget) { WidgetContainer(palette: palette) }
     }
 }
 
@@ -110,15 +153,34 @@ private struct FavoritesEntryView: View {
 struct ZallaBurnWidget: Widget {
     var body: some WidgetConfiguration {
         AppIntentConfiguration(kind: "ZallaBurnWidget", intent: ZallaStyleIntent.self, provider: ZallaStyleProvider()) { entry in
-            BurnWidgetView(palette: entry.palette)
-                .widgetURL(WidgetShared.burnLink)
-                .containerBackground(for: .widget) {
-                    BurnWidgetBackground()
-                }
+            BurnEntryView(entry: entry)
         }
         .configurationDisplayName("Burn It All")
         .description("Opens Zalla's Burn It All confirmation. Nothing is erased until you confirm.")
         .supportedFamilies([.systemSmall])
+    }
+}
+
+private struct BurnEntryView: View {
+    let entry: ZallaEntry
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var palette: WidgetPalette {
+        let around = WidgetSurroundings(colorScheme: colorScheme, renderingMode: renderingMode)
+        return entry.palette(isDark: around.isDark, tinted: around.tinted)
+    }
+
+    var body: some View {
+        BurnWidgetView(palette: palette)
+            .widgetURL(WidgetShared.burnLink)
+            .containerBackground(for: .widget) {
+                if palette.tinted {
+                    Color.clear
+                } else {
+                    BurnWidgetBackdrop()
+                }
+            }
     }
 }
 
@@ -138,18 +200,27 @@ struct ZallaPrivacyWidget: Widget {
 private struct PrivacyEntryView: View {
     let entry: ZallaEntry
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    private var palette: WidgetPalette {
+        let around = WidgetSurroundings(colorScheme: colorScheme, renderingMode: renderingMode)
+        return entry.palette(isDark: around.isDark, tinted: around.tinted)
+    }
 
     var body: some View {
         content
             .widgetURL(WidgetShared.appLink)
-            .containerBackground(for: .widget) {
-                switch family {
-                case .accessoryRectangular:
-                    AccessoryWidgetBackground()
-                default:
-                    WidgetBackground(palette: entry.palette)
-                }
-            }
+            .containerBackground(for: .widget) { background }
+    }
+
+    @ViewBuilder
+    private var background: some View {
+        if family == .accessoryRectangular {
+            AccessoryWidgetBackground()
+        } else {
+            WidgetContainer(palette: palette)
+        }
     }
 
     @ViewBuilder
@@ -158,24 +229,24 @@ private struct PrivacyEntryView: View {
         case .accessoryRectangular:
             HStack(spacing: 8) {
                 Image(systemName: "shield.lefthalf.filled")
-                    .font(.title3.weight(.semibold))
+                    .font(.title3.weight(.bold))
+                    .widgetAccentable()
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Privacy Report")
                         .font(.headline)
-                    if entry.snapshot.hasData {
-                        Text("\(entry.snapshot.privacy.total) things Zalla did")
-                            .font(.caption)
-                    } else {
-                        Text("Open Zalla to start")
-                            .font(.caption)
-                    }
+                    Text(lockScreenLine)
+                        .font(.caption)
                 }
                 Spacer(minLength: 0)
             }
         case .systemMedium:
-            PrivacyWidgetView(palette: entry.palette, counts: entry.snapshot.privacy, hasData: entry.snapshot.hasData, medium: true)
+            PrivacyWidgetView(palette: palette, counts: entry.snapshot.privacy, hasData: entry.snapshot.hasData, medium: true)
         default:
-            PrivacyWidgetView(palette: entry.palette, counts: entry.snapshot.privacy, hasData: entry.snapshot.hasData)
+            PrivacyWidgetView(palette: palette, counts: entry.snapshot.privacy, hasData: entry.snapshot.hasData)
         }
+    }
+
+    private var lockScreenLine: String {
+        entry.snapshot.hasData ? "\(entry.snapshot.privacy.total) things Zalla did" : "Open Zalla to start"
     }
 }

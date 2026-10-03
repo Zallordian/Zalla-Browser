@@ -66,4 +66,33 @@ final class QuickActionTests: XCTestCase {
         }
         XCTAssertTrue(DefaultBrowser.settingsFooter.contains("Apple"))
     }
+
+    func testSearchKeyboardSettingDefaultsOn() {
+        let defaults = UserDefaults(suiteName: "SearchFocusTests")!
+        defaults.removePersistentDomain(forName: "SearchFocusTests")
+        XCTAssertTrue(SearchFocus.isEnabled(in: defaults))
+        defaults.set(false, forKey: SearchFocus.storageKey)
+        XCTAssertFalse(SearchFocus.isEnabled(in: defaults))
+    }
+
+    func testSearchFocusRequestExpiresSoALaterTabNeverGrabsTheKeyboard() {
+        let asked = Date(timeIntervalSince1970: 1_000)
+        XCTAssertFalse(SearchFocus.isPending(requestedAt: nil, now: asked))
+        XCTAssertTrue(SearchFocus.isPending(requestedAt: asked, now: asked))
+        XCTAssertTrue(SearchFocus.isPending(requestedAt: asked, now: asked.addingTimeInterval(SearchFocus.window - 0.1)))
+        XCTAssertFalse(SearchFocus.isPending(requestedAt: asked, now: asked.addingTimeInterval(SearchFocus.window)))
+        XCTAssertFalse(SearchFocus.isPending(requestedAt: asked, now: asked.addingTimeInterval(-5)))
+    }
+
+    func testSearchFocusAsksOnlyWhileActiveAndIsDoneOnlyWithTheKeyboardUp() {
+        XCTAssertTrue(SearchFocus.shouldAsk(pending: true, isActive: true))
+        XCTAssertFalse(SearchFocus.shouldAsk(pending: true, isActive: false))
+        XCTAssertFalse(SearchFocus.shouldAsk(pending: false, isActive: true))
+        XCTAssertTrue(SearchFocus.isSatisfied(fieldFocused: true, keyboardHolderExists: true))
+        XCTAssertFalse(SearchFocus.isSatisfied(fieldFocused: true, keyboardHolderExists: false))
+        XCTAssertFalse(SearchFocus.isSatisfied(fieldFocused: false, keyboardHolderExists: true))
+        // Retries cover a few seconds, and never outlast the request.
+        let retryTotal = Double(SearchFocus.maxAttempts) * Double(SearchFocus.retryNanoseconds) / 1_000_000_000
+        XCTAssertLessThanOrEqual(retryTotal, SearchFocus.window)
+    }
 }

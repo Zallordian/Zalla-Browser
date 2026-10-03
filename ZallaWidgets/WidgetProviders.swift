@@ -8,12 +8,15 @@ struct ZallaEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot
     let accentHex: String
-    let soft: Bool
+    let look: WidgetLookKey
     let source: WidgetFavoritesSource
     let limit: Int
     let showTitles: Bool
 
-    var palette: WidgetPalette { WidgetPalette(hex: accentHex, soft: soft) }
+    /// The colors for this entry. `tinted` is the Home Screen tinted or Lock Screen rendering.
+    func palette(isDark: Bool, tinted: Bool) -> WidgetPalette {
+        WidgetPalette(hex: accentHex, look: look, isDark: isDark, tinted: tinted)
+    }
 
     var favorites: [WidgetLink] {
         source == .bookmarks ? snapshot.bookmarks : snapshot.shortcuts
@@ -31,7 +34,7 @@ struct ZallaEntry: TimelineEntry {
             date: Date(),
             snapshot: snapshot,
             accentHex: WidgetShared.resolvedAccentHex(choiceKey: accent.rawValue, snapshot: snapshot),
-            soft: look == .soft,
+            look: look.key,
             source: source,
             limit: limit.value,
             showTitles: showTitles
@@ -42,10 +45,10 @@ struct ZallaEntry: TimelineEntry {
     static var placeholder: ZallaEntry {
         var snapshot = WidgetSnapshot()
         snapshot.shortcuts = [
-            WidgetLink(title: "Favorite", urlString: "https://example.com/1", symbolName: "globe"),
-            WidgetLink(title: "Favorite", urlString: "https://example.com/2", symbolName: "book"),
-            WidgetLink(title: "Favorite", urlString: "https://example.com/3", symbolName: "newspaper"),
-            WidgetLink(title: "Favorite", urlString: "https://example.com/4", symbolName: "star")
+            WidgetLink(title: "News", urlString: "https://example.com/1", symbolName: "globe"),
+            WidgetLink(title: "Mail", urlString: "https://example.com/2", symbolName: "envelope"),
+            WidgetLink(title: "Maps", urlString: "https://example.com/3", symbolName: "map"),
+            WidgetLink(title: "Notes", urlString: "https://example.com/4", symbolName: "globe")
         ]
         snapshot.privacy = WidgetPrivacyCounts(linkCleaned: 12, httpsUpgrade: 8, cookieBannerDismissed: 5)
         snapshot.updatedAt = Date()
@@ -53,7 +56,7 @@ struct ZallaEntry: TimelineEntry {
             date: Date(),
             snapshot: snapshot,
             accentHex: WidgetShared.defaultAccentHex,
-            soft: false,
+            look: WidgetLookKey.defaultLook,
             source: .shortcuts,
             limit: 8,
             showTitles: true

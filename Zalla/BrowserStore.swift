@@ -51,8 +51,8 @@ final class BrowserStore: ObservableObject {
     @Published var imageExport: ImageExportRequest?
     /// An action that arrived from the app icon menu or a widget link, waiting for the screen to carry it out.
     @Published var pendingQuickAction: QuickAction?
-    /// Bumped to ask the address bar to take focus (the Search action). Whichever bar style is showing reacts.
-    @Published var addressFocusRequest = 0
+    /// When the Search action asked for the address bar. Whichever bar style is showing takes it and clears this.
+    @Published var addressFocusRequestedAt: Date?
     /// Bumped to ask for the Burn It All confirmation. Burn never starts without that confirmation.
     @Published var burnConfirmRequest = 0
     private let fileURL: URL
@@ -177,6 +177,12 @@ final class BrowserStore: ObservableObject {
     func openPrivateTab(url: URL? = nil) async {
         guard await unlockPrivateTabs() else { return }
         addTab(isPrivate: true, url: url)
+    }
+
+    /// The Search action: asks for the address bar and the keyboard, unless the person turned that off.
+    func requestAddressFocus() {
+        guard SearchFocus.isEnabled() else { return }
+        addressFocusRequestedAt = Date()
     }
 
     /// A New Tab action: the current tab when it is already blank and regular, otherwise a fresh one.
@@ -617,6 +623,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ThemeTransitionSpeed.storageKey)
         defaults.removeObject(forKey: LogoStyle.storageKey)
         defaults.removeObject(forKey: QuickAction.storageKey)
+        defaults.removeObject(forKey: SearchFocus.storageKey)
         defaults.removeObject(forKey: VideoSaver.storageKey)
         defaults.removeObject(forKey: WidgetShared.shareKey)
         WidgetSync.clear()

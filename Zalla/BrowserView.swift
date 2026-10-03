@@ -93,7 +93,7 @@ extension BrowserView {
             switch action.step {
             case .newTab: browser.openNewTabFromQuickAction()
             case .newPrivateTab: await browser.openPrivateTab()
-            case .focusAddressBar: browser.addressFocusRequest += 1
+            case .focusAddressBar: browser.requestAddressFocus()
             case .openLibrary: sheet = .library
             case .confirmBurn: browser.burnConfirmRequest += 1
             }
@@ -374,7 +374,7 @@ private struct TabContent: View {
                 isEditingClassicAddress = false
             }
         }
-        .onChange(of: browser.addressFocusRequest) { _, _ in focusAddressBarFromOutside() }
+        .onChange(of: browser.addressFocusRequestedAt) { _, _ in startAddressFocusRequest() }
         .onChange(of: browser.burnConfirmRequest) { _, _ in confirmBurn = true }
         .onChange(of: addressFocused) { _, focused in
             if focused {
@@ -404,6 +404,7 @@ private struct TabContent: View {
         }
         .onAppear {
             address = tab.url?.absoluteString ?? ""
+            startAddressFocusRequest()
             if toolbarStyle == .compact, !hasSeenCompactTip {
                 chromeTipMessage = ChromeModeTips.compactMessage
             } else if toolbarStyle == .quickAction, !hasSeenQuickActionTip {
@@ -1056,9 +1057,41 @@ private struct TabContent: View {
         }
     }
 
-    /// The Search quick action: puts the cursor in whichever address bar this toolbar style has.
+    /// Whether the address field has focus and something really holds the keyboard.
+    private var addressKeyboardIsUp: Bool {
+        SearchFocus.isSatisfied(fieldFocused: addressFocused, keyboardHolderExists: UIResponder.currentFirstResponder() != nil)
+    }
+
+    /// The Search action (app icon or widget). The request can arrive before this screen exists (cold launch) or
+    /// while Zalla is not active yet, so ask, check, and ask again until the keyboard is up or the request expires.
+    private func startAddressFocusRequest() {
+        guard SearchFocus.isPending(requestedAt: browser.addressFocusRequestedAt, now: Date()) else { return }
+        Task { @MainActor in
+            for _ in 0..<SearchFocus.maxAttempts {
+                let pending = SearchFocus.isPending(requestedAt: browser.addressFocusRequestedAt, now: Date())
+                guard pending else { return }
+                if SearchFocus.shouldAsk(pending: pending, isActive: UIApplication.shared.applicationState == .active) {
+                    focusAddressBarFromOutside()
+                }
+                try? await Task.sleep(nanoseconds: SearchFocus.retryNanoseconds)
+                if addressKeyboardIsUp {
+                    browser.addressFocusRequestedAt = nil
+                    return
+                }
+            }
+        }
+    }
+
+    /// Puts the cursor in whichever address bar this toolbar style has.
     private func focusAddressBarFromOutside() {
-        guard !addressFocused else { return }
+        if addressFocused {
+            // Focus was set while the keyboard could not show yet. Set it again.
+            if UIResponder.currentFirstResponder() == nil {
+                addressFocused = false
+                focusAddressFieldSelectingAll()
+            }
+            return
+        }
         switch toolbarStyle {
         case .compact: beginCompactAddressEditing()
         case .quickAction: beginQuickActionAddressEditing()
@@ -2883,7 +2916,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "29"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "30"
         return "\(marketing) (\(build))"
     }
 

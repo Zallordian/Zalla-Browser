@@ -14,6 +14,17 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 30",
+            name: "Ready to Type",
+            highlights: [
+                "Tap Search on the widget (or Search in the app icon menu) and Zalla opens with the cursor already in the address bar and the keyboard up. It works from a cold start and when Zalla is already running. If you would rather it just open, there is a switch in Settings, Tools, Widgets",
+                "The widgets got a makeover. Five looks to pick from in the widget editor: Accent gradient (the default, it follows your Zalla accent), Midnight, Aurora, Glass, and Paper. Search has a proper rounded bar, favorites are colored tiles with their icon or first letter, Burn It All glows like embers, and Privacy Report has a big number and a ring",
+                "Widgets also behave on a tinted Home Screen and on the Lock Screen, and they follow light and dark"
+            ],
+            improvements: "Settings, Tools, Widgets explains why a widget can open Zalla ready to type but cannot take typing itself, and the previews can try each look.",
+            fixes: "The Search quick action no longer depends on the address bar already being on screen, so it works on a cold launch too."
+        ),
+        ChangelogEntry(
             version: "Build 29",
             name: "Press and Hold",
             highlights: [

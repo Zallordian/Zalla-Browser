@@ -23,13 +23,18 @@ enum WidgetAccentChoice: String, AppEnum {
 }
 
 enum WidgetLook: String, AppEnum {
-    case filled, soft
+    case gradient, midnight, aurora, glass, paper
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Look"
     static var caseDisplayRepresentations: [WidgetLook: DisplayRepresentation] = [
-        .filled: "Filled",
-        .soft: "Soft"
+        .gradient: "Accent gradient",
+        .midnight: "Midnight",
+        .aurora: "Aurora",
+        .glass: "Glass",
+        .paper: "Paper"
     ]
+
+    var key: WidgetLookKey { WidgetLookKey(rawValue: rawValue) ?? WidgetLookKey.defaultLook }
 }
 
 enum WidgetFavoritesSource: String, AppEnum {
@@ -61,7 +66,7 @@ enum WidgetFavoriteLimit: String, AppEnum {
     }
 }
 
-/// Search, Burn It All, and Privacy Report: color and look.
+/// Search and Privacy Report: color and look. (Burn It All keeps its ember look and has no options.)
 struct ZallaStyleIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Zalla widget"
     static var description = IntentDescription("Choose the color and look.")
@@ -69,7 +74,7 @@ struct ZallaStyleIntent: WidgetConfigurationIntent {
     @Parameter(title: "Color", default: .followApp)
     var accent: WidgetAccentChoice
 
-    @Parameter(title: "Look", default: .filled)
+    @Parameter(title: "Look", default: .gradient)
     var look: WidgetLook
 }
 
@@ -81,7 +86,7 @@ struct ZallaFavoritesIntent: WidgetConfigurationIntent {
     @Parameter(title: "Color", default: .followApp)
     var accent: WidgetAccentChoice
 
-    @Parameter(title: "Look", default: .filled)
+    @Parameter(title: "Look", default: .gradient)
     var look: WidgetLook
 
     @Parameter(title: "Favorites", default: .shortcuts)
