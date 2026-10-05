@@ -36,11 +36,18 @@ final class ZallaUnlockTests: XCTestCase {
             ZallaUnlockProduct.Copy.title, ZallaUnlockProduct.Copy.subtitle, ZallaUnlockProduct.Copy.note,
             ZallaUnlockProduct.Copy.unavailable, ZallaUnlockProduct.Copy.pending, ZallaUnlockProduct.Copy.failed,
             ZallaUnlockProduct.Copy.restoreNone, ZallaUnlockProduct.Copy.unlocked,
-            ZallaUnlockProduct.Copy.restoreOffline, ZallaUnlockProduct.Copy.tryAgain
+            ZallaUnlockProduct.Copy.restoreOffline, ZallaUnlockProduct.Copy.tryAgain, ZallaUnlockProduct.Copy.notOffered
         ]
         XCTAssertFalse(copy.contains { $0.contains("\u{2014}") })
         XCTAssertFalse(copy.contains { $0.contains("\u{2013}") })
         XCTAssertTrue(ZallaUnlockProduct.Copy.unavailable.contains("App Store"))
+    }
+
+    func testUnavailableMessageSeparatesErrorFromEmptyAnswer() {
+        XCTAssertEqual(ZallaUnlockProduct.unavailableMessage(loadFailed: true), ZallaUnlockProduct.Copy.unavailable)
+        XCTAssertEqual(ZallaUnlockProduct.unavailableMessage(loadFailed: false), ZallaUnlockProduct.Copy.notOffered)
+        XCTAssertTrue(ZallaUnlockProduct.Copy.unavailable.contains("Couldn't reach the App Store"))
+        XCTAssertFalse(ZallaUnlockProduct.Copy.notOffered.contains("App Store"))
     }
 
     func testRestoreMessageSeparatesOfflineFromNone() {

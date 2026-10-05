@@ -21,10 +21,13 @@ final class BurnCopyTests: XCTestCase {
     }
 
     func testChangelogNeverSaysBurnItAllQuits() {
-        for entry in Changelog.releases.prefix(1) {
+        for entry in Changelog.releases.prefix(2) {
             let text = (entry.highlights + [entry.improvements, entry.fixes]).joined(separator: " ").lowercased()
-            XCTAssertFalse(text.contains("quit"))
-            XCTAssertTrue(text.contains("fresh tab"))
+            XCTAssertFalse(text.contains("quit"), entry.version)
+            // Build 32 is the entry that announced the new Burn It All behavior.
+            if entry.version == "Build 32" {
+                XCTAssertTrue(text.contains("fresh tab"), entry.version)
+            }
         }
     }
 

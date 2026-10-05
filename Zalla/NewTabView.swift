@@ -552,7 +552,7 @@ private struct ShortcutEditor: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(name)
+                        .accessibilityLabel(HomeShortcuts.symbolLabel(name))
                     }
                 }
             }

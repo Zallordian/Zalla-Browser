@@ -47,12 +47,17 @@ final class TipJarTests: XCTestCase {
     func testCopyHasNoDashes() {
         let dash = String(UnicodeScalar(0x2014)!)
         let copy = [
-            TipJar.Copy.note, TipJar.Copy.unavailable, TipJar.Copy.pending,
+            TipJar.Copy.note, TipJar.Copy.unavailable, TipJar.Copy.notOffered, TipJar.Copy.tryAgain, TipJar.Copy.pending,
             TipJar.Copy.failed, TipJar.Copy.thanksTitle, TipJar.Copy.thanksMessage
         ]
         for line in copy {
             XCTAssertFalse(line.contains(dash), line)
         }
         XCTAssertTrue(TipJar.Copy.note.contains("do not unlock features"))
+    }
+
+    func testUnavailableMessageSeparatesErrorFromEmptyAnswer() {
+        XCTAssertEqual(TipJar.unavailableMessage(loadFailed: true), TipJar.Copy.unavailable)
+        XCTAssertEqual(TipJar.unavailableMessage(loadFailed: false), TipJar.Copy.notOffered)
     }
 }

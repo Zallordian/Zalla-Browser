@@ -27,9 +27,17 @@ enum TipJar {
         productIDs.firstIndex(of: id) ?? productIDs.count
     }
 
+    /// What the tip list says when no tips are shown: a thrown error means the App Store was not reached,
+    /// an empty answer means it was reached but offers no tips right now.
+    static func unavailableMessage(loadFailed: Bool) -> String {
+        loadFailed ? Copy.unavailable : Copy.notOffered
+    }
+
     enum Copy {
         static let note = "Zalla is made by one person. If it makes your browsing better, a tip helps keep it going. Tips are a thank you and do not unlock features."
-        static let unavailable = "Tips aren't available yet. Thanks for wanting to help!"
+        static let unavailable = "Couldn't reach the App Store. Check your connection and try again."
+        static let notOffered = "Tips aren't available right now. Thanks for wanting to help!"
+        static let tryAgain = "Try again"
         static let pending = "Your tip is waiting for approval. Thank you for thinking of Zalla!"
         static let failed = "The tip did not go through. Please try again later."
         static let thanksTitle = "Thank you!"
@@ -118,6 +126,8 @@ final class TipStore: ObservableObject {
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var loadState: LoadState = .idle
+    /// True when the last product load threw, false when it answered with no products.
+    @Published private(set) var loadFailed = false
     @Published var purchaseState: PurchaseState = .idle
 
     var isPurchasing: Bool {
@@ -128,6 +138,7 @@ final class TipStore: ObservableObject {
     func loadProducts() async {
         if loadState == .loading || (loadState == .loaded && !products.isEmpty) { return }
         loadState = .loading
+        loadFailed = false
         do {
             let loaded = try await Product.products(for: TipJar.productIDs)
             let sorted = TipJar.sortedByPrice(loaded, id: { $0.id }, price: { $0.price })
@@ -135,6 +146,7 @@ final class TipStore: ObservableObject {
             loadState = sorted.isEmpty ? .unavailable : .loaded
         } catch {
             products = []
+            loadFailed = true
             loadState = .unavailable
         }
     }

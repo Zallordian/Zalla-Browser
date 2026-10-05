@@ -207,7 +207,7 @@ final class BrowserStore: ObservableObject {
     /// Escape hatch on the lock screen: close every private tab without unlocking them.
     func closePrivateTabs() {
         speaker.stop()
-        tabs.filter(\.isPrivate).forEach { $0.cancelOpenDialogs(); $0.webView.stopLoading() }
+        tabs.filter(\.isPrivate).forEach { $0.detachDialogs(); $0.webView.stopLoading() }
         tabs.removeAll { $0.isPrivate }
         if tabs.isEmpty {
             addTab()
@@ -402,7 +402,7 @@ final class BrowserStore: ObservableObject {
     func close(_ tab: BrowserTab) {
         if speaker.tabID == tab.id { speaker.stop() }
         tab.capturePreview()
-        tab.cancelOpenDialogs()
+        tab.detachDialogs()
         tab.webView.stopLoading()
         tabs.removeAll { $0.id == tab.id }
         if tabs.isEmpty { addTab() }
@@ -413,7 +413,7 @@ final class BrowserStore: ObservableObject {
         let snapshot = tabs
         for tab in snapshot {
             tab.capturePreview()
-            tab.cancelOpenDialogs()
+            tab.detachDialogs()
             tab.webView.stopLoading()
         }
         tabs.removeAll()
@@ -1434,7 +1434,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private func present(_ alert: UIAlertController, on host: UIViewController, gate: DialogGate) {
         openDialogs.removeAll { !$0.gate.isOpen }
         openDialogs.append((gate: gate, alert: alert))
+        guard host.viewIfLoaded?.window != nil else {
+            gate.deny()
+            return
+        }
         host.present(alert, animated: true)
+        // If UIKit refused to show it, answer "no" now so the page is never left waiting. Once the dialog has been
+        // answered or cancelled the gate is closed, so this does nothing.
+        Task { @MainActor in
+            if alert.presentingViewController == nil { gate.deny() }
+        }
+    }
+
+    /// For a tab that is being closed: answers its open dialogs and stops listening to its page, so a page that keeps
+    /// calling alert() after the tab is gone is answered by WebKit instead of shown. This web view only.
+    func detachDialogs() {
+        cancelOpenDialogs()
+        webView.uiDelegate = nil
     }
 
     /// Takes down any dialog this tab is showing and answers it "no", so WebKit is never left waiting.
@@ -1708,9 +1724,15 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         }
         let scheme = url.scheme?.lowercased() ?? ""
         if scheme == "blob" || scheme == "data" {
-            // JS-triggered blob/data downloads become WKDownload via the action path.
-            pendingDownloadURL = url
-            decisionHandler(.download)
+            // JS-triggered blob/data downloads become WKDownload via the action path. A blob or data page inside a
+            // frame of the page (not a download link) loads normally.
+            let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
+            if isMainFrame || navigationAction.shouldPerformDownload {
+                pendingDownloadURL = url
+                decisionHandler(.download)
+            } else {
+                decisionHandler(.allow)
+            }
             return
         }
         if ["http", "https", "about"].contains(scheme) {

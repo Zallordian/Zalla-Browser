@@ -25,11 +25,18 @@ enum ZallaUnlockProduct {
         return reachedStore ? Copy.restoreNone : Copy.restoreOffline
     }
 
+    /// What the purchase row says when the product is not shown. A thrown error means the App Store was not reached.
+    /// An empty answer means it was reached but does not offer the unlock right now.
+    static func unavailableMessage(loadFailed: Bool) -> String {
+        loadFailed ? Copy.unavailable : Copy.notOffered
+    }
+
     enum Copy {
         static let title = "Zalla Unlock"
         static let subtitle = "One time purchase"
         static let note = "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs. Buy once, keep it on this Apple Account."
         static let unavailable = "Couldn't reach the App Store. Check your connection and try again."
+        static let notOffered = "Zalla Unlock isn't available right now."
         static let tryAgain = "Try again"
         static let pending = "Your purchase is waiting for approval."
         static let failed = "The purchase did not go through. Please try again later."
@@ -76,6 +83,8 @@ final class ZallaUnlock: ObservableObject {
     @Published private(set) var isUnlocked: Bool
     @Published private(set) var product: Product?
     @Published private(set) var loadState: LoadState = .idle
+    /// True when the last product load threw, false when it answered with no product.
+    @Published private(set) var loadFailed = false
     @Published var purchaseState: PurchaseState = .idle
 
     /// Called on the main actor whenever the entitlement changes.
@@ -92,12 +101,14 @@ final class ZallaUnlock: ObservableObject {
     func loadProduct() async {
         if loadState == .loading || (loadState == .loaded && product != nil) { return }
         loadState = .loading
+        loadFailed = false
         do {
             let products = try await Product.products(for: [ZallaUnlockProduct.id])
             product = products.first
             loadState = product == nil ? .unavailable : .loaded
         } catch {
             product = nil
+            loadFailed = true
             loadState = .unavailable
         }
     }

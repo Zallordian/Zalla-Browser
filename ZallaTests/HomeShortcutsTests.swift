@@ -162,4 +162,12 @@ final class PopularSitesTests: XCTestCase {
         XCTAssertEqual(PopularSites.site(forHost: "www." + first.domain)?.domain, first.domain)
         XCTAssertNil(PopularSites.site(forHost: nil))
     }
+
+    func testSymbolLabelsAreReadable() {
+        XCTAssertEqual(HomeShortcuts.symbolLabel("magnifyingglass"), "Search")
+        XCTAssertEqual(HomeShortcuts.symbolLabel("square.and.arrow.up"), "square and arrow up")
+        for name in HomeShortcuts.curatedSymbols {
+            XCTAssertFalse(HomeShortcuts.symbolLabel(name).contains("."), name)
+        }
+    }
 }

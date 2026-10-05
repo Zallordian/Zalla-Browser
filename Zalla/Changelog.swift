@@ -17,11 +17,11 @@ enum Changelog {
             version: "Build 33",
             name: "Last Polish",
             highlights: [
-                "Restore Purchases now tells you when it could not reach the App Store, instead of saying no purchase was found. If Zalla Unlock cannot load, you get a Try again button",
+                "Restore Purchases now tells you when it could not reach the App Store, instead of saying no purchase was found. If Zalla Unlock or the tip jar cannot load, you get a Try again button",
                 "Saving or sharing an image only lists the formats your phone can actually create"
             ],
             improvements: "Settings wording is plainer: the Burn It All help matches what it really does, the Settings shortcut row is called Open Zalla settings in iOS, and the How to steps point to the right Settings screens. Clear browsing data now also clears cached files and lets go of open tabs, like Burn It All does.",
-            fixes: "Closing a tab, or burning, while a page is asking a question (an alert, a camera or location request) is handled cleanly. If the app icon cannot be changed, the message is now short and plain."
+            fixes: "Closing a tab, or burning, while a page is asking a question (an alert, a camera or location request) is handled cleanly. If the app icon cannot be changed, the message is now short and plain. Pages that show content in a frame from a data or blob address now load instead of turning into a download. The icon choices for a new tab shortcut have readable names for VoiceOver."
         ),
         ChangelogEntry(
             version: "Build 32",

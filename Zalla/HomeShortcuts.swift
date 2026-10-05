@@ -53,6 +53,29 @@ enum HomeShortcuts {
         "gamecontroller"
     ]
 
+    private static let symbolLabels: [String: String] = [
+        "magnifyingglass": "Search",
+        "newspaper": "News",
+        "lock.shield": "Lock and shield",
+        "music.note": "Music",
+        "play.rectangle": "Video",
+        "cart": "Shopping cart",
+        "bubble.left.and.bubble.right": "Chat",
+        "person.crop.circle": "Person",
+        "safari": "Compass",
+        "doc.text": "Document",
+        "bolt": "Lightning bolt",
+        "gamecontroller": "Game controller",
+        "apple.logo": "Apple",
+        "chevron.left.forwardslash.chevron.right": "Code"
+    ]
+
+    /// What VoiceOver reads for an icon choice. Falls back to the symbol name with the dots turned into spaces.
+    static func symbolLabel(_ name: String) -> String {
+        if let friendly = symbolLabels[name] { return friendly }
+        return name.replacingOccurrences(of: ".", with: " ")
+    }
+
     /// Fresh installs and resets start with no shortcuts. Existing users keep the list they already have.
     static let defaults: [HomeShortcut] = []
 

@@ -82,8 +82,13 @@ struct SupportZallaView: View {
                 Spacer()
             }
         case .unavailable:
-            Text(TipJar.Copy.unavailable)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(TipJar.unavailableMessage(loadFailed: store.loadFailed))
+                    .foregroundStyle(.secondary)
+                Button(TipJar.Copy.tryAgain) {
+                    Task { await store.loadProducts() }
+                }
+            }
         case .loaded:
             ForEach(store.products, id: \.id) { product in
                 TipButton(

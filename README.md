@@ -27,6 +27,12 @@ Implemented in source:
 - Clear browsing data now stops speech, tears down the closed tabs, and clears `URLCache`, like Burn It All.
 - How to paths fixed (Appearance, Home personalization; Premium or Appearance, Explore theme packs).
 - `TipTransactionObserver.start()` also runs from `ZallaAppDelegate.didFinishLaunchingWithOptions`; the call in `ZallaApp` stays and does nothing a second time.
+- Follow-ups folded into Build 33 (second audit):
+  - `BurnCopyTests` changelog check covers the two newest entries; only the Build 32 entry must say "fresh tab".
+  - Unlock and Tip Jar tell a thrown product load (`loadFailed`, "Couldn't reach the App Store...") from an empty answer ("isn't available right now"), both with Try again (`unavailableMessage(loadFailed:)`).
+  - `BrowserTab.present` denies the dialog right away when the host has no window or UIKit did not present it. `detachDialogs()` (cancel dialogs plus `webView.uiDelegate = nil`) runs in `close(_:)`, `closeAllTabs()` and `closePrivateTabs()`; each popup child has its own web view and is covered the same way.
+  - `data:` and `blob:` navigations become downloads only in the main frame or when WebKit marks them as a download (`shouldPerformDownload`); subframes load normally.
+  - `HomeShortcuts.symbolLabel` gives the shortcut icon picker readable VoiceOver names.
 - Version bump: `CURRENT_PROJECT_VERSION` 33, fallback strings, Build 33 changelog entry "Last Polish", AboutTests ordering.
 
 ## Build 32
