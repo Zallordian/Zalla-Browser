@@ -57,6 +57,9 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## iPhone-only device family (Build 34)
+After `xcodegen generate`, check `TARGETED_DEVICE_FAMILY = 1` for the Zalla, ZallaWidgets, and ZallaTests targets (Xcode Build Settings, or `xcodebuild -showBuildSettings`). In App Store Connect or TestFlight the build lists iPhone only, with no iPad. The iPad simulator is not offered as a run destination.
+
 ## Last Polish (Build 33)
 Needs a physical iPhone. Check:
 - Dialogs: open a page that fires alert(), confirm(), and prompt() in a loop, plus one that asks for camera, microphone, or location. While a dialog is up, close the tab, use Close All, run Clear browsing data, and run Burn It All. No crash and no stuck page each time. Answer a dialog normally and confirm it only fires once.

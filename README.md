@@ -15,6 +15,10 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 34
+
+- iPhone-only device family fix (`project.yml`): XcodeGen's iOS preset sets `TARGETED_DEVICE_FAMILY` to "1,2" on every iOS target, which overrides the project-level "1", so builds 32 and 33 showed iPhone and iPad in TestFlight. The Zalla app target and ZallaTests now set `TARGETED_DEVICE_FAMILY: "1"` at target level, like the widget. No app code changed; version bump only (`CURRENT_PROJECT_VERSION` 34, fallback strings), no changelog entry because nothing user visible changes.
+
 ## Build 33
 
 - Settings help for Burn It All now uses `BurnCopy.settingsHelp` (added to `BurnCopy.all`, so `BurnCopyTests` guards it). The older in-app changelog lines that said Burn closes Zalla were reworded.
