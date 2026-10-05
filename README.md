@@ -15,6 +15,20 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 33
+
+- Settings help for Burn It All now uses `BurnCopy.settingsHelp` (added to `BurnCopy.all`, so `BurnCopyTests` guards it). The older in-app changelog lines that said Burn closes Zalla were reworded.
+- Dialogs and permission prompts from a page (`BrowserStore.swift`): new `DialogGate` makes sure each WebKit completion handler (alert, confirm, prompt, camera and microphone, geolocation) runs exactly once. Each `BrowserTab` remembers its open alerts; `tearDown()`, closing a tab, Close All, closing private tabs, Clear browsing data, Reset, and Burn It All dismiss them and answer deny, false, or nil.
+- Image export (`ImageExporter.swift`, `ImageExportSheet.swift`) lists only the formats `CGImageDestinationCopyTypeIdentifiers()` reports (PNG and JPEG always stay). `ImageExportFormatTests` covers the filter.
+- App icon failure text is now "Alternate icons aren't available right now." (`ZallaTheme.swift`).
+- Settings row "Open Zalla settings in iOS" (was "Make Zalla your default browser") with a neutral footer in `DefaultBrowser.swift`; the entitlement is still off.
+- Zalla Unlock messaging (`ZallaUnlock.swift`, `ContentBlockingViews.swift`): Restore says it could not reach the App Store when `AppStore.sync()` throws (offline or cancelled sign-in), and "No previous purchase" only when the sync worked; a failed product load shows "Couldn't reach the App Store" with a Try again button. `ZallaUnlockProduct.restoreMessage` is covered by tests.
+- Cookie banners: removed the `.truste-button2` selector.
+- Clear browsing data now stops speech, tears down the closed tabs, and clears `URLCache`, like Burn It All.
+- How to paths fixed (Appearance, Home personalization; Premium or Appearance, Explore theme packs).
+- `TipTransactionObserver.start()` also runs from `ZallaAppDelegate.didFinishLaunchingWithOptions`; the call in `ZallaApp` stays and does nothing a second time.
+- Version bump: `CURRENT_PROJECT_VERSION` 33, fallback strings, Build 33 changelog entry "Last Polish", AboutTests ordering.
+
 ## Build 32
 
 - Burn It All no longer quits the app (App Store review risk). `BrowserStore.burnEverything()` (was `burnEverythingAndClose()`) keeps the confirmation, the fire, and the same wipe as before (website data, cookies, cache, history, tabs, and the rest of what it erased; bookmarks and downloads are kept as before). Then it closes every tab and tears down each web view (`BrowserTab.tearDown()`: stop loading, drop delegates, remove script handlers and user scripts, detach), clears the image export and the dismissed app banner list, runs a second site data erase on the now empty store, adds one fresh tab, and fades the burn overlay out. `exit(0)` is gone. `BrowserView` dismisses any open sheet when a burn starts. The launch flag that finishes an interrupted burn is unchanged, so a force quit mid burn is still wiped on the next launch.

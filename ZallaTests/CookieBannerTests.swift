@@ -31,6 +31,10 @@ final class CookieBannerTests: XCTestCase {
         XCTAssertTrue(script.contains("/cookie|consent|gdpr|privacy|cmp|onetrust|didomi|cookiebot|truste/"))
     }
 
+    func testNoSelectorThatCouldPressAccept() {
+        XCTAssertFalse(CookieBannerDismiss.script.contains("truste-button2"))
+    }
+
     func testScriptStopsAfterAFewSeconds() {
         XCTAssertTrue(CookieBannerDismiss.script.contains("tries > 12"))
         XCTAssertTrue(CookieBannerDismiss.script.contains("}, 500);"))

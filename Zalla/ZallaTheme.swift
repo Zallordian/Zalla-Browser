@@ -350,7 +350,7 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
 
     static func apply(_ preference: AppIconPreference, completion: ((String?) -> Void)? = nil) {
         guard UIApplication.shared.supportsAlternateIcons else {
-            completion?("Alternate icons need a TestFlight or App Store build with CFBundleAlternateIcons configured.")
+            completion?("Alternate icons aren't available right now.")
             return
         }
         let name = preference.alternateIconName

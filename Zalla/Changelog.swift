@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 33",
+            name: "Last Polish",
+            highlights: [
+                "Restore Purchases now tells you when it could not reach the App Store, instead of saying no purchase was found. If Zalla Unlock cannot load, you get a Try again button",
+                "Saving or sharing an image only lists the formats your phone can actually create"
+            ],
+            improvements: "Settings wording is plainer: the Burn It All help matches what it really does, the Settings shortcut row is called Open Zalla settings in iOS, and the How to steps point to the right Settings screens. Clear browsing data now also clears cached files and lets go of open tabs, like Burn It All does.",
+            fixes: "Closing a tab, or burning, while a page is asking a question (an alert, a camera or location request) is handled cleanly. If the app icon cannot be changed, the message is now short and plain."
+        ),
+        ChangelogEntry(
             version: "Build 32",
             name: "Fresh Start",
             highlights: [
@@ -148,7 +158,7 @@ enum Changelog {
             version: "Build 19",
             name: "Pull Down, Burn Up",
             highlights: [
-                "Burn It All has a new look: flames in yellow, orange, and red rise over your page, break apart into embers, and fade to black, then a plain Clearing browsing data label shows until Zalla closes. Settings, Privacy has a switch if you prefer a quiet fade",
+                "Burn It All has a new look: flames in yellow, orange, and red rise over your page, break apart into embers, and fade to black, then a plain Clearing browsing data label shows while it finishes, then you land on a fresh tab. Settings, Privacy has a switch if you prefer a quiet fade",
                 "Pull down at the top of any page to reload it, with a spinner that stops when the page is done. It is on by default and has a switch in Settings, Browsing",
                 "The new tab page is now the first page of every tab's history. Swipe back from your first site and you land on it, and swipe forward to return. The Back and Forward buttons and the history peek know about it too"
             ],
@@ -205,7 +215,7 @@ enum Changelog {
             version: "Build 14",
             name: "Built Around You",
             highlights: [
-                "The Flame, since renamed Burn It All: one confirmed tap erases your tabs, history, cookies, and site data, then closes Zalla. Free",
+                "The Flame, since renamed Burn It All: one confirmed tap erases your tabs, history, cookies, and site data, then opens a fresh tab. Free",
                 "HTTPS-Only Mode is now on by default, with a clear warning page and a per-site Continue anyway",
                 "A tidier new tab page: no preloaded shortcuts, a plus tile, and an Add Shortcut list of popular sites, your bookmarks, or any address. Press and hold a link on any page to add it",
                 "Space and Jungle theme packs in Zalla Unlock: accents, icons, backgrounds, and an optional refresh animation that respects Reduce Motion",

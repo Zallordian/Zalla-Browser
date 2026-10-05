@@ -21,6 +21,19 @@ enum ImageExportFormat: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The formats from `formats` whose type identifier is in `supportedIdentifiers`. PNG and JPEG always stay.
+    static func filtered(_ formats: [ImageExportFormat], supportedIdentifiers: [String]) -> [ImageExportFormat] {
+        formats.filter { format in
+            format == .png || format == .jpeg || supportedIdentifiers.contains(format.utType.identifier)
+        }
+    }
+
+    /// The formats this device can write. A format ImageIO cannot encode (WebP on some systems) is simply not listed.
+    static var available: [ImageExportFormat] {
+        let supported = CGImageDestinationCopyTypeIdentifiers() as? [String] ?? []
+        return filtered(allCases, supportedIdentifiers: supported)
+    }
+
     var fileExtension: String {
         switch self {
         case .png: return "png"

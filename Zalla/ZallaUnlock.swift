@@ -19,14 +19,22 @@ enum ZallaUnlockProduct {
         return false
     }
 
+    /// What Restore says. Owning the unlock wins. Otherwise a failed App Store sync is "couldn't reach", not "none".
+    static func restoreMessage(unlocked: Bool, reachedStore: Bool) -> String {
+        if unlocked { return Copy.unlocked }
+        return reachedStore ? Copy.restoreNone : Copy.restoreOffline
+    }
+
     enum Copy {
         static let title = "Zalla Unlock"
         static let subtitle = "One time purchase"
         static let note = "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs. Buy once, keep it on this Apple Account."
-        static let unavailable = "Unlock isn't available yet."
+        static let unavailable = "Couldn't reach the App Store. Check your connection and try again."
+        static let tryAgain = "Try again"
         static let pending = "Your purchase is waiting for approval."
         static let failed = "The purchase did not go through. Please try again later."
         static let restoreNone = "No previous Zalla Unlock purchase was found for this Apple Account."
+        static let restoreOffline = "Couldn't reach the App Store, so Restore couldn't check. Check your connection and sign-in, then try again."
         static let unlocked = "Zalla Unlock is active. Thank you!"
     }
 }
@@ -126,13 +134,15 @@ final class ZallaUnlock: ObservableObject {
     func restore() async {
         guard !isBusy else { return }
         purchaseState = .restoring
+        var reachedStore = true
         do {
             try await AppStore.sync()
         } catch {
             // Cancelled sign in or offline: still check what is already on this device.
+            reachedStore = false
         }
         await refreshEntitlements()
-        purchaseState = .message(isUnlocked ? ZallaUnlockProduct.Copy.unlocked : ZallaUnlockProduct.Copy.restoreNone)
+        purchaseState = .message(ZallaUnlockProduct.restoreMessage(unlocked: isUnlocked, reachedStore: reachedStore))
     }
 
     /// Reads current entitlements from StoreKit and updates the cache.

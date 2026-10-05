@@ -5,7 +5,7 @@ Zalla is prepared to be chosen as the default browser, but the choice only works
 ## What is already in the build (Build 29)
 - `project.yml` declares the `http` and `https` URL types for the app (`CFBundleURLTypes`, second entry, name `com.zalla.browser.web`). This is harmless without the entitlement.
 - Incoming web links are handled in `ZallaApp.swift` with `onOpenURL`, which calls `BrowserStore.openIncoming`. It reuses a blank new tab or opens a new one. It works for a cold launch and a warm launch, and only `http` and `https` addresses are ever opened (`IncomingLink.webURL`). Links with other schemes are dropped.
-- Settings, Tools has a row "Make Zalla your default browser". It opens the Settings app page for Zalla (`UIApplication.openSettingsURLString`). The wording says the Default Browser App choice appears there only once Apple has approved Zalla.
+- Settings, Tools has a row "Open Zalla settings in iOS" (called "Make Zalla your default browser" before Build 33). It opens the Settings app page for Zalla (`UIApplication.openSettingsURLString`). The wording says the Default Browser App choice appears there only once Apple has approved Zalla.
 
 ## What is NOT active
 The entitlement `com.apple.developer.web-browser` lives in `config/Zalla-DefaultBrowser.entitlements`. Nothing points at that file. An entitlement that Apple has not approved for the App ID makes the provisioning profile invalid and breaks signing, so it must stay out of the build until approval.

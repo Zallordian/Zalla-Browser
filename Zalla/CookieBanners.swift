@@ -19,7 +19,7 @@ enum CookieBannerDismiss {
       var selectors = [
         '#onetrust-reject-all-handler', '.ot-pc-refuse-all-handler', '#CybotCookiebotDialogBodyButtonDecline',
         '#CybotCookiebotDialogBodyLevelButtonLevelOptinDeclineAll', '.cmp-reject-all', '#didomi-notice-disagree-button',
-        '.truste-button2', '#truste-consent-required', 'button[data-testid="reject-all"]', 'button[id*="reject-all"]',
+        '#truste-consent-required', 'button[data-testid="reject-all"]', 'button[id*="reject-all"]',
         'button[class*="reject-all"]', '#cookie-reject', '.js-cookie-reject', '.cc-deny', '.cookie-decline'
       ];
       var phrases = [

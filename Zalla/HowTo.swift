@@ -109,7 +109,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Tap the pencil in the corner to change the background or edit shortcuts.",
                 "Tap the plus tile to add a shortcut from a popular list, your bookmarks, or a web address.",
                 "In Shortcuts, drag the handles to reorder and swipe to delete.",
-                "Logo style in Settings, Home picks the red, white, or black Zalla logo. Auto chooses the one that stands out on your background."
+                "Logo style in Settings, Appearance, Home personalization picks the red, white, or black Zalla logo. Auto chooses the one that stands out on your background."
             ]
         case .addToDashboard:
             return [
@@ -128,7 +128,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
         case .themeTransitions:
             return [
                 "Jungle sweeps layers of leaves across the screen. Space launches a rocket with a long flame and a trail of smoke. Volcano floods the screen with lava and sparks. Deep Ocean rolls a wave across with bubbles and light, then pulls it back. Retro Arcade dissolves the screen into pixels behind CRT scanlines. Neon City sweeps a flickering neon wipe with glow streaks. Arctic spreads frost with snow sparkle. Cherry Blossom swirls petals across. They play when you refresh and when you apply a theme.",
-                "Open Settings, Theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
+                "Open Premium or Appearance, Explore theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
                 "With Reduce Motion on, you get a quick fade instead.",
                 "Theme packs are part of Zalla Unlock."
             ]

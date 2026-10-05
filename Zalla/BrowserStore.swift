@@ -207,7 +207,7 @@ final class BrowserStore: ObservableObject {
     /// Escape hatch on the lock screen: close every private tab without unlocking them.
     func closePrivateTabs() {
         speaker.stop()
-        tabs.filter(\.isPrivate).forEach { $0.webView.stopLoading() }
+        tabs.filter(\.isPrivate).forEach { $0.cancelOpenDialogs(); $0.webView.stopLoading() }
         tabs.removeAll { $0.isPrivate }
         if tabs.isEmpty {
             addTab()
@@ -402,6 +402,7 @@ final class BrowserStore: ObservableObject {
     func close(_ tab: BrowserTab) {
         if speaker.tabID == tab.id { speaker.stop() }
         tab.capturePreview()
+        tab.cancelOpenDialogs()
         tab.webView.stopLoading()
         tabs.removeAll { $0.id == tab.id }
         if tabs.isEmpty { addTab() }
@@ -412,6 +413,7 @@ final class BrowserStore: ObservableObject {
         let snapshot = tabs
         for tab in snapshot {
             tab.capturePreview()
+            tab.cancelOpenDialogs()
             tab.webView.stopLoading()
         }
         tabs.removeAll()
@@ -554,13 +556,17 @@ final class BrowserStore: ObservableObject {
         PageZoom.save([:])
         PrivacyReport.clearHosts()
         UserDefaults.standard.removeObject(forKey: DesktopSitePreference.storageKey)
+        speaker.stop()
         tabs.forEach { $0.webView.stopLoading() }
+        let closing = tabs
         tabs.removeAll()
         selectedID = nil
+        closing.forEach { $0.tearDown() }
         clearHistory()
         await WKWebsiteDataStore.default().removeData(
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
         )
+        URLCache.shared.removeAllCachedResponses()
         addTab()
         sessionSavingEnabled = true
         clearingData = false
@@ -576,8 +582,10 @@ final class BrowserStore: ObservableObject {
         PageZoom.save([:])
         speaker.stop()
         tabs.forEach { $0.webView.stopLoading() }
+        let closing = tabs
         tabs.removeAll()
         selectedID = nil
+        closing.forEach { $0.tearDown() }
         history.removeAll()
         if !keepingBookmarks {
             bookmarks.removeAll()
@@ -802,6 +810,33 @@ private final class WeakScriptMessageHandler: NSObject, WKScriptMessageHandler {
     }
 }
 
+/// One question a page asked through a dialog or permission prompt. WebKit insists that its completion handler is
+/// called exactly once, so every answer goes through here, and a second one is ignored.
+final class DialogGate {
+    private var denyAnswer: (() -> Void)?
+
+    /// `deny` is the "no" answer (false, nil, or Don't Allow), used if the dialog has to be dropped.
+    init(deny: @escaping () -> Void) {
+        denyAnswer = deny
+    }
+
+    var isOpen: Bool { denyAnswer != nil }
+
+    /// Runs the answer the person gave, unless the question was already answered.
+    func answer(_ body: () -> Void) {
+        guard denyAnswer != nil else { return }
+        denyAnswer = nil
+        body()
+    }
+
+    /// Answers "no", unless the question was already answered.
+    func deny() {
+        guard let run = denyAnswer else { return }
+        denyAnswer = nil
+        run()
+    }
+}
+
 @MainActor
 final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
     let id = UUID()
@@ -882,6 +917,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Saved state waiting for the tab to be opened after a cold launch.
     private var pendingRestore: TabSessionEntry?
     private var observations: [NSKeyValueObservation] = []
+    /// Dialogs and permission prompts this tab has on screen, so they can be answered if the tab goes away first.
+    private var openDialogs: [(gate: DialogGate, alert: UIAlertController)] = []
     private let scriptHandlerProxy = WeakScriptMessageHandler()
     private var pendingDownloadResponse: URLResponse?
     private var pendingDownloadURL: URL?
@@ -1382,6 +1419,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Lets go of everything this tab's web view holds so WebKit can free the page and its process (Burn It All).
     /// The tab is not used again afterwards.
     func tearDown() {
+        cancelOpenDialogs()
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
@@ -1390,6 +1428,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         controller.removeAllUserScripts()
         webView.removeFromSuperview()
         previewImage = nil
+    }
+
+    /// Shows a dialog for this tab and remembers it, so closing the tab can answer it.
+    private func present(_ alert: UIAlertController, on host: UIViewController, gate: DialogGate) {
+        openDialogs.removeAll { !$0.gate.isOpen }
+        openDialogs.append((gate: gate, alert: alert))
+        host.present(alert, animated: true)
+    }
+
+    /// Takes down any dialog this tab is showing and answers it "no", so WebKit is never left waiting.
+    func cancelOpenDialogs() {
+        let open = openDialogs
+        openDialogs.removeAll()
+        for item in open {
+            item.gate.deny()
+            item.alert.dismiss(animated: false)
+        }
     }
 
     func capturePreview() {
@@ -1795,20 +1850,25 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             return
         }
         guard let host = hostController() else { decisionHandler(.deny); return }
+        let gate = DialogGate(deny: { decisionHandler(.deny) })
         let alert = UIAlertController(
             title: MediaCapturePrompt.title(site: site, kind: kind),
             message: MediaCapturePrompt.message,
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: MediaCapturePrompt.denyTitle, style: .cancel) { _ in
-            MediaPermissionSession.memory.remember(false, site: site, kind: kind, isPrivate: privateTab)
-            decisionHandler(.deny)
+            gate.answer {
+                MediaPermissionSession.memory.remember(false, site: site, kind: kind, isPrivate: privateTab)
+                decisionHandler(.deny)
+            }
         })
         alert.addAction(UIAlertAction(title: MediaCapturePrompt.allowTitle, style: .default) { _ in
-            MediaPermissionSession.memory.remember(true, site: site, kind: kind, isPrivate: privateTab)
-            decisionHandler(.grant)
+            gate.answer {
+                MediaPermissionSession.memory.remember(true, site: site, kind: kind, isPrivate: privateTab)
+                decisionHandler(.grant)
+            }
         })
-        host.present(alert, animated: true)
+        present(alert, on: host, gate: gate)
     }
 
     /// Website location (iOS 27 and later, where WebKit offers this as public API). WebKit asks iOS for location
@@ -1835,50 +1895,59 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         }
         guard let host = hostController() else { decisionHandler(.deny); return }
         let site = MediaCapturePrompt.siteLabel(scheme: origin.protocol, host: origin.host, port: origin.port)
+        let gate = DialogGate(deny: { decisionHandler(.deny) })
         let alert = UIAlertController(
             title: WebsiteLocation.Copy.title(site: site),
             message: WebsiteLocation.Copy.message(isPrivate: privateTab),
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: WebsiteLocation.Copy.denyTitle, style: .cancel) { _ in
-            if let siteKey { LocationSettings.remember(false, host: siteKey, isPrivate: privateTab) }
-            decisionHandler(.deny)
+            gate.answer {
+                if let siteKey { LocationSettings.remember(false, host: siteKey, isPrivate: privateTab) }
+                decisionHandler(.deny)
+            }
         })
         alert.addAction(UIAlertAction(title: WebsiteLocation.Copy.allowTitle, style: .default) { _ in
-            if let siteKey { LocationSettings.remember(true, host: siteKey, isPrivate: privateTab) }
-            decisionHandler(.grant)
+            gate.answer {
+                if let siteKey { LocationSettings.remember(true, host: siteKey, isPrivate: privateTab) }
+                decisionHandler(.grant)
+            }
         })
-        host.present(alert, animated: true)
+        present(alert, on: host, gate: gate)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
         guard let host = hostController() else { completionHandler(); return }
+        let gate = DialogGate(deny: { completionHandler() })
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
-        host.present(alert, animated: true)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in gate.answer { completionHandler() } })
+        present(alert, on: host, gate: gate)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
         guard let host = hostController() else { completionHandler(false); return }
+        let gate = DialogGate(deny: { completionHandler(false) })
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(false) })
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler(true) })
-        host.present(alert, animated: true)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in gate.answer { completionHandler(false) } })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in gate.answer { completionHandler(true) } })
+        present(alert, on: host, gate: gate)
     }
 
     func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
                  defaultText: String?, initiatedByFrame frame: WKFrameInfo,
                  completionHandler: @escaping (String?) -> Void) {
         guard let host = hostController() else { completionHandler(nil); return }
+        let gate = DialogGate(deny: { completionHandler(nil) })
         let alert = UIAlertController(title: nil, message: prompt, preferredStyle: .alert)
         alert.addTextField { $0.text = defaultText }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in completionHandler(nil) })
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-            completionHandler(alert.textFields?.first?.text)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in gate.answer { completionHandler(nil) } })
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak alert] _ in
+            let text = alert?.textFields?.first?.text
+            gate.answer { completionHandler(text) }
         })
-        host.present(alert, animated: true)
+        present(alert, on: host, gate: gate)
     }
 
     func webView(_ webView: WKWebView,

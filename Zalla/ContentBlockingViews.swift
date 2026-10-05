@@ -502,8 +502,13 @@ private struct UnlockPurchaseRow: View {
                     Spacer()
                 }
             case .unavailable:
-                Text(ZallaUnlockProduct.Copy.unavailable)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(ZallaUnlockProduct.Copy.unavailable)
+                        .foregroundStyle(.secondary)
+                    Button(ZallaUnlockProduct.Copy.tryAgain) {
+                        Task { await unlock.loadProduct() }
+                    }
+                }
             case .loaded:
                 buyButton
             }

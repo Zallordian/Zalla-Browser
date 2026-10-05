@@ -2925,7 +2925,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "32"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "33"
         return "\(marketing) (\(build))"
     }
 
@@ -3169,7 +3169,7 @@ private struct SettingsView: View {
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
                 DisclosureGroup("What these do") {
-                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Burn It All plays a fire effect before it closes Zalla; turn the fire effect off for a quick fade instead. Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -3243,7 +3243,7 @@ private struct SettingsView: View {
                     }
                 } label: {
                     HStack {
-                        Label("Make Zalla your default browser", systemImage: "safari")
+                        Label("Open Zalla settings in iOS", systemImage: "safari")
                         Spacer()
                         Image(systemName: "arrow.up.forward.app")
                             .font(.footnote)

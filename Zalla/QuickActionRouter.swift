@@ -29,6 +29,15 @@ final class QuickActionRouter: ObservableObject {
 final class ZallaAppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        // Start finishing unfinished purchases right away. Calling start() again later does nothing.
+        TipTransactionObserver.start()
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
         configurationForConnecting connectingSceneSession: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {

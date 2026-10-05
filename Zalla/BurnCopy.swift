@@ -13,8 +13,10 @@ enum BurnCopy {
     static let howToEffectStep = "Flames rise over the page, break apart into embers, and fade to black. Then a plain Clearing browsing data label shows while it finishes, and Zalla opens a fresh tab."
     static let howToAfterStep = "You are left with one fresh tab. Bookmarks and downloads stay put."
 
+    static let settingsHelp = "Burn It All plays a fire effect, erases your tabs, history, cookies, and site data, then opens a fresh tab. Turn the fire effect off for a quick fade instead."
+
     static let all: [String] = [
         confirmationMessage, menuFooter, accessibilityHint, overlayAccessibility,
-        howToSummary, safetyDetail, howToWipeStep, howToEffectStep, howToAfterStep
+        howToSummary, safetyDetail, howToWipeStep, howToEffectStep, howToAfterStep, settingsHelp
     ]
 }

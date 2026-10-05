@@ -14,7 +14,7 @@ struct ImageExportSheet: View {
             Form {
                 Section("Export as") {
                     Picker("Format", selection: $selected) {
-                        ForEach(ImageExportFormat.allCases) { format in
+                        ForEach(ImageExportFormat.available) { format in
                             Text(format.rawValue).tag(format)
                         }
                     }
