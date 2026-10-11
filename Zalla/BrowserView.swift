@@ -136,6 +136,8 @@ private struct TabContent: View {
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
+    @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBarOn = ScrollChrome.underStatusBarDefault
+    @AppStorage(ScrollChrome.collapseKey) private var collapseOnScrollOn = ScrollChrome.collapseDefault
     @AppStorage("appearance") private var appearance = "System"
     @AppStorage(AppBanner.storageKey) private var appBannersOn = AppBanner.defaultEnabled
     @ObservedObject private var appBannerSession = AppBannerSession.shared
@@ -177,6 +179,8 @@ private struct TabContent: View {
     /// The color scheme actually applied for the status bar text. It follows `statusBarScheme`, but a switch between
     /// light and dark waits a moment so a page that flickers near mid gray does not flip the whole app back and forth.
     @State private var appliedStatusBarScheme: ColorScheme?
+    /// True while the bottom toolbar is shrunk to the address pill because the page scrolled down (Build 35).
+    @State private var toolbarCollapsed = false
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -213,8 +217,38 @@ private struct TabContent: View {
             hasPage: tab.hasPage,
             sample: tab.isReaderActive ? nil : tab.pageColor,
             appearance: appearance,
-            isDark: tab.pageColorIsDark
+            isDark: tab.pageColorIsDark,
+            underStatusBar: pageRunsUnderStatusBar
         )
+    }
+    /// Build 35: the page runs under a transparent status bar, like Safari, when the address bar is at the bottom.
+    private var pageRunsUnderStatusBar: Bool {
+        ScrollChrome.pageUnderStatusBar(
+            enabled: pageUnderStatusBarOn,
+            immersive: immersiveLayout,
+            bottomBar: addressBarPlacement == .bottom,
+            supported: ObscuredInsets.isSupported
+        )
+    }
+    /// Whether scrolling may shrink the bottom toolbar right now.
+    private var canCollapseToolbar: Bool {
+        let editing = addressFocused || isEditingClassicAddress || isEditingCompactAddress
+        return ScrollChrome.canCollapse(
+            enabled: collapseOnScrollOn,
+            bottomBar: addressBarPlacement == .bottom,
+            quickAction: toolbarStyle == .quickAction,
+            hasPage: tab.hasPage,
+            editing: editing
+        )
+    }
+    private var showsCollapsedToolbar: Bool {
+        toolbarCollapsed && canCollapseToolbar
+    }
+    private func setToolbarCollapsed(_ collapsed: Bool) {
+        guard collapsed != toolbarCollapsed else { return }
+        withMotion(.bar, reduceMotion: reduceMotion) {
+            toolbarCollapsed = collapsed
+        }
     }
     /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted. The
     /// scroll view then adds no automatic top inset of its own, so the chrome height alone keeps the page clear of
@@ -246,7 +280,10 @@ private struct TabContent: View {
             if tab.hasPage {
                 WebSurface(
                     webView: tab.webView,
-                    chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomContentInset, right: 0)
+                    chromeInsets: UIEdgeInsets(top: topChromeHeight, left: 0, bottom: bottomContentInset, right: 0),
+                    canCollapse: canCollapseToolbar,
+                    isCollapsed: toolbarCollapsed,
+                    onCollapseChange: { collapsed in setToolbarCollapsed(collapsed) }
                 )
                 // Container only: the keyboard still resizes the page like before. While the status bar strip is
                 // painted the page frame starts below the clock (top safe area respected), so a site's fixed
@@ -376,6 +413,8 @@ private struct TabContent: View {
             }
         }
         .onChange(of: tab.url) { _, url in
+            // A new page starts with the full toolbar.
+            toolbarCollapsed = false
             if !addressFocused {
                 address = url?.absoluteString ?? ""
                 isEditingClassicAddress = false
@@ -385,6 +424,7 @@ private struct TabContent: View {
         .onChange(of: browser.burnConfirmRequest) { _, _ in confirmBurn = true }
         .onChange(of: addressFocused) { _, focused in
             if focused {
+                toolbarCollapsed = false
                 if toolbarStyle == .classic {
                     isEditingClassicAddress = true
                     address = AddressDisplay.editingText(url: tab.url).isEmpty ? address : AddressDisplay.editingText(url: tab.url)
@@ -529,7 +569,9 @@ private struct TabContent: View {
                 errorBanner(error)
             }
             Group {
-                if addressBarPlacement == .bottom {
+                if addressBarPlacement == .bottom, showsCollapsedToolbar {
+                    collapsedToolbar
+                } else if addressBarPlacement == .bottom {
                     bottomChrome
                 } else if toolbarStyle == .classic {
                     classicNavOnly
@@ -546,7 +588,40 @@ private struct TabContent: View {
         // Immersive: the bar group runs to the physical bottom edge (the keyboard still lifts it).
         .ignoresSafeArea(.container, edges: immersiveLayout ? .bottom : [])
         .onPreferenceChange(TopChromeHeightKey.self) { topChromeHeight = $0 }
-        .onPreferenceChange(BottomChromeHeightKey.self) { bottomChromeHeight = $0 }
+        .onPreferenceChange(BottomChromeHeightKey.self) { height in
+            // While the bar is collapsed the page keeps the full bar's inset, so the end of the page never
+            // hides behind the bar and the scroll range does not jump when it changes size.
+            if !showsCollapsedToolbar { bottomChromeHeight = height }
+        }
+    }
+
+    /// The small address pill shown while the page scrolls down. Tapping it brings the full bar back.
+    private var collapsedToolbar: some View {
+        let title = AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage)
+        return Button {
+            setToolbarCollapsed(false)
+        } label: {
+            HStack(spacing: 6) {
+                if tab.url?.scheme?.lowercased() == "https" {
+                    Image(systemName: "lock.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                Text(title)
+                    .font(.footnote.weight(.semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(.regularMaterial, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .padding(.top, immersiveLayout ? 0 : 6)
+        .accessibilityLabel(title)
+        .accessibilityHint("Shows the toolbar")
+        .transition(.opacity)
     }
 
     private func errorBanner(_ error: String) -> some View {
@@ -775,7 +850,33 @@ private struct TabContent: View {
             statusStrip(fill: Color(red: color.red, green: color.green, blue: color.blue))
         case .fallback:
             statusStrip(fill: Color(uiColor: .systemBackground))
+        case .clear(let color):
+            statusFade(color)
         }
+    }
+
+    /// Build 35: the status bar stays transparent over the page. A light fade in the page's own color (nearly invisible
+    /// at the top of the page) keeps the clock legible over whatever scrolls underneath.
+    private func statusFade(_ sample: PageRGB?) -> some View {
+        let base: Color
+        if let sample {
+            base = Color(red: sample.red, green: sample.green, blue: sample.blue)
+        } else {
+            base = Color(uiColor: .systemBackground)
+        }
+        let fade = LinearGradient(
+            colors: [base.opacity(0.7), base.opacity(0)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        return VStack(spacing: 0) {
+            Color.clear
+                .frame(height: 0)
+                .background { fade.ignoresSafeArea(.container, edges: .top) }
+            Spacer(minLength: 0)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private func statusStrip(fill: Color) -> some View {
@@ -816,7 +917,7 @@ private struct TabContent: View {
     /// Past the edge of the page (rubber banding) the web view shows its under-page color. While the strip is
     /// painted that is the strip color, so the overscroll never shows a gap between the strip and the page.
     private func syncUnderPageColor() {
-        if case .page(let color) = statusBarPlan.fill {
+        if let color = statusBarPlan.fill.pageColor {
             tab.webView.underPageBackgroundColor = UIColor(
                 red: CGFloat(color.red), green: CGFloat(color.green), blue: CGFloat(color.blue), alpha: 1
             )
@@ -1875,33 +1976,125 @@ private struct WebSurface: UIViewRepresentable {
     let webView: WKWebView
     /// Heights of the floating chrome over the page, not counting the device safe area.
     var chromeInsets: UIEdgeInsets = .zero
+    /// Build 35: whether scrolling may collapse the bottom toolbar, the collapsed state SwiftUI shows, and where
+    /// a change from scrolling is reported.
+    var canCollapse = false
+    var isCollapsed = false
+    var onCollapseChange: (Bool) -> Void = { _ in }
+
+    func makeCoordinator() -> ScrollCollapseCoordinator {
+        ScrollCollapseCoordinator()
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         // Every time a tab is shown, make sure its edge swipes are in place and match the Settings switch.
         EdgeNavigation.install(on: webView, enabled: SwipeNavigation.isEnabled)
         Self.apply(chromeInsets, to: webView)
+        context.coordinator.observe(webView.scrollView)
+        sync(context.coordinator)
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
         Self.apply(chromeInsets, to: uiView)
+        sync(context.coordinator)
+    }
+
+    private func sync(_ coordinator: ScrollCollapseCoordinator) {
+        coordinator.canCollapse = canCollapse
+        coordinator.onCollapseChange = onCollapseChange
+        coordinator.follow(isCollapsed)
     }
 
     /// Lets pages scroll fully clear of the translucent chrome. The scroll view keeps its automatic
     /// adjustment, which adds whichever notch and home indicator insets the web view frame overlaps (none at the
     /// top while the status bar strip is painted, since the frame then starts below it), so only the bar heights
-    /// are added here.
+    /// are added here. On iOS 26 and later WebKit is also told what is covered, so a site's fixed header lays out
+    /// below the status bar and the bars instead of under them.
     private static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
         let scrollView = webView.scrollView
         // While the pull to refresh spinner is out, UIKit owns the top inset.
         if scrollView.refreshControl?.isRefreshing == true { return }
-        guard scrollView.contentInset != insets else { return }
-        let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
-        scrollView.contentInset = insets
-        scrollView.verticalScrollIndicatorInsets = insets
-        if wasAtTop {
-            // Keep the top of the page just below the top bar instead of hidden under it.
-            scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: -scrollView.adjustedContentInset.top)
+        if scrollView.contentInset != insets {
+            let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
+            scrollView.contentInset = insets
+            scrollView.verticalScrollIndicatorInsets = insets
+            if wasAtTop {
+                // Keep the top of the page just below the top bar instead of hidden under it.
+                scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: -scrollView.adjustedContentInset.top)
+            }
+        }
+        ObscuredInsets.apply(scrollView.adjustedContentInset, to: webView)
+    }
+}
+
+/// `WKWebView.obscuredContentInsets` (iOS 26 SDK and later). Kept in one place so older SDKs and systems skip it.
+enum ObscuredInsets {
+    static var isSupported: Bool {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) { return true }
+        #endif
+        return false
+    }
+
+    @MainActor
+    static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            if webView.obscuredContentInsets != insets {
+                webView.obscuredContentInsets = insets
+            }
+        }
+        #endif
+    }
+}
+
+/// Watches the page scroll and decides when the bottom toolbar collapses (`ScrollChrome`). Only scrolling the
+/// person does counts, so inset changes and page jumps never flip the bar.
+@MainActor
+final class ScrollCollapseCoordinator {
+    var canCollapse = false
+    var onCollapseChange: (Bool) -> Void = { _ in }
+    private var tracker = ScrollChrome.Tracker()
+    private var observation: NSKeyValueObservation?
+
+    func observe(_ scrollView: UIScrollView) {
+        observation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
+            self?.scrolled(scrollView)
+        }
+    }
+
+    /// Takes on the state SwiftUI shows, for example after a tap on the pill or a new page.
+    func follow(_ collapsed: Bool) {
+        guard tracker.collapsed != collapsed else { return }
+        tracker.collapsed = collapsed
+        tracker.anchor = tracker.lastOffset
+    }
+
+    private func scrolled(_ scrollView: UIScrollView) {
+        let inset = scrollView.adjustedContentInset
+        let offset = scrollView.contentOffset.y + inset.top
+        let visibleHeight = scrollView.bounds.height - inset.top - inset.bottom
+        let maxOffset = scrollView.contentSize.height - visibleHeight
+        guard canCollapse, !KeyboardVisibility.shared.isVisible else {
+            let wasCollapsed = tracker.collapsed
+            tracker = ScrollChrome.Tracker(collapsed: false, anchor: offset, lastOffset: offset, lastDirection: 0)
+            if wasCollapsed {
+                let report = onCollapseChange
+                Task { @MainActor in report(false) }
+            }
+            return
+        }
+        guard scrollView.isDragging || scrollView.isDecelerating else {
+            tracker.lastOffset = offset
+            tracker.anchor = offset
+            return
+        }
+        let updated = ScrollChrome.next(tracker, offset: offset, maxOffset: maxOffset)
+        let changed = updated.collapsed != tracker.collapsed
+        tracker = updated
+        if changed {
+            onCollapseChange(updated.collapsed)
         }
     }
 }
@@ -2872,6 +3065,8 @@ private struct SettingsView: View {
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
+    @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBar = ScrollChrome.underStatusBarDefault
+    @AppStorage(ScrollChrome.collapseKey) private var collapseToolbarOnScroll = ScrollChrome.collapseDefault
     @AppStorage(SettingsTabHaptics.storageKey) private var settingsTabHaptics = SettingsTabHaptics.defaultEnabled
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(BurnEffectPlan.animationKey) private var burnAnimation = true
@@ -2924,8 +3119,8 @@ private struct SettingsView: View {
         )
     }
     private var versionString: String {
-        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "34"
+        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "35"
         return "\(marketing) (\(build))"
     }
 
@@ -3050,6 +3245,11 @@ private struct SettingsView: View {
                 Toggle("Immersive layout", isOn: $immersiveLayout)
                 Toggle("Status bar matches the page", isOn: $statusBarMatchesPage)
                     .disabled(!immersiveLayout)
+                Group {
+                    Toggle("Page under the status bar", isOn: $pageUnderStatusBar)
+                        .disabled(!immersiveLayout)
+                    Toggle("Collapse toolbar while scrolling", isOn: $collapseToolbarOnScroll)
+                }
                 Toggle("Haptic tap on Settings tabs", isOn: $settingsTabHaptics)
                 NavigationLink("Customize Toolbar") {
                     ToolbarEditorView(theme: theme)
@@ -3063,7 +3263,7 @@ private struct SettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars. With Immersive layout on, the status bar area takes the page's own color and page content stops below it; Status bar matches the page turns that coloring off.")
+                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars. With Immersive layout on and the address bar at the bottom, the page runs under the clock like in Safari (iOS 26 and later); turn off Page under the status bar to have the status bar area take the page's own color instead, with page content stopping below it. Status bar matches the page turns the page coloring off. Collapse toolbar while scrolling shrinks the bottom bar to a small address pill as you scroll down; scroll up or tap the pill to bring it back.")
             }
 
             Section {

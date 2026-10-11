@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 35",
+            name: "Room to Read",
+            highlights: [
+                "Pages now run all the way to the top of the screen, under the clock and battery, like in Safari. A site's own header still starts below the clock. This needs iOS 26 or later and the address bar at the bottom; you can turn it off in Settings, Appearance, Page under the status bar",
+                "The bottom toolbar shrinks to a small address pill while you scroll down a page, so you see more of it. Scroll up, reach the top or the end of the page, or tap the pill to get the full bar back. Settings, Appearance has a switch called Collapse toolbar while scrolling"
+            ],
+            improvements: "The toolbar stays put while you type in the address bar, on short pages, and with Quick Action. With Reduce Motion on it changes without the spring.",
+            fixes: ""
+        ),
+        ChangelogEntry(
             version: "Build 33",
             name: "Last Polish",
             highlights: [

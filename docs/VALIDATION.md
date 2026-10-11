@@ -57,6 +57,15 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Room to Read (Build 35)
+Needs a physical iPhone on iOS 26 or later, plus one on iOS 17 or 18 if available. Check:
+- Address bar at the bottom, Immersive layout on: on google.com results, youtube.com, reddit.com, apple.com, and a plain white page, the page shows through under the clock and battery with no colored strip. At scroll position 0 the site's header starts right below the clock (YouTube and Reddit headers fully visible). Scroll down: content passes under the clock with a light fade, and the fixed header stays below the clock. Clock and battery stay readable on dark sites (YouTube in dark mode) and light ones; with Appearance set to Light or Dark explicitly too.
+- Rubber band at the top shows the page's color, not a gray gap. Rotate to landscape and back.
+- Address bar at the top (Classic, Compact, Quick Action): exactly as in Build 34, the strip and the top bar sit under the status bar.
+- Turn off Page under the status bar: the Build 34 colored strip comes back. On iOS 17 to 25 the strip is always used.
+- Collapse toolbar while scrolling, Classic and Compact with a bottom bar: scroll down a long page and the bar shrinks to the address pill; small finger wiggles do nothing; scroll up a little and the full bar springs back; reaching the top or the very end of the page brings it back; tapping the pill brings it back; a new page starts with the full bar. The last line of a long page is never hidden behind the bar. Short pages never collapse. Typing in a page form with the keyboard up and editing the address never collapse it. Quick Action and the top address bar never collapse. Reduce Motion on: the change has no spring. Turn the setting off: the bar never collapses.
+- Pull to refresh, edge swipes, the app banner, Find on page, and Reader still work with the new layout.
+
 ## iPhone-only device family (Build 34)
 After `xcodegen generate`, check `TARGETED_DEVICE_FAMILY = 1` for the Zalla, ZallaWidgets, and ZallaTests targets (Xcode Build Settings, or `xcodebuild -showBuildSettings`). In App Store Connect or TestFlight the build lists iPhone only, with no iPad. The iPad simulator is not offered as a run destination.
 

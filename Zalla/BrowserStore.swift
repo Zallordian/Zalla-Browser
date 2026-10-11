@@ -631,6 +631,8 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: SettingsCategory.storageKey)
         defaults.removeObject(forKey: ImmersiveLayout.storageKey)
         defaults.removeObject(forKey: PageColor.storageKey)
+        defaults.removeObject(forKey: ScrollChrome.underStatusBarKey)
+        defaults.removeObject(forKey: ScrollChrome.collapseKey)
         defaults.removeObject(forKey: QuickTheme.storageKey)
         defaults.removeObject(forKey: AppBanner.storageKey)
         defaults.removeObject(forKey: MenuTopRow.storageKey)

@@ -210,6 +210,18 @@ enum PageColor {
             case page(PageRGB)
             /// Paint the Zalla background (page color unknown, the setting is off, or it would not be legible).
             case fallback
+            /// Build 35: nothing painted, the page runs under the status bar like Safari. Only a light fade in this
+            /// color (the page's own color, or the Zalla background when nil) softens what scrolls under the clock.
+            case clear(PageRGB?)
+
+            /// The page color in play, if any. Used for the overscroll area.
+            var pageColor: PageRGB? {
+                switch self {
+                case .page(let color): return color
+                case .clear(let color): return color
+                case .none, .fallback: return nil
+                }
+            }
         }
         var fill: Fill
         /// Set while the system appearance is in use and the page color calls for light or dark status bar text.
@@ -219,7 +231,7 @@ enum PageColor {
         /// header) sit under the clock instead of beneath the painted strip. Exactly when a strip is painted.
         var startsBelowStatusBar: Bool {
             switch fill {
-            case .none: return false
+            case .none, .clear: return false
             case .page, .fallback: return true
             }
         }
@@ -233,9 +245,13 @@ enum PageColor {
         hasPage: Bool,
         sample: PageRGB?,
         appearance: String,
-        isDark: Bool? = nil
+        isDark: Bool? = nil,
+        underStatusBar: Bool = false
     ) -> StatusBarPlan {
         guard immersive, hasPage else { return StatusBarPlan(fill: .none, schemeOverride: nil) }
+        if underStatusBar {
+            return clearPlan(matchPage: matchPage, sample: sample, appearance: appearance, isDark: isDark)
+        }
         guard matchPage, let sample else { return StatusBarPlan(fill: .fallback, schemeOverride: nil) }
         // `isDark` carries the hysteresis choice; without it the plain luminance rule applies.
         let pageIsDark = isDark ?? sample.prefersLightText
@@ -246,6 +262,21 @@ enum PageColor {
             return StatusBarPlan(fill: pageIsDark ? .fallback : .page(sample), schemeOverride: nil)
         default:
             return StatusBarPlan(fill: .page(sample), schemeOverride: pageIsDark ? .dark : .light)
+        }
+    }
+
+    /// The page runs under a transparent status bar (Build 35). Under the system appearance the status bar text follows
+    /// the page. With an explicit Light or Dark choice, a page that would clash gets the fade in the Zalla background.
+    static func clearPlan(matchPage: Bool, sample: PageRGB?, appearance: String, isDark: Bool?) -> StatusBarPlan {
+        guard matchPage, let sample else { return StatusBarPlan(fill: .clear(nil), schemeOverride: nil) }
+        let pageIsDark = isDark ?? sample.prefersLightText
+        switch appearance {
+        case "Dark":
+            return StatusBarPlan(fill: .clear(pageIsDark ? sample : nil), schemeOverride: nil)
+        case "Light":
+            return StatusBarPlan(fill: .clear(pageIsDark ? nil : sample), schemeOverride: nil)
+        default:
+            return StatusBarPlan(fill: .clear(sample), schemeOverride: pageIsDark ? .dark : .light)
         }
     }
 

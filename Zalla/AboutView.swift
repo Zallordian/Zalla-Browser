@@ -6,8 +6,8 @@ struct AboutView: View {
     @State private var expandedBeta = false
 
     private var versionString: String {
-        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "34"
+        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "35"
         return "\(marketing) (\(build))"
     }
 
