@@ -246,8 +246,27 @@ private struct TabContent: View {
     }
     private func setToolbarCollapsed(_ collapsed: Bool) {
         guard collapsed != toolbarCollapsed else { return }
-        withMotion(.bar, reduceMotion: reduceMotion) {
+        // Build 36: one spring for the whole morph. Reduce Motion gets a plain fade (no scaling, see the modifiers).
+        let animation: Animation = reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: 0.35, dampingFraction: 0.86)
+        withAnimation(animation) {
             toolbarCollapsed = collapsed
+        }
+    }
+    /// A tap on the address bar: while collapsed it brings the full bar back, otherwise it starts editing.
+    private func tapClassicAddress() {
+        if showsCollapsedToolbar {
+            setToolbarCollapsed(false)
+        } else {
+            beginClassicAddressEditing()
+        }
+    }
+    private func tapCompactAddress() {
+        if showsCollapsedToolbar {
+            setToolbarCollapsed(false)
+        } else {
+            beginCompactAddressEditing()
         }
     }
     /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted. The
@@ -414,7 +433,7 @@ private struct TabContent: View {
         }
         .onChange(of: tab.url) { _, url in
             // A new page starts with the full toolbar.
-            toolbarCollapsed = false
+            setToolbarCollapsed(false)
             if !addressFocused {
                 address = url?.absoluteString ?? ""
                 isEditingClassicAddress = false
@@ -424,7 +443,7 @@ private struct TabContent: View {
         .onChange(of: browser.burnConfirmRequest) { _, _ in confirmBurn = true }
         .onChange(of: addressFocused) { _, focused in
             if focused {
-                toolbarCollapsed = false
+                setToolbarCollapsed(false)
                 if toolbarStyle == .classic {
                     isEditingClassicAddress = true
                     address = AddressDisplay.editingText(url: tab.url).isEmpty ? address : AddressDisplay.editingText(url: tab.url)
@@ -569,9 +588,7 @@ private struct TabContent: View {
                 errorBanner(error)
             }
             Group {
-                if addressBarPlacement == .bottom, showsCollapsedToolbar {
-                    collapsedToolbar
-                } else if addressBarPlacement == .bottom {
+                if addressBarPlacement == .bottom {
                     bottomChrome
                 } else if toolbarStyle == .classic {
                     classicNavOnly
@@ -593,35 +610,6 @@ private struct TabContent: View {
             // hides behind the bar and the scroll range does not jump when it changes size.
             if !showsCollapsedToolbar { bottomChromeHeight = height }
         }
-    }
-
-    /// The small address pill shown while the page scrolls down. Tapping it brings the full bar back.
-    private var collapsedToolbar: some View {
-        let title = AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage)
-        return Button {
-            setToolbarCollapsed(false)
-        } label: {
-            HStack(spacing: 6) {
-                if tab.url?.scheme?.lowercased() == "https" {
-                    Image(systemName: "lock.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(.regularMaterial, in: Capsule())
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .padding(.top, immersiveLayout ? 0 : 6)
-        .accessibilityLabel(title)
-        .accessibilityHint("Shows the toolbar")
-        .transition(.opacity)
     }
 
     private func errorBanner(_ error: String) -> some View {
@@ -966,7 +954,7 @@ private struct TabContent: View {
 
     @ViewBuilder
     private func classicAddressBlock(includeNav: Bool) -> some View {
-        VStack(spacing: 10) {
+        VStack(spacing: showsCollapsedToolbar ? 0 : 10) {
             if tab.isLoading {
                 ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading")
                     .motion(.progress, value: tab.progress)
@@ -975,7 +963,9 @@ private struct TabContent: View {
                 classicAddressField
             }
             if includeNav {
+                // Build 36: while collapsed the buttons fade and shrink away in place; the row stays in the hierarchy.
                 classicNavRow
+                    .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: false))
             }
         }
     }
@@ -1001,9 +991,9 @@ private struct TabContent: View {
                 Text(AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: showsCollapsedToolbar ? .center : .leading)
                     .contentShape(Rectangle())
-                    .onTapGesture { beginClassicAddressEditing() }
+                    .onTapGesture { tapClassicAddress() }
                     .accessibilityLabel("Address, \(AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage))")
                     .accessibilityAddTraits(.isButton)
                     .accessibilityHint("Shows the full URL for editing")
@@ -1017,18 +1007,22 @@ private struct TabContent: View {
             }
             .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
             .frame(minWidth: 44, minHeight: 44)
+            .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
         }
-        .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: barSize(52))
+        .padding(.leading, 16)
+        .padding(.trailing, showsCollapsedToolbar ? 16 : 6)
+        .frame(minHeight: showsCollapsedToolbar ? barSize(38) : barSize(52))
         .modifier(ClassicAddressSurface(immersive: immersiveLayout, isDark: colorScheme == .dark))
         .contentShape(Capsule())
         .motion(.bar, value: addressFocused || isEditingClassicAddress)
         .onTapGesture {
             if !(addressFocused || isEditingClassicAddress) {
-                beginClassicAddressEditing()
+                tapClassicAddress()
             }
         }
         // The width slider only narrows the resting bar; editing uses the full width.
         .searchBarWidth(addressFocused || isEditingClassicAddress ? SearchBarWidth.full : searchBarWidthValue)
+        .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
     }
 
     /// Classic button row, built from the customizable toolbar layout.
@@ -1494,7 +1488,7 @@ private struct TabContent: View {
                 ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
                     .motion(.progress, value: tab.progress)
             }
-            HStack(spacing: 12) {
+            HStack(spacing: showsCollapsedToolbar ? 0 : 12) {
                 // While editing, the side buttons slide away and the pill springs out to fill the row.
                 if !isEditingCompactAddress, !toolbarLayout.compactLeading.isEmpty {
                     HStack(spacing: 8) {
@@ -1502,11 +1496,13 @@ private struct TabContent: View {
                             compactItem(kind)
                         }
                     }
+                    .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
                     .transition(.move(edge: .leading).combined(with: .opacity))
                 }
 
                 compactPill
                     .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
+                    .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
 
                 if !isEditingCompactAddress, !toolbarLayout.compactTrailing.isEmpty {
                     HStack(spacing: 12) {
@@ -1514,6 +1510,7 @@ private struct TabContent: View {
                             compactItem(kind)
                         }
                     }
+                    .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
                     .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -1592,43 +1589,32 @@ private struct TabContent: View {
                 // Tabs sits beside the pill when it is one of the bar buttons, so the pill does not repeat it.
                 if !toolbarLayout.compact.contains(.tabs) {
                     tabsButtonCompact
+                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
                 }
+                // Grows only while collapsed, so the domain sits in the middle of the small pill.
+                Spacer(minLength: 0)
+                    .frame(maxWidth: showsCollapsedToolbar ? .infinity : 0)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(compactTitle)
+                    // One Text for both states; the words cross-fade from the page title to the domain.
+                    Text(showsCollapsedToolbar ? AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage) : compactTitle)
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                         .foregroundStyle(.primary)
+                        .contentTransition(.opacity)
                     if tab.hasPage {
-                        HStack(spacing: 4) {
-                            connectionSecurityAffordance(
-                                font: .caption2,
-                                textFont: .caption2.weight(.semibold)
-                            )
-                            if let host = CompactAddressChrome.hostSubtitle(url: tab.url, hasPage: tab.hasPage) {
-                                Text(host)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                        }
+                        compactSubtitle
+                            .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: false))
                     }
                 }
                 Spacer(minLength: 0)
                 if tab.hasPage {
-                    Button {
-                        tab.reloadOrStop()
-                    } label: {
-                        Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
-                            .font(.subheadline.weight(.semibold))
-                            .contentTransition(.symbolEffect(.replace))
-                            .motion(.pop, value: tab.isLoading)
-                    }
-                    .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
+                    compactReloadButton
+                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
                 }
             }
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: barSize(48))
+        .frame(minHeight: showsCollapsedToolbar ? barSize(38) : barSize(48))
         .background(.ultraThinMaterial, in: Capsule(style: .continuous))
         .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
         .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
@@ -1636,9 +1622,37 @@ private struct TabContent: View {
         // Attach tap-to-edit only while collapsed so the TextField keeps pointer events.
         .modifier(CompactPillInteractionModifier(
             isEditing: isEditingCompactAddress,
-            onBeginEditing: beginCompactAddressEditing,
+            onBeginEditing: tapCompactAddress,
             onCancelEditing: cancelCompactAddressEditing
         ))
+    }
+
+    /// Lock and host under the page title in the Compact pill.
+    private var compactSubtitle: some View {
+        HStack(spacing: 4) {
+            connectionSecurityAffordance(
+                font: .caption2,
+                textFont: .caption2.weight(.semibold)
+            )
+            if let host = CompactAddressChrome.hostSubtitle(url: tab.url, hasPage: tab.hasPage) {
+                Text(host)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private var compactReloadButton: some View {
+        Button {
+            tab.reloadOrStop()
+        } label: {
+            Image(systemName: tab.isLoading ? "xmark" : "arrow.clockwise")
+                .font(.subheadline.weight(.semibold))
+                .contentTransition(.symbolEffect(.replace))
+                .motion(.pop, value: tab.isLoading)
+        }
+        .accessibilityLabel(tab.isLoading ? "Stop loading" : "Reload")
     }
 
     private var compactTitle: String {
@@ -1883,6 +1897,37 @@ private struct FloatingCircle: ViewModifier {
 }
 
 /// The Classic address field: a solid grouped capsule, or its own floating glass capsule when immersive.
+/// Build 36: the address bar narrows into the small domain pill while the bottom toolbar is collapsed. It stays the
+/// same view, so the change is one continuous animation instead of a swap.
+private struct CollapsingAddressBar: ViewModifier {
+    let collapsed: Bool
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(collapsed && !reduceMotion ? 0.94 : 1, anchor: .bottom)
+            .frame(maxWidth: collapsed ? ScrollChrome.collapsedPillWidth : .infinity)
+    }
+}
+
+/// Build 36: buttons around the address bar fade out (and shrink a little, unless Reduce Motion is on) while the
+/// bottom toolbar is collapsed. They give up their space so the pill can sit in the middle, and stop taking taps.
+private struct CollapsingControls: ViewModifier {
+    let collapsed: Bool
+    let reduceMotion: Bool
+    /// True for buttons beside the address bar (their width goes to zero), false for a row under it (only its height).
+    let zeroWidth: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(collapsed ? 0 : 1)
+            .scaleEffect(collapsed && !reduceMotion ? 0.85 : 1)
+            .frame(width: collapsed && zeroWidth ? 0 : nil, height: collapsed ? 0 : nil)
+            .allowsHitTesting(!collapsed)
+            .accessibilityHidden(collapsed)
+    }
+}
+
 private struct ClassicAddressSurface: ViewModifier {
     let immersive: Bool
     let isDark: Bool
@@ -3120,7 +3165,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "35"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "36"
         return "\(marketing) (\(build))"
     }
 

@@ -14,6 +14,8 @@ enum ScrollChrome {
     static let threshold: CGFloat = 24
     /// Within this distance of the top or the bottom of the page the full bar is shown.
     static let edgeSlack: CGFloat = 12
+    /// Build 36: the widest the address pill gets while the toolbar is collapsed.
+    static let collapsedPillWidth: CGFloat = 220
     /// Pages that scroll less than this never collapse the bar.
     static let minimumScrollRange: CGFloat = 120
 

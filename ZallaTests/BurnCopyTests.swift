@@ -21,7 +21,7 @@ final class BurnCopyTests: XCTestCase {
     }
 
     func testChangelogNeverSaysBurnItAllQuits() {
-        for entry in Changelog.releases.prefix(3) {
+        for entry in Changelog.releases.prefix(4) {
             let text = (entry.highlights + [entry.improvements, entry.fixes]).joined(separator: " ").lowercased()
             XCTAssertFalse(text.contains("quit"), entry.version)
             // Build 32 is the entry that announced the new Burn It All behavior.

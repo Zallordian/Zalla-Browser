@@ -14,6 +14,15 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 36",
+            name: "Smooth Scroll",
+            highlights: [
+                "The bottom toolbar now folds away smoothly while you scroll. The buttons fade out as the address bar narrows into a small pill with the site's name, all in one motion, and it opens back up the same way"
+            ],
+            improvements: "Tap the small pill to bring the full bar back. With Reduce Motion on, the bar simply fades between the two looks.",
+            fixes: "The address bar no longer jumps or snaps when the toolbar folds away or comes back."
+        ),
+        ChangelogEntry(
             version: "Build 35",
             name: "Room to Read",
             highlights: [

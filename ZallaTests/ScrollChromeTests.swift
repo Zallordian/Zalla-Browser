@@ -17,6 +17,11 @@ final class ScrollChromeTests: XCTestCase {
         XCTAssertTrue(ScrollChrome.underStatusBarDefault)
     }
 
+    func testCollapsedPillIsNarrowerThanAPhone() {
+        XCTAssertGreaterThan(ScrollChrome.collapsedPillWidth, 120)
+        XCTAssertLessThan(ScrollChrome.collapsedPillWidth, 320)
+    }
+
     func testScrollingDownPastTheThresholdCollapses() {
         XCTAssertTrue(scroll([0, 40, 80, 120]).collapsed)
     }
