@@ -16,6 +16,20 @@ enum ScrollChrome {
     static let edgeSlack: CGFloat = 12
     /// Build 36: the widest the address pill gets while the toolbar is collapsed.
     static let collapsedPillWidth: CGFloat = 220
+    /// Build 37: gap between the collapsed pill and the top of the home indicator area, so a tap on the pill never
+    /// lands on the system's swipe home zone. Also the lift on devices without a home indicator.
+    static let pillLift: CGFloat = 14
+
+    /// Space under the bottom bar group. Expanded it is the Build 22 value (a slim gap in the immersive layout, a small
+    /// pull down into the indicator area for solid bars). Collapsed, the pill sits `pillLift` above the home indicator
+    /// area: the immersive group runs to the physical edge, so the indicator inset is added; solid bars already sit
+    /// above it.
+    static func bottomPadding(collapsed: Bool, immersive: Bool, homeIndicatorInset: CGFloat) -> CGFloat {
+        let expanded = immersive ? ImmersiveLayout.bottomGap : -ImmersiveLayout.solidBottomPullDown
+        guard collapsed else { return expanded }
+        return immersive ? max(homeIndicatorInset, 0) + pillLift : pillLift
+    }
+
     /// Pages that scroll less than this never collapse the bar.
     static let minimumScrollRange: CGFloat = 120
 

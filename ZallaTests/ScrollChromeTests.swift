@@ -22,6 +22,16 @@ final class ScrollChromeTests: XCTestCase {
         XCTAssertLessThan(ScrollChrome.collapsedPillWidth, 320)
     }
 
+    func testCollapsedPillRisesAboveTheHomeIndicator() {
+        XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: false, immersive: true, homeIndicatorInset: 34), ImmersiveLayout.bottomGap)
+        XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: false, immersive: false, homeIndicatorInset: 34), -ImmersiveLayout.solidBottomPullDown)
+        XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: true, immersive: true, homeIndicatorInset: 34), 34 + ScrollChrome.pillLift)
+        XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: true, immersive: true, homeIndicatorInset: 0), ScrollChrome.pillLift)
+        XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: true, immersive: false, homeIndicatorInset: 34), ScrollChrome.pillLift)
+        XCTAssertGreaterThanOrEqual(ScrollChrome.pillLift, 12)
+        XCTAssertLessThanOrEqual(ScrollChrome.pillLift, 16)
+    }
+
     func testScrollingDownPastTheThresholdCollapses() {
         XCTAssertTrue(scroll([0, 40, 80, 120]).collapsed)
     }

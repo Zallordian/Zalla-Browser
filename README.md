@@ -15,6 +15,12 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 37
+
+- Collapsed pill clears the home indicator (`ScrollChrome.bottomPadding`, `BrowserView.swift` chrome layer). The expanded bar keeps its Build 22 bottom spacing. Collapsed, the bottom bar group's padding becomes the remembered home indicator inset plus `ScrollChrome.pillLift` (14) in the immersive layout (the group runs to the physical edge), or 14 above the safe area for solid bars; 14 on devices with no indicator. It is part of the same Build 36 spring (Reduce Motion: the short ease, no scale). The bottom content inset stays frozen at the full bar height while collapsed.
+- Domain centered in the collapsed pill: Classic hides the lock with `CollapsingControls` and drops the row spacing to 0; Compact drops the pill's row spacing to 0 so the two spacers center the text whether or not the Tabs button sits in the pill.
+- Changelog "Easy Reach", AboutTests ordering, `BurnCopyTests` checks the five newest entries, `CURRENT_PROJECT_VERSION` 37 and fallback strings, new `ScrollChromeTests` case.
+
 ## Build 36
 
 - Smooth toolbar collapse (`BrowserView.swift`). The Build 35 swap between the full bar and a separate pill view is gone. The bottom Classic and Compact bars stay one view hierarchy driven by `showsCollapsedToolbar`: `CollapsingControls` fades the buttons (opacity 1 to 0, scale 1 to 0.85), zeroes their frame, and turns off their hit testing; `CollapsingAddressBar` narrows the address bar to `ScrollChrome.collapsedPillWidth` (220) with a slight 0.94 scale, while its height animates from 52 (Classic) or 48 (Compact) to 38. Classic centers the domain; Compact cross-fades one Text from the page title to the domain (`.contentTransition(.opacity)`) and centers it with a spacer that only grows while collapsed. One `withAnimation(.spring(response: 0.35, dampingFraction: 0.86))` at the state change drives everything; Reduce Motion uses a 0.2 second ease and no scaling. A tap on the collapsed bar expands it (`tapClassicAddress`, `tapCompactAddress`); outside taps such as the Search widget still go straight to editing. All Build 35 rules (threshold, short pages, keyboard, editing, Quick Action, top bar, the Settings switch, frozen bottom inset) are unchanged. Not scroll driven yet: the bar settles with the spring once the threshold is crossed.

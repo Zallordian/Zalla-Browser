@@ -244,6 +244,13 @@ private struct TabContent: View {
     private var showsCollapsedToolbar: Bool {
         toolbarCollapsed && canCollapseToolbar
     }
+    private var bottomBarPadding: CGFloat {
+        ScrollChrome.bottomPadding(
+            collapsed: showsCollapsedToolbar,
+            immersive: immersiveLayout,
+            homeIndicatorInset: homeIndicatorInset
+        )
+    }
     private func setToolbarCollapsed(_ collapsed: Bool) {
         guard collapsed != toolbarCollapsed else { return }
         // Build 36: one spring for the whole morph. Reduce Motion gets a plain fade (no scaling, see the modifiers).
@@ -596,7 +603,8 @@ private struct TabContent: View {
             }
             // Immersive: a slim gap under the floating capsule. Solid: the bar is pulled a little into the
             // home indicator area so the bezel under it is not so tall.
-            .padding(.bottom, immersiveLayout ? ImmersiveLayout.bottomGap : -ImmersiveLayout.solidBottomPullDown)
+            // Build 37: while collapsed the pill also rises clear of the home indicator, in the same spring.
+            .padding(.bottom, bottomBarPadding)
             // Solid bars own their whole band. Floating controls only catch touches on themselves,
             // so the page stays live in the gaps between them.
             .solidHitArea(!immersiveLayout)
@@ -971,8 +979,10 @@ private struct TabContent: View {
     }
 
     private var classicAddressField: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: showsCollapsedToolbar ? 0 : 10) {
+            // Build 37: the lock steps aside while collapsed so the domain sits in the middle of the pill.
             classicAddressLeading
+                .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
             if addressFocused || isEditingClassicAddress {
                 TextField("Search or enter a website", text: $address)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -1558,7 +1568,7 @@ private struct TabContent: View {
     }
 
     private var compactPill: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: showsCollapsedToolbar ? 0 : 10) {
             if isEditingCompactAddress {
                 Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
                     .foregroundStyle(.secondary)
@@ -3165,7 +3175,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "36"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "37"
         return "\(marketing) (\(build))"
     }
 
