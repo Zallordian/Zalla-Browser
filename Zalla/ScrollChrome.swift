@@ -16,6 +16,12 @@ enum ScrollChrome {
     static let edgeSlack: CGFloat = 12
     /// Build 36: the widest the address pill gets while the toolbar is collapsed.
     static let collapsedPillWidth: CGFloat = 220
+    /// Build 38: the solid bar's material band (and the matching status bar band) is fully shown while expanded and
+    /// fully gone while collapsed. The pill keeps its own capsule, so the page shows edge to edge behind it.
+    static func barBackgroundOpacity(collapsed: Bool) -> Double {
+        collapsed ? 0 : 1
+    }
+
     /// Build 37: gap between the collapsed pill and the top of the home indicator area, so a tap on the pill never
     /// lands on the system's swipe home zone. Also the lift on devices without a home indicator.
     static let pillLift: CGFloat = 14

@@ -57,6 +57,9 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Clear View (Build 38)
+Immersive layout OFF (solid bars), Classic and Compact. Scroll down: the gray bands at the bottom and top fade out with the collapse; the page is visible edge to edge behind the pill and under the clock, the clock stays readable. Scroll up: both bands return exactly as in Build 36. Repeat with Immersive on and "Page under the status bar" on: no band anywhere.
+
 ## Easy Reach (Build 37)
 Physical iPhone with a home indicator, plus an iPhone SE (Home button) if available. Classic and Compact, bottom bar, Immersive layout on and off. Scroll down: the bar shrinks and rises in one motion; the pill's bottom edge sits clearly above the home indicator. Tap the pill many times, including near its bottom edge: it always expands the bar and never triggers swipe home. Scroll up: the bar lowers and widens back to exactly where it was. The page does not jump either way. The domain is centered in the pill in Classic and in Compact (with Tabs in the pill and with Tabs as a bar button). Reduce Motion: a fade with the position change, no scaling. Landscape too.
 

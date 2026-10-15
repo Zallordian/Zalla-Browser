@@ -15,6 +15,10 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 38
+
+- Fix: with the solid (non immersive) bars, the bottom material band and the top status bar band stayed opaque while the toolbar was collapsed, framing the pill in gray. `chromeScrim` now fades to `ScrollChrome.barBackgroundOpacity(collapsed:)` (0 collapsed, 1 expanded) in the same spring; the top band cross-fades to the light legibility scrim. The page already runs edge to edge under the bars (contentInset, not frame), so nothing is clipped. Expanded is unchanged. Build 38, changelog "Clear View", new `ScrollChromeTests` case.
+
 ## Build 37
 
 - Collapsed pill clears the home indicator (`ScrollChrome.bottomPadding`, `BrowserView.swift` chrome layer). The expanded bar keeps its Build 22 bottom spacing. Collapsed, the bottom bar group's padding becomes the remembered home indicator inset plus `ScrollChrome.pillLift` (14) in the immersive layout (the group runs to the physical edge), or 14 above the safe area for solid bars; 14 on devices with no indicator. It is part of the same Build 36 spring (Reduce Motion: the short ease, no scale). The bottom content inset stays frozen at the full bar height while collapsed.

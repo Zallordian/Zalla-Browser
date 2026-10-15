@@ -14,6 +14,13 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 38",
+            name: "Clear View",
+            highlights: [],
+            improvements: "",
+            fixes: "When the toolbar folds into the small pill, the gray bands at the top and bottom of the screen now fade away too, so the page fills the whole screen behind the pill."
+        ),
+        ChangelogEntry(
             version: "Build 37",
             name: "Easy Reach",
             highlights: [

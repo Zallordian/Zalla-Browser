@@ -22,6 +22,11 @@ final class ScrollChromeTests: XCTestCase {
         XCTAssertLessThan(ScrollChrome.collapsedPillWidth, 320)
     }
 
+    func testCollapsedBarLeavesNoBand() {
+        XCTAssertEqual(ScrollChrome.barBackgroundOpacity(collapsed: true), 0)
+        XCTAssertEqual(ScrollChrome.barBackgroundOpacity(collapsed: false), 1)
+    }
+
     func testCollapsedPillRisesAboveTheHomeIndicator() {
         XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: false, immersive: true, homeIndicatorInset: 34), ImmersiveLayout.bottomGap)
         XCTAssertEqual(ScrollChrome.bottomPadding(collapsed: false, immersive: false, homeIndicatorInset: 34), -ImmersiveLayout.solidBottomPullDown)

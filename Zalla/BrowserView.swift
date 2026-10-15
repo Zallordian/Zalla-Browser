@@ -816,7 +816,9 @@ private struct TabContent: View {
     @ViewBuilder
     private func chromeScrim(edge: VerticalEdge, extent: CGFloat = 0) -> some View {
         if !immersiveLayout {
+            // Build 38: the band fades out with the collapse, so only the pill floats over the page.
             solidChromeScrim(edge: edge, extent: extent)
+                .opacity(ScrollChrome.barBackgroundOpacity(collapsed: showsCollapsedToolbar))
         }
     }
 
@@ -831,7 +833,14 @@ private struct TabContent: View {
                 statusBarScrim
             }
         } else {
-            solidChromeScrim(edge: .top, extent: 0)
+            // Build 38: while the bottom bar is collapsed the page runs clear under the status bar too, with only
+            // the light legibility fade. Expanded keeps the Build 36 band.
+            ZStack {
+                statusBarScrim
+                    .opacity(1 - ScrollChrome.barBackgroundOpacity(collapsed: showsCollapsedToolbar))
+                solidChromeScrim(edge: .top, extent: 0)
+                    .opacity(ScrollChrome.barBackgroundOpacity(collapsed: showsCollapsedToolbar))
+            }
         }
     }
 
@@ -3175,7 +3184,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "37"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "38"
         return "\(marketing) (\(build))"
     }
 
