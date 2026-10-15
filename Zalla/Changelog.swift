@@ -16,9 +16,11 @@ enum Changelog {
         ChangelogEntry(
             version: "Build 38",
             name: "Clear View",
-            highlights: [],
+            highlights: [
+                "When the toolbar folds into the small pill, the gray bands at the top and bottom of the screen now fade away too, so the page fills the whole screen behind the pill"
+            ],
             improvements: "",
-            fixes: "When the toolbar folds into the small pill, the gray bands at the top and bottom of the screen now fade away too, so the page fills the whole screen behind the pill."
+            fixes: ""
         ),
         ChangelogEntry(
             version: "Build 37",
