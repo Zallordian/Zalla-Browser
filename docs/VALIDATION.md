@@ -57,6 +57,12 @@ Needs a physical iPhone. Check: tabs are easy to hit with a thumb; the selected 
 ## Burn fire look (Build 22)
 Needs a physical iPhone. Check: flames have soft curved edges and a warm gradient from a hot base to a deeper tip, the front lemon core has a gentle glow, embers include dots, sparks, and flakes, timing is the same as Build 21 (about 2.4 seconds, black and one label at the end, no replay), and it still holds 60 frames a second and stays cool on an older iPhone; Reduce Motion and the Privacy switch still give the quick fade.
 
+## Steady Hands (Build 39)
+- Best Buy and Google Shopping listings: scroll, fling, swipe carousels, pinch. Export image never appears. Hold a product image still for half a second: it appears once, and not again until the next hold.
+- Google search, tap results that open apps (YouTube, Maps) and start a download: no "Frame load interrupted" notice. Airplane mode: the offline page still appears.
+- Open a heavy page, switch to several big apps for a few minutes, come back: the page reloads by itself with no error. Toggle Wi-Fi off and on just before returning: still no error once the network is back.
+- Collapse the toolbar, then tap Google's search box: the full toolbar returns above the keyboard; an error notice sits above the toolbar.
+
 ## Clear View (Build 38)
 Immersive layout OFF (solid bars), Classic and Compact. Scroll down: the gray bands at the bottom and top fade out with the collapse; the page is visible edge to edge behind the pill and under the clock, the clock stays readable. Scroll up: both bands return exactly as in Build 36. Repeat with Immersive on and "Page under the status bar" on: no band anywhere.
 

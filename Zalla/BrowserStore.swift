@@ -26,6 +26,7 @@ final class BrowserStore: ObservableObject {
             }
             selected?.lastActiveAt = Date()
             selected?.restoreIfNeeded()
+            selected?.reloadIfTerminated()
             if speaker.isActive, speaker.tabID != selectedID { speaker.stop() }
             scheduleSessionSave()
         }
@@ -286,6 +287,13 @@ final class BrowserStore: ObservableObject {
         ShieldRuntime.refreshProxy(privateStores: tabs.filter(\.isPrivate).map { $0.webView.configuration.websiteDataStore })
     }
 
+    /// Build 39: Zalla came back to the foreground. The shown tab reloads quietly if iOS ended its page while away,
+    /// and a load that trips over the network waking up gets one silent retry.
+    func appDidBecomeActive() {
+        selected?.noteResumed()
+        selected?.reloadIfTerminated()
+    }
+
     @discardableResult
     func addTab(isPrivate: Bool = false, url: URL? = nil) -> BrowserTab {
         let tab = BrowserTab(isPrivate: isPrivate)
@@ -307,7 +315,11 @@ final class BrowserStore: ObservableObject {
             self.save()
         }
         tab.onImageExport = { [weak self] request in
-            self?.imageExport = request
+            guard let self, self.imageExport == nil else { return }
+            self.imageExport = request
+        }
+        tab.isImageExportShowing = { [weak self] in
+            self?.imageExport != nil
         }
         tab.onDownloadDecision = { [weak self] tab, download, response, sourceURL in
             self?.beginDownload(tab: tab, download: download, response: response, sourceURL: sourceURL)
@@ -907,6 +919,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var toast: String?
     var onVisit: ((SavedPage) -> Void)?
     var onImageExport: ((ImageExportRequest) -> Void)?
+    /// Build 39: iOS ended this page's process while Zalla was in the background. It reloads when next shown.
+    private var reloadWhenShown = false
+    /// Build 39: until this time (just after returning to Zalla), a network hiccup gets one quiet retry.
+    private var resumeRetryUntil: Date?
+    private var resumeRetried = false
+    /// Build 39: whether the Export image sheet is already up, so a second hold does not stack another one.
+    var isImageExportShowing: (() -> Bool)?
     var onDownloadDecision: ((BrowserTab, WKDownload, URLResponse, URL) -> Void)?
     /// Fires when something worth saving in the tab session changes (committed URL or title).
     var onSessionChange: (() -> Void)?
@@ -960,7 +979,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         super.init()
         if let newController {
             scriptHandlerProxy.delegate = self
-            newController.add(scriptHandlerProxy, name: "zallaImage")
+            newController.add(scriptHandlerProxy, name: ImageHold.messageName)
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
             newController.add(scriptHandlerProxy, name: PageColor.messageName)
             if FeatureFlags.videoSaverEnabled {
@@ -1000,7 +1019,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         controller.addUserScript(WKUserScript(
-            source: Self.imageLongPressScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false
+            source: ImageHold.script, injectionTime: .atDocumentEnd, forMainFrameOnly: false
         ))
         if ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
             // Page colors for the status bar and the app banner tag. The script only reads; it loads nothing.
@@ -1027,34 +1046,6 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             ))
         }
     }
-
-    private static let imageLongPressScript = """
-    (function() {
-      if (window.__zallaImageHook) return;
-      window.__zallaImageHook = true;
-      var timer = null;
-      function send(src) {
-        try {
-          if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.zallaImage) {
-            window.webkit.messageHandlers.zallaImage.postMessage({ src: src });
-          }
-        } catch (e) {}
-      }
-      document.addEventListener('touchstart', function(e) {
-        var t = e.target;
-        if (!t || t.tagName !== 'IMG' || !t.src) return;
-        timer = setTimeout(function() { send(t.src); }, 480);
-      }, { passive: true });
-      document.addEventListener('touchend', function() { if (timer) clearTimeout(timer); }, { passive: true });
-      document.addEventListener('touchmove', function() { if (timer) clearTimeout(timer); }, { passive: true });
-      document.addEventListener('contextmenu', function(e) {
-        var t = e.target;
-        if (t && t.tagName === 'IMG' && t.src) {
-          send(t.src);
-        }
-      });
-    })();
-    """
 
     private func refresh() {
         // A tab waiting to be restored or woken keeps showing its saved title and address.
@@ -1571,10 +1562,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             if !isPrivate { PrivacyReport.record(.cookieBannerDismissed, host: webView.url?.host) }
             return
         }
-        guard message.name == "zallaImage",
-              let body = message.body as? [String: Any],
-              let src = body["src"] as? String,
-              let imageURL = URL(string: src),
+        // Build 39: only a real, still hold on an image, never while the page scrolls or a sheet is already up.
+        guard message.name == ImageHold.messageName,
+              let report = ImageHold.Report(body: message.body) else { return }
+        let scrolling = webView.scrollView.isDragging || webView.scrollView.isDecelerating
+        guard ImageHold.accepts(report, scrolling: scrolling, sheetShowing: isImageExportShowing?() ?? false),
+              let imageURL = URL(string: report.src),
               ["http", "https", "data"].contains(imageURL.scheme?.lowercased() ?? "") else { return }
         Task { await prepareImageExport(from: imageURL) }
     }
@@ -1664,7 +1657,23 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     private func show(_ error: Error) {
-        guard (error as NSError).code != NSURLErrorCancelled else { return }
+        // Build 39: cancels, policy interruptions ("Frame load interrupted"), and anything that is not a real network
+        // failure stay quiet. WebKit only reports main frame navigations here, so subframe trouble never shows.
+        guard FriendlyErrorKind.shouldShow(error) else { return }
+        if ResumeRetry.shouldRetry(error, now: Date(), until: resumeRetryUntil, alreadyRetried: resumeRetried) {
+            resumeRetried = true
+            let target = FriendlyError(error: error, fallbackURL: webView.url ?? url).failedURL
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: ResumeRetry.delayNanoseconds)
+                guard let self else { return }
+                if let target, ["http", "https"].contains(target.scheme?.lowercased() ?? "") {
+                    self.load(target)
+                } else {
+                    self.webView.reload()
+                }
+            }
+            return
+        }
         let friendly = FriendlyError(error: error, fallbackURL: webView.url ?? url)
         // Only a real network failure gets the full page. Odd errors keep the small banner.
         if friendly.kind != .other {
@@ -1693,13 +1702,39 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        errorMessage = "This page stopped responding. Reload to continue."
+        // Build 39: iOS often ends a page's process while Zalla is in the background. Reloading right then runs into
+        // a suspended network and ends on an error page. Instead, wait until the tab is shown again, and reload
+        // quietly either way: the page simply comes back.
+        errorMessage = nil
+        pageError = nil
+        guard hasPage, !isSleeping else { return }
+        if UIApplication.shared.applicationState == .active {
+            reloadAfterTermination()
+        } else {
+            reloadWhenShown = true
+        }
+    }
+
+    /// Reloads a page whose process iOS ended while Zalla was away. Called when the tab is shown or Zalla returns.
+    func reloadIfTerminated() {
+        guard reloadWhenShown, UIApplication.shared.applicationState == .active else { return }
+        reloadAfterTermination()
+    }
+
+    private func reloadAfterTermination() {
+        reloadWhenShown = false
         let restoreURL = url ?? webView.url ?? webView.backForwardList.currentItem?.url
         if let restoreURL, ["http", "https"].contains(restoreURL.scheme?.lowercased() ?? "") {
             webView.load(URLRequest(url: restoreURL))
         } else {
             webView.reload()
         }
+    }
+
+    /// Starts the short window after returning to Zalla in which a network hiccup is retried once, quietly.
+    func noteResumed() {
+        resumeRetryUntil = Date().addingTimeInterval(ResumeRetry.window)
+        resumeRetried = false
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,

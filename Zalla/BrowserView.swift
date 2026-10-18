@@ -447,6 +447,10 @@ private struct TabContent: View {
             }
         }
         .onChange(of: browser.addressFocusRequestedAt) { _, _ in startAddressFocusRequest() }
+        // Build 39: a keyboard for a field on the page brings the full toolbar back, like address editing does.
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            setToolbarCollapsed(false)
+        }
         .onChange(of: browser.burnConfirmRequest) { _, _ in confirmBurn = true }
         .onChange(of: addressFocused) { _, focused in
             if focused {
@@ -592,7 +596,11 @@ private struct TabContent: View {
             .background(ChromeHeightReader(key: TopChromeHeightKey.self))
             Spacer(minLength: 0)
             if let error = tab.errorMessage {
+                // Build 39: the notice always draws above the toolbar and pill, and keeps its full height when the
+                // keyboard leaves little room (the space above it gives way first).
                 errorBanner(error)
+                    .layoutPriority(1)
+                    .zIndex(1)
             }
             Group {
                 if addressBarPlacement == .bottom {
@@ -3184,7 +3192,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "38"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "39"
         return "\(marketing) (\(build))"
     }
 

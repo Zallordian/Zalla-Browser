@@ -114,6 +114,7 @@ struct ZallaApp: App {
                     browser.lockPrivateTabsIfNeeded()
                 }
                 if phase == .active {
+                    browser.appDidBecomeActive()
                     Task { await browser.runAutoClearIfDue() }
                 }
             }

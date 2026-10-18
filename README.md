@@ -15,6 +15,13 @@ Implemented in source:
 - Clear history and website data, closing tabs before deletion; bookmarks retained.
 - App-switcher privacy cover; device-protected library file excluded from OS backup.
 
+## Build 39
+
+- Image export hold (`ImageHold.swift`): the page script listens in the capture phase on window (sites cannot swallow touchend or touchmove), ends a hold on touchcancel, touchend, a second finger, movement over 10pt, any page or element scroll, gesturestart, or the page hiding; ignores synthetic touches; one timer at a time. The app checks the report again (one finger, at least 500 ms, at most 10pt, web view not dragging or decelerating, no sheet already up). The old `contextmenu` path is gone.
+- Navigation errors (`FriendlyErrorKind.shouldShow`): -999, WebKitErrorDomain 101, 102, 204 and any non NSURLErrorDomain error stay quiet.
+- Resume (`ResumeRetry`, `BrowserTab.reloadIfTerminated`): a page whose process iOS ends in the background reloads quietly when shown again, not while backgrounded; for 10 seconds after returning, a lost connection, timeout, or DNS failure gets one quiet retry.
+- Keyboard: any keyboard showing expands a collapsed toolbar. The error notice has layout priority and draws above the toolbar.
+
 ## Build 38
 
 - Fix: with the solid (non immersive) bars, the bottom material band and the top status bar band stayed opaque while the toolbar was collapsed, framing the pill in gray. `chromeScrim` now fades to `ScrollChrome.barBackgroundOpacity(collapsed:)` (0 collapsed, 1 expanded) in the same spring; the top band cross-fades to the light legibility scrim. The page already runs edge to edge under the bars (contentInset, not frame), so nothing is clipped. Expanded is unchanged. Build 38, changelog "Clear View", new `ScrollChromeTests` case.

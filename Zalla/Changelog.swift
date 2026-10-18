@@ -14,6 +14,16 @@ enum Changelog {
     /// Newest first. Add future releases (1.1, 1.2, and so on) at the top of `releases`.
     static let releases: [ChangelogEntry] = [
         ChangelogEntry(
+            version: "Build 39",
+            name: "Steady Hands",
+            highlights: [
+                "Export image only opens when you really press and hold a picture. Scrolling through shopping pages and swiping carousels no longer pops it up",
+                "Coming back to Zalla after a while brings your page right back, without an error"
+            ],
+            improvements: "Typing in a search box on a page brings the full toolbar back, and notices always sit above the toolbar.",
+            fixes: "No more \"Frame load interrupted\" message when a link opens an app or starts a download."
+        ),
+        ChangelogEntry(
             version: "Build 38",
             name: "Clear View",
             highlights: [

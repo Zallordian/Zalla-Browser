@@ -9,6 +9,23 @@ enum FriendlyErrorKind: String, Equatable {
     case cannotConnect
     case other
 
+    /// Build 39: failures that are part of normal browsing and need no message. A cancelled load (-999), WebKit's
+    /// "cannot show URL" (101) and "frame load interrupted" (102, a download, a cancel, or an app link taking over),
+    /// and a load a plug-in handled (204).
+    static func isBenign(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain { return ns.code == NSURLErrorCancelled }
+        if ns.domain == "WebKitErrorDomain" { return [101, 102, 204].contains(ns.code) }
+        return false
+    }
+
+    /// Only real network failures of the page itself (offline, no such host, timeouts, refused connections, bad
+    /// certificates, and other URL loading errors) get a message. WebKit's own error domains stay quiet.
+    static func shouldShow(_ error: Error) -> Bool {
+        guard !isBenign(error) else { return false }
+        return (error as NSError).domain == NSURLErrorDomain
+    }
+
     /// Sorts a failed load into one of the friendly kinds.
     static func classify(_ error: Error) -> FriendlyErrorKind {
         let ns = error as NSError
@@ -91,5 +108,27 @@ struct FriendlyError: Equatable {
             failedURL = fallbackURL
         }
         host = failedURL?.host
+    }
+}
+
+/// Build 39: right after Zalla returns to the foreground the network can take a moment to wake up, so the first
+/// load often fails with a lost connection or a timeout. One quiet retry covers that without an error page.
+enum ResumeRetry {
+    /// Seconds after returning in which a failure counts as a wake up hiccup.
+    static let window: TimeInterval = 10
+    static let delayNanoseconds: UInt64 = 800_000_000
+
+    static func isTransient(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == NSURLErrorDomain else { return false }
+        return [
+            NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet, NSURLErrorTimedOut,
+            NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed
+        ].contains(ns.code)
+    }
+
+    static func shouldRetry(_ error: Error, now: Date, until: Date?, alreadyRetried: Bool) -> Bool {
+        guard !alreadyRetried, let until, now <= until else { return false }
+        return isTransient(error)
     }
 }
