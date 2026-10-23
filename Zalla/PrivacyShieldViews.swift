@@ -36,14 +36,22 @@ struct PrivacyShieldView: View {
                     }
                 }
                 if showDNSRestartNote {
-                    Text("Restart Zalla for this change to take effect.")
+                    Text(PrivacyShield.Copy.dnsRestartNote)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             } header: {
                 Text("Name lookups")
             }
-            .onChange(of: encryptedDNS) { _, _ in showDNSRestartNote = true }
+            .onChange(of: encryptedDNS) { _, isOn in
+                // Turning it on works right away. Turning it off, or a new provider, needs a fresh start of Zalla.
+                if isOn {
+                    ShieldRuntime.applyEncryptedDNS()
+                    showDNSRestartNote = false
+                } else {
+                    showDNSRestartNote = true
+                }
+            }
             .onChange(of: dnsProvider) { _, _ in showDNSRestartNote = true }
 
             Section {

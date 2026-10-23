@@ -8,6 +8,8 @@ struct ZallaApp: App {
     /// Icon quick actions land here first, then move to the browser once it is on screen.
     @ObservedObject private var quickActions = QuickActionRouter.shared
     @Environment(\.scenePhase) private var scenePhase
+    @AppStorage(PrivacyCover.storageKey) private var privacyCoverEnabled = PrivacyCover.defaultEnabled
+    @State private var privacyCoverShown = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
@@ -79,7 +81,7 @@ struct ZallaApp: App {
                 handOverQuickAction(action)
             }
             .overlay {
-                if scenePhase != .active {
+                if privacyCoverShown {
                     ZStack {
                         Color(uiColor: .systemBackground).ignoresSafeArea()
                         Label("Zalla", systemImage: "shield.lefthalf.filled")
@@ -103,6 +105,8 @@ struct ZallaApp: App {
                 fallBackIfLocked()
             }
             .onChange(of: scenePhase) { _, phase in
+                let coverPhase: PrivacyCover.Phase = phase == .background ? .background : (phase == .active ? .active : .inactive)
+                privacyCoverShown = PrivacyCover.showsCover(enabled: privacyCoverEnabled, phase: coverPhase, current: privacyCoverShown)
                 // Save open tabs whenever Zalla leaves the foreground so a cold launch can restore them.
                 if phase != .active {
                     browser.saveSession()

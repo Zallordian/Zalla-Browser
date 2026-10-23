@@ -3009,8 +3009,15 @@ private struct DownloadsView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        Button("Delete", role: .destructive) {
-                            browser.removeDownload(record)
+                        HStack {
+                            if DownloadsStore.canRetry(record) {
+                                Button("Retry") {
+                                    browser.retryDownload(record)
+                                }
+                            }
+                            Button("Delete", role: .destructive) {
+                                browser.removeDownload(record)
+                            }
                         }
                         .font(.subheadline.weight(.semibold))
                         .buttonStyle(.borderless)
@@ -3148,6 +3155,7 @@ private struct SettingsView: View {
     @AppStorage(QuickAction.storageKey) private var quickActionsOn = QuickAction.defaultEnabled
     @AppStorage(VideoSaver.storageKey) private var videoSaverOn = VideoSaver.defaultEnabled
     @AppStorage(CookieBannerDismiss.storageKey) private var cookieBanners = true
+    @AppStorage(PrivacyCover.storageKey) private var privacyCover = PrivacyCover.defaultEnabled
     @AppStorage(AppBanner.storageKey) private var appBanners = AppBanner.defaultEnabled
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
     @AppStorage(SettingsCategory.storageKey) private var selectedCategory = SettingsCategory.default.rawValue
@@ -3436,12 +3444,13 @@ private struct SettingsView: View {
                 }
                 Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
                 Toggle("Burn It All fire effect", isOn: $burnAnimation)
+                Toggle(PrivacyCover.title, isOn: $privacyCover)
                 Button("Clear browsing data", role: .destructive) { confirmClear = true }
                     .disabled(browser.clearingData)
                 Button("Reset the App", role: .destructive) { confirmReset = true }
                     .disabled(browser.clearingData)
                 DisclosureGroup("What these do") {
-                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
+                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Hide page in app switcher shows a plain Zalla screen once Zalla is in the background. Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

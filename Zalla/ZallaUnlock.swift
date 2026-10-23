@@ -33,7 +33,7 @@ enum ZallaUnlockProduct {
 
     enum Copy {
         static let title = "Zalla Unlock"
-        static let subtitle = "One time purchase"
+        static let subtitle = "One-time purchase"
         static let note = "Stronger blocking, Face ID for private tabs, tab groups, listen to page, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs. Buy once, keep it on this Apple Account."
         static let unavailable = "Couldn't reach the App Store. Check your connection and try again."
         static let notOffered = "Zalla Unlock isn't available right now."

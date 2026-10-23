@@ -78,8 +78,14 @@ enum DownloadsStore {
         do {
             try prepareDirectories()
             guard FileManager.default.fileExists(atPath: manifestURL.path) else { return [] }
-            return try JSONDecoder().decode([DownloadRecord].self, from: Data(contentsOf: manifestURL))
+            let records = try JSONDecoder().decode([DownloadRecord].self, from: Data(contentsOf: manifestURL))
+            LibraryBackup.relaxProtection(of: manifestURL)
+            return recovered(records)
         } catch {
+            // Keep the unreadable list to one side before the next save replaces it.
+            if FileManager.default.fileExists(atPath: manifestURL.path) {
+                LibraryBackup.keepCopy(of: manifestURL)
+            }
             return []
         }
     }
@@ -87,7 +93,30 @@ enum DownloadsStore {
     static func save(_ records: [DownloadRecord]) throws {
         try prepareDirectories()
         let data = try JSONEncoder().encode(records)
-        try data.write(to: manifestURL, options: [.atomic, .completeFileProtection])
+        try data.write(to: manifestURL, options: LibraryBackup.writeOptions)
+    }
+
+    static let interruptedMessage = "This download stopped when Zalla closed."
+
+    /// Build 40: a download that was still running when Zalla closed can never finish, so it comes back as failed
+    /// (with Retry) instead of spinning forever. A finished file that is already on disk counts as completed.
+    static func recovered(_ records: [DownloadRecord], fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> [DownloadRecord] {
+        records.map { record in
+            guard record.state == .downloading else { return record }
+            var copy = record
+            copy.state = .failed
+            copy.errorMessage = interruptedMessage
+            if let url = record.localFileURL, fileExists(url) {
+                try? FileManager.default.removeItem(at: url)
+            }
+            return copy
+        }
+    }
+
+    /// Only plain web addresses can be fetched again. blob: and data: downloads came from a page that is gone.
+    static func canRetry(_ record: DownloadRecord) -> Bool {
+        guard record.state == .failed else { return false }
+        return ["http", "https"].contains(record.sourceURL.scheme?.lowercased() ?? "")
     }
 
     static func uniqueDestination(for filename: String) -> (url: URL, relative: String) {

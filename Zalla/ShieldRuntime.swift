@@ -39,6 +39,21 @@ enum ShieldRuntime {
         }
     }
 
+    /// Build 40: a one-off session for requests Zalla makes for a page, such as Export image. Nothing is cached or
+    /// kept: it has its own in-memory cookie jar (filled with the tab's cookies, so private and normal tabs stay
+    /// apart), no disk cache, and it goes through the user's proxy when one is set up.
+    static func pageRequestSession(cookies: [HTTPCookie], defaults: UserDefaults = .standard) -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 30
+        if let jar = configuration.httpCookieStorage {
+            cookies.forEach { jar.setCookie($0) }
+        }
+        configuration.proxyConfigurations = proxyConfigurations(defaults: defaults)
+        return URLSession(configuration: configuration)
+    }
+
     /// Requires encrypted DNS for requests Zalla makes itself (image export, speed test).
     /// Turning it off takes effect the next time Zalla starts.
     /// WebKit runs page networking in its own processes, so this does not change how web pages look up addresses.

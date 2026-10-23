@@ -55,6 +55,21 @@ final class ContentBlocker: ObservableObject {
         rebuild()
     }
 
+    /// Build 40: true once the first compile or lookup has finished, whether it worked or not.
+    var hasSettled: Bool { status == .ready || status == .failed }
+
+    /// Waits for the rule lists, up to `timeout` seconds, so the first page after launch loads with blocking on.
+    /// Cached lists are looked up in well under a second; a fresh compile after an update can take longer, and then
+    /// the page loads anyway rather than leaving the person waiting.
+    func waitUntilReady(timeout: TimeInterval = ContentBlocker.launchWait) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !hasSettled, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+    }
+
+    nonisolated static let launchWait: TimeInterval = 2
+
     // MARK: Tabs
 
     /// Rule lists for a page, or none when blocking is off for it.

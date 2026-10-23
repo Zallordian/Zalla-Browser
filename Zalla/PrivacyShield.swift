@@ -55,9 +55,10 @@ enum PrivacyShield {
         static let fingerprintTitle = "Fingerprinting protection"
         static let fingerprintDetail = "Adds small changes to canvas and audio results and reports a common processor count, so it is harder to tell your device apart. It does not make you anonymous and can affect some games and web apps."
         static let encryptedDNSTitle = "Encrypted DNS"
-        static let encryptedDNSDetail = "Uses encrypted name lookups for what Zalla itself requests, such as image export and the speed test. iOS does not let an app change how web pages look up addresses. For that, add an encrypted DNS setting for your whole iPhone or use a DNS app."
+        static let encryptedDNSDetail = "Encrypts the address lookups Zalla makes on its own, like Export image and the speed test. Web pages you visit still use your iPhone's normal DNS, because iOS does not let an app change that. To cover everything, set up encrypted DNS for your whole iPhone in iOS Settings or with a DNS app."
         static let proxyTitle = "Use my own proxy"
         static let proxyDetail = "Sends web page traffic through a proxy server that you run or subscribe to. The proxy can see the sites you visit, and it looks up their addresses. Zalla does not provide a proxy, and proxies that ask for a username and password are not supported yet."
+        static let dnsRestartNote = "Close Zalla from the app switcher and open it again for this to take effect."
         static let footer = "Privacy Shield works on this device. It is not a VPN: it does not hide your IP address, and sites and your search engine still see the requests you make."
     }
 }

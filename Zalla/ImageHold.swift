@@ -1,4 +1,5 @@
 import Foundation
+import WebKit
 
 /// Build 39: press and hold on a page image to export it. The page script only reports a hold that stayed put, and
 /// the app checks the report again before showing the Export image sheet.
@@ -32,6 +33,15 @@ enum ImageHold {
                   let touches = dict["touches"] as? NSNumber else { return nil }
             self.init(src: src, heldMs: held.doubleValue, moved: moved.doubleValue, touches: touches.intValue)
         }
+    }
+
+    /// Build 40: Zalla's own script world. The page's scripts run in another world and cannot reach this handler.
+    @MainActor static var world: WKContentWorld { .defaultClient }
+
+    /// Build 40: only a report from the top page, sent by Zalla's script in Zalla's world, is listened to. Ads and
+    /// other embedded frames, and anything a site posts itself, are ignored.
+    static func trusts(isMainFrame: Bool, fromZallaWorld: Bool) -> Bool {
+        isMainFrame && fromZallaWorld
     }
 
     /// True only for one finger held still long enough while the page is not scrolling, and with no sheet already up.

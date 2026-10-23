@@ -6,7 +6,7 @@ struct AboutView: View {
     @State private var expandedBeta = false
 
     private var versionString: String {
-        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
+        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "39"
         return "\(marketing) (\(build))"
     }
@@ -43,9 +43,11 @@ struct AboutView: View {
                 ForEach(Changelog.releases) { entry in
                     ReleaseView(entry: entry)
                 }
-                DisclosureGroup("Before launch", isExpanded: $expandedBeta) {
-                    ForEach(Changelog.beta) { entry in
-                        ReleaseView(entry: entry)
+                if !Changelog.beta.isEmpty {
+                    DisclosureGroup("Before launch", isExpanded: $expandedBeta) {
+                        ForEach(Changelog.beta) { entry in
+                            ReleaseView(entry: entry)
+                        }
                     }
                 }
             }

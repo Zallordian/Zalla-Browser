@@ -25,7 +25,7 @@ final class BrowserStore: ObservableObject {
                 tabs.first { $0.id == old }?.lastActiveAt = Date()
             }
             selected?.lastActiveAt = Date()
-            selected?.restoreIfNeeded()
+            if !holdingRestoreForBlocker { selected?.restoreIfNeeded() }
             selected?.reloadIfTerminated()
             if speaker.isActive, speaker.tabID != selectedID { speaker.stop() }
             scheduleSessionSave()
@@ -66,6 +66,10 @@ final class BrowserStore: ObservableObject {
     private var proxyObserver: NSObjectProtocol?
 
     var selected: BrowserTab? { tabs.first { $0.id == selectedID } }
+    /// Build 40: true at launch until the content blocker is ready, so the restored tab does not load unblocked.
+    private var holdingRestoreForBlocker = false
+    /// True when library.json exists but could not be read this launch. Saving stays off so it is not erased.
+    private var libraryReadFailed = false
 
     init() {
         // Build 26 moved Tabs into the default Compact bar; carry over anyone who never changed that bar.
@@ -80,14 +84,24 @@ final class BrowserStore: ObservableObject {
             values.isExcludedFromBackup = true
             try excluded.setResourceValues(values)
             if FileManager.default.fileExists(atPath: fileURL.path) {
-                let library = try JSONDecoder().decode(Library.self, from: Data(contentsOf: fileURL))
-                bookmarks = library.bookmarks
-                history = library.history
+                do {
+                    let library = try JSONDecoder().decode(Library.self, from: Data(contentsOf: fileURL))
+                    bookmarks = library.bookmarks
+                    history = library.history
+                } catch {
+                    // Never write over a library we could not read: that would erase every bookmark. Keep a copy
+                    // to one side and leave saving off for this run, so the file is still there next launch.
+                    libraryReadFailed = true
+                    LibraryBackup.keepCopy(of: fileURL)
+                    storageError = "Your bookmarks could not be opened right now, so Zalla left them untouched. Close and reopen Zalla to try again."
+                }
             }
             downloads = DownloadsStore.load()
         } catch {
             storageError = "Your saved library could not be read. \(error.localizedDescription)"
         }
+        // Older builds saved with full file protection, which blocks reads and writes while the iPhone is locked.
+        LibraryBackup.relaxProtection(of: fileURL)
         // Brave Search is the new default. People who already finished setup keep the engine they had.
         SearchEngine.keepExistingChoice()
         // Home shortcuts: fresh installs start empty; anyone who already has a saved list keeps it.
@@ -102,6 +116,7 @@ final class BrowserStore: ObservableObject {
         if UserDefaults.standard.bool(forKey: BurnEffectPlan.pendingKey) {
             finishInterruptedBurn()
         }
+        holdingRestoreForBlocker = true
         if !restoreSession() {
             addTab()
         }
@@ -114,7 +129,15 @@ final class BrowserStore: ObservableObject {
                 self?.tabs.forEach { $0.applyContentBlocking(for: $0.webView.url) }
             }
         }
+        // Listen for the keyboard from launch, so the toolbar collapse logic never misses the first one.
+        _ = KeyboardVisibility.shared
         ContentBlocker.shared.start()
+        Task { @MainActor [weak self] in
+            await ContentBlocker.shared.waitUntilReady()
+            guard let self else { return }
+            self.holdingRestoreForBlocker = false
+            self.selected?.restoreIfNeeded()
+        }
         // Privacy Shield, location, and site CSS choices reach a tab's next page load.
         scriptsObserver = NotificationCenter.default.addObserver(
             forName: .zallaScriptsChanged, object: nil, queue: .main
@@ -579,6 +602,7 @@ final class BrowserStore: ObservableObject {
             ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast
         )
         URLCache.shared.removeAllCachedResponses()
+        HTTPCookieStorage.shared.removeCookies(since: .distantPast)
         addTab()
         sessionSavingEnabled = true
         clearingData = false
@@ -658,6 +682,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: LogoStyle.storageKey)
         defaults.removeObject(forKey: QuickAction.storageKey)
         defaults.removeObject(forKey: SearchFocus.storageKey)
+        defaults.removeObject(forKey: PrivacyCover.storageKey)
         defaults.removeObject(forKey: VideoSaver.storageKey)
         defaults.removeObject(forKey: WidgetShared.shareKey)
         WidgetSync.clear()
@@ -716,6 +741,29 @@ final class BrowserStore: ObservableObject {
         persistDownloads()
     }
 
+    /// Build 40: starts a failed download again from its original address, in a tab of the same kind (private or not),
+    /// so it keeps that tab's cookies and proxy. The old entry is replaced by the new one.
+    func retryDownload(_ record: DownloadRecord) {
+        guard DownloadsStore.canRetry(record) else { return }
+        let tab: BrowserTab
+        if let current = selected, current.isPrivate == record.isPrivate {
+            tab = current
+        } else if let match = tabs.last(where: { $0.isPrivate == record.isPrivate }) {
+            tab = match
+        } else {
+            return
+        }
+        removeDownload(record)
+        let url = record.sourceURL
+        tab.webView.startDownload(using: URLRequest(url: url)) { [weak self, weak tab] download in
+            MainActor.assumeIsolated {
+                guard let self, let tab else { return }
+                let response = URLResponse(url: url, mimeType: nil, expectedContentLength: -1, textEncodingName: nil)
+                self.beginDownload(tab: tab, download: download, response: response, sourceURL: url)
+            }
+        }
+    }
+
     func removeDownload(_ record: DownloadRecord) {
         if let url = record.localFileURL {
             try? FileManager.default.removeItem(at: url)
@@ -743,9 +791,11 @@ final class BrowserStore: ObservableObject {
     }
 
     private func save() {
+        // Build 40: a library that failed to load is never overwritten with empty lists.
+        guard !libraryReadFailed else { return }
         do {
             let data = try JSONEncoder().encode(Library(bookmarks: bookmarks, history: history))
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: fileURL, options: LibraryBackup.writeOptions)
         } catch {
             storageError = "Your changes could not be saved. \(error.localizedDescription)"
         }
@@ -979,7 +1029,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         super.init()
         if let newController {
             scriptHandlerProxy.delegate = self
-            newController.add(scriptHandlerProxy, name: ImageHold.messageName)
+            // Build 40: the image hold lives in Zalla's own script world, so page scripts can neither see nor post to it.
+            newController.add(scriptHandlerProxy, contentWorld: ImageHold.world, name: ImageHold.messageName)
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
             newController.add(scriptHandlerProxy, name: PageColor.messageName)
             if FeatureFlags.videoSaverEnabled {
@@ -1019,7 +1070,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
         controller.addUserScript(WKUserScript(
-            source: ImageHold.script, injectionTime: .atDocumentEnd, forMainFrameOnly: false
+            source: ImageHold.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: ImageHold.world
         ))
         if ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
             // Page colors for the status bar and the app banner tag. The script only reads; it loads nothing.
@@ -1033,7 +1084,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 ))
             }
         }
-        if !isPrivate, CookieBannerDismiss.isEnabled, ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
+        // Private tabs get cookie banner closing too. Only the privacy report skips them.
+        if CookieBannerDismiss.isEnabled, ["http", "https"].contains(url?.scheme?.lowercased() ?? "") {
             controller.addUserScript(WKUserScript(
                 source: CookieBannerDismiss.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true
             ))
@@ -1564,6 +1616,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         }
         // Build 39: only a real, still hold on an image, never while the page scrolls or a sheet is already up.
         guard message.name == ImageHold.messageName,
+              ImageHold.trusts(isMainFrame: message.frameInfo.isMainFrame, fromZallaWorld: message.world == ImageHold.world),
               let report = ImageHold.Report(body: message.body) else { return }
         let scrolling = webView.scrollView.isDragging || webView.scrollView.isDecelerating
         guard ImageHold.accepts(report, scrolling: scrolling, sheetShowing: isImageExportShowing?() ?? false),
@@ -1572,9 +1625,26 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         Task { await prepareImageExport(from: imageURL) }
     }
 
+    /// Build 40: fetches the image with this tab's own cookies and the user's proxy, in a session that keeps nothing.
+    /// A private tab's cookies never meet a normal tab's, and nothing lands in a shared cache or cookie jar.
     private func prepareImageExport(from imageURL: URL) async {
+        if imageURL.scheme?.lowercased() == "data" {
+            if let data = try? Data(contentsOf: imageURL) {
+                onImageExport?(ImageExportRequest(sourceURL: imageURL, data: data))
+            } else {
+                errorMessage = "Could not load that image for export."
+            }
+            return
+        }
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        let session = ShieldRuntime.pageRequestSession(cookies: cookies)
+        defer { session.finishTasksAndInvalidate() }
+        var request = URLRequest(url: imageURL)
+        if let page = webView.url, ["http", "https"].contains(page.scheme?.lowercased() ?? ""), !PrivacyShield.trimReferrer() {
+            request.setValue(page.absoluteString, forHTTPHeaderField: "Referer")
+        }
         do {
-            let (data, _) = try await URLSession.shared.data(from: imageURL)
+            let (data, _) = try await session.data(for: request)
             onImageExport?(ImageExportRequest(sourceURL: imageURL, data: data))
         } catch {
             errorMessage = "Could not load that image for export."
