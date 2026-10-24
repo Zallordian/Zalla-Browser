@@ -46,6 +46,14 @@ targets:
             CFBundleURLSchemes:
               - http
               - https
+        # Build 48: "Open in Zalla" for PDFs from Files and the share sheet. Zalla gets a private copy; the original is never changed.
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: PDF Document
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - com.adobe.pdf
+        LSSupportsOpeningDocumentsInPlace: false
         # Press and hold the app icon. Routed by QuickActions.swift (types are typePrefix + case name).
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: com.zalla.browser.quickaction.newTab

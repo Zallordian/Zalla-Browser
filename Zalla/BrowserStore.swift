@@ -644,6 +644,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: SearchEngine.customTemplateKey)
         defaults.removeObject(forKey: "themeID")
         defaults.removeObject(forKey: "appIconPreference")
+        SignatureStore.shared.delete()
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.removeObject(forKey: AddressBarPlacement.storageKey)
         defaults.removeObject(forKey: BarLayout.storageKey)

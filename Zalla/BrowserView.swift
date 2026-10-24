@@ -3255,6 +3255,9 @@ private struct DownloadsView: View {
     @State private var showShare = false
     @State private var previewURL: URL?
     @State private var confirmClear = false
+    @State private var editingPDF: PDFDocumentItem?
+    @State private var showPDFUnlock = false
+    @ObservedObject private var pdfUnlock = ZallaUnlock.shared
 
     var body: some View {
         List {
@@ -3321,6 +3324,21 @@ private struct DownloadsView: View {
                                 shareURL = fileURL
                                 showShare = true
                             }
+                            if PDFEditorGate.isPDF(fileURL) {
+                                Button {
+                                    switch PDFEditorGate.action(unlocked: pdfUnlock.isUnlocked) {
+                                    case .edit: editingPDF = PDFDocumentItem(url: fileURL)
+                                    case .needsUnlock: showPDFUnlock = true
+                                    }
+                                } label: {
+                                    if pdfUnlock.isUnlocked {
+                                        Text("Edit PDF")
+                                    } else {
+                                        Label("Edit PDF", systemImage: "lock.fill")
+                                    }
+                                }
+                                .accessibilityLabel(pdfUnlock.isUnlocked ? "Edit PDF" : "Edit PDF, needs Zalla Unlock")
+                            }
                             Button("Delete", role: .destructive) {
                                 browser.removeDownload(record)
                             }
@@ -3372,6 +3390,8 @@ private struct DownloadsView: View {
             }
         }
         .quickLookPreview($previewURL)
+        .fullScreenCover(item: $editingPDF) { item in PDFEditorView(url: item.url) }
+        .sheet(isPresented: $showPDFUnlock) { ZallaUnlockSheet() }
         .alert("Clear all downloads?", isPresented: $confirmClear) {
             Button("Clear all", role: .destructive) { browser.clearAllDownloads() }
             Button("Cancel", role: .cancel) {}

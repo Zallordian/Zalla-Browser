@@ -10,6 +10,7 @@ struct ZallaApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(PrivacyCover.storageKey) private var privacyCoverEnabled = PrivacyCover.defaultEnabled
     @State private var privacyCoverShown = false
+    @State private var incomingPDF: PDFDocumentItem?
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
     @AppStorage("useCustomAccent") private var useCustomAccent = false
@@ -71,12 +72,16 @@ struct ZallaApp: App {
             rootView
             .onOpenURL { url in
                 // A zalla:// action link (widgets) asks for something. Anything else is a web address.
-                if let action = QuickAction.resolve(url: url) {
+                // Build 48: a PDF opened in Zalla from Files or the share sheet opens in the PDF viewer and editor.
+                if url.isFileURL {
+                    if let item = PDFDocumentItem.incoming(url) { incomingPDF = item }
+                } else if let action = QuickAction.resolve(url: url) {
                     browser.pendingQuickAction = action
                 } else {
                     browser.openIncoming(url)
                 }
             }
+            .fullScreenCover(item: $incomingPDF) { item in PDFEditorView(url: item.url) }
             .onChange(of: quickActions.pending) { _, action in
                 handOverQuickAction(action)
             }

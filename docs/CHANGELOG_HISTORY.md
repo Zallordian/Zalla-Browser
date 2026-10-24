@@ -6,6 +6,10 @@ The in-app What's new shows only the public 1.0 entry. This is the full TestFlig
 - Each seasonal theme now has its own short refresh animation, played when you pull to refresh or pick the theme: snowfall for Winter and Christmas, bats for Halloween, drifting leaves for Fall Harvest, small fireworks for Fourth of July and New Year's, floating hearts for Valentine's Day, shamrocks for Saint Patrick's Day, petals for Spring and Easter, a warm sun shimmer for Summer, and quiet stars for Memorial Day
 - They're free like the seasonal themes, play only while that theme is on, and follow the Theme transitions switch and speed
 - With Reduce Motion on, they play as a quick, still color fade
+- Edit PDF, part of Zalla Unlock: open a downloaded PDF from Downloads, or send one to Zalla from Files or the share sheet, and tap Edit PDF. Fill in form fields, add text boxes, draw a signature and drag or pinch it into place, highlight selected text, undo, and save a copy to Files or share it
+- Everything happens on your iPhone. Nothing is uploaded, and your original file stays as it was
+- You can save one signature for next time. It stays on this device, isn't backed up, and you can delete it from the signature screen. Burn It All keeps it, like your bookmarks and downloads, and Reset the App deletes it
+- Without Zalla Unlock you can still open and read PDFs, and Edit PDF shows a lock
 
 ## Build 47: Seasonal Themes and New Pro Themes
 - Free seasonal themes show up in Theme and Accent under Seasonal, each only during its season, with a small "Available until" date: New Year's (December 26 to January 7), Winter (December through February), Valentine's Day (February 1 to 15), Saint Patrick's Day (March 1 to 18), Easter (two weeks before Easter Sunday through the Monday after), Spring (March 19 to May 31), Memorial Day (the nine days before Memorial Day and the day itself), Summer (June through August), Fourth of July (June 24 to July 7), Halloween (October 1 to November 1), Fall Harvest (October and November, through Thanksgiving), and Christmas (December 1 to 26)

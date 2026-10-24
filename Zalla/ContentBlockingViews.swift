@@ -427,7 +427,10 @@ struct ZallaUnlockSheet: View {
                             Label("Video Saver for plain video files", systemImage: "arrow.down.to.line")
                         }
                     }
-                    Label("Per-site CSS", systemImage: "paintbrush")
+                    Group {
+                        Label("Per-site CSS", systemImage: "paintbrush")
+                        Label("Edit PDF: fill forms, add text, sign, and highlight", systemImage: "signature")
+                    }
                     Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
                     Label("Background packs for new tabs", systemImage: "photo.on.rectangle.angled")
                     Label("Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs, with matching icons and full-screen transitions", systemImage: "sparkles")
