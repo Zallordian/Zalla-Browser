@@ -38,6 +38,11 @@ struct BrowserView: View {
                 switch item {
                 case .tabs: TabsView(browser: browser)
                 case .library: LibraryView(browser: browser)
+                case .history: LibraryView(browser: browser, startsOnHistory: true)
+                case .privacyReport:
+                    if let tab = browser.selected {
+                        PrivacyReportView(tab: tab)
+                    }
                 case .settings: SettingsView(browser: browser)
                 case .menu: BrowserMenuSheet(browser: browser, sheet: $sheet)
                 case .downloads: DownloadsView(browser: browser)
@@ -117,7 +122,7 @@ extension BrowserView {
 }
 
 enum BrowserSheet: String, Identifiable {
-    case tabs, library, settings, menu, downloads, pageZoom
+    case tabs, library, settings, menu, downloads, pageZoom, history, privacyReport
     var id: String { rawValue }
 }
 
@@ -2171,6 +2176,8 @@ final class ScrollCollapseCoordinator {
     }
 }
 
+/// Build 41: the Menu, Brave style. A privacy card with real counts, My actions, the page list, the library, and
+/// All Settings, each in its own rounded card over the page. It follows Light and Dark mode.
 private struct BrowserMenuSheet: View {
     @ObservedObject var browser: BrowserStore
     @Binding var sheet: BrowserSheet?
@@ -2178,114 +2185,33 @@ private struct BrowserMenuSheet: View {
     @Environment(\.colorScheme) private var colorScheme
     @State private var showShare = false
     @State private var confirmFlame = false
+    @State private var showAllPageRows = false
     @AppStorage(MenuTopRow.storageKey) private var menuTopRowData = Data()
+    @AppStorage("themeID") private var themeID = ZallaThemeID.zallaRed.rawValue
+    @AppStorage("useCustomAccent") private var useCustomAccent = false
+    @AppStorage("customAccentHex") private var customAccentHex = "E33B4F"
+    @AppStorage("customAccentGradient") private var customAccentGradient = true
+
+    private var theme: ZallaTheme {
+        ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex, gradient: customAccentGradient)
+    }
+
+    private var hasPage: Bool { browser.selected?.hasPage ?? false }
 
     var body: some View {
         List {
             if let tab = browser.selected {
-                // Customize it in Settings, Appearance. Every action here also lives further down the Menu.
-                MenuNavigationRow(
-                    tab: tab,
-                    items: MenuTopRow.decode(menuTopRowData).items,
-                    onAction: { performTopRowAction($0, tab: tab) },
-                    onDone: { dismiss() }
-                )
+                privacyCardSection(tab)
+                actionsSection(tab)
             }
-            Section("Page actions") {
-                Button {
-                    browser.addTab()
-                    dismiss()
-                } label: { Label("New tab", systemImage: "plus") }
-                Button {
-                    dismiss()
-                    Task { await browser.openPrivateTab() }
-                } label: { Label("New private tab", systemImage: "eye.slash") }
-                Button {
-                    let tab = browser.selected
-                    dismiss()
-                    // The find bar needs the page, not the sheet, to take focus.
-                    Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 450_000_000)
-                        tab?.findOnPage()
-                    }
-                } label: { Label("Find on page", systemImage: "text.magnifyingglass") }
-                .disabled(!(browser.selected?.hasPage ?? false))
-                Button {
-                    browser.selected?.toggleDesktopSite()
-                    dismiss()
-                } label: {
-                    HStack {
-                        Label("Request Desktop Site", systemImage: "desktopcomputer")
-                        Spacer()
-                        if browser.selected?.prefersDesktopSite == true {
-                            Image(systemName: "checkmark")
-                                .font(.body.weight(.semibold))
-                        }
-                    }
-                }
-                .disabled(!(browser.selected?.hasPage ?? false))
-                .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
-                if let tab = browser.selected, tab.hasPage {
-                    PageZoomControl(tab: tab)
-                    if FeatureFlags.videoSaverEnabled {
-                        VideoSaverMenuRow(tab: tab, browser: browser, sheet: $sheet)
-                    }
-                    SiteBlockingMenuRows(tab: tab, onDone: { dismiss() })
-                    SiteToolsMenuRows(tab: tab)
-                    NavigationLink {
-                        PrivacyReportView(tab: tab)
-                    } label: {
-                        Label("Privacy report", systemImage: "checklist")
-                    }
-                }
-                Button {
-                    if let tab = browser.selected {
-                        tab.toggleReaderMode(dark: colorScheme == .dark)
-                    }
-                    dismiss()
-                } label: {
-                    Label(
-                        browser.selected?.isReaderActive == true ? "Exit reader" : "Reader mode",
-                        systemImage: "doc.plaintext"
-                    )
-                }
-                .disabled(!(browser.selected?.hasPage ?? false))
-                if let tab = browser.selected {
-                    ListenMenuRows(tab: tab, speaker: browser.speaker, onDone: { dismiss() })
-                }
-                Button {
-                    if let tab = browser.selected { browser.bookmark(tab) }
-                    dismiss()
-                } label: { Label("Bookmark page", systemImage: "bookmark") }
-                .disabled(browser.selected?.url == nil)
-                Button {
-                    showShare = true
-                } label: { Label("Share", systemImage: "square.and.arrow.up") }
-                .disabled(browser.selected?.url == nil)
-            }
-            Section("Library") {
-                Button {
-                    sheet = .library
-                } label: { Label("Bookmarks and history", systemImage: "books.vertical") }
-                Button {
-                    sheet = .downloads
-                } label: { Label("Downloads", systemImage: "arrow.down.circle") }
-            }
-            Section("Settings") {
-                Button {
-                    sheet = .settings
-                } label: { Label("Settings", systemImage: "gearshape") }
-            }
-            Section {
-                Button(role: .destructive) {
-                    confirmFlame = true
-                } label: {
-                    Label { Text("Burn It All") } icon: { FlameMark(size: 22) }
-                }
-            } footer: {
-                Text(BurnCopy.menuFooter)
-            }
+            pageSection
+            librarySection
+            settingsSection
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .presentationBackground(.regularMaterial)
+        .presentationCornerRadius(28)
         .flameConfirmation(isPresented: $confirmFlame, browser: browser, onBurn: { dismiss() })
         .navigationTitle("Menu")
         .navigationBarTitleDisplayMode(.inline)
@@ -2299,17 +2225,154 @@ private struct BrowserMenuSheet: View {
         }
     }
 
-    /// Back, Forward, and Reload run inside the row. Everything else lands here.
-    private func performTopRowAction(_ item: MenuTopRowItem, tab: BrowserTab) {
+    private func privacyCardSection(_ tab: BrowserTab) -> some View {
+        Section {
+            NavigationLink {
+                PrivacyReportView(tab: tab)
+            } label: {
+                MenuPrivacyCard(
+                    counts: PrivacyReport.load().overall,
+                    blockingOn: ContentBlocker.shared.settings.shouldBlock(url: tab.url),
+                    secure: tab.hasOnlySecureContent && tab.hasPage
+                )
+            }
+        }
+    }
+
+    private func actionsSection(_ tab: BrowserTab) -> some View {
+        Section {
+            MenuActionsGrid(
+                tab: tab,
+                items: MenuTopRow.decode(menuTopRowData).items,
+                tint: theme.primary,
+                onAction: { performAction($0, tab: tab) }
+            )
+        } header: {
+            HStack {
+                Text("My actions")
+                Spacer()
+                NavigationLink("Edit") {
+                    MenuTopRowEditorView(theme: theme)
+                }
+                .font(.footnote.weight(.semibold))
+                .textCase(nil)
+            }
+        }
+    }
+
+    private var pageSection: some View {
+        Section {
+            shareRow
+            findRow
+            readerRow
+            if let tab = browser.selected {
+                ListenMenuRows(tab: tab, speaker: browser.speaker, onDone: { dismiss() })
+            }
+            desktopRow
+            if showAllPageRows {
+                MenuMorePageRows(browser: browser, sheet: $sheet, onDone: { dismiss() })
+            } else if hasPage {
+                Button {
+                    withAnimation { showAllPageRows = true }
+                } label: {
+                    Label("Show All...", systemImage: "ellipsis.circle")
+                }
+            }
+        }
+    }
+
+    private var shareRow: some View {
+        Button {
+            showShare = true
+        } label: { Label("Share...", systemImage: "square.and.arrow.up") }
+        .disabled(browser.selected?.url == nil)
+    }
+
+    private var findRow: some View {
+        Button {
+            let tab = browser.selected
+            dismiss()
+            // The find bar needs the page, not the sheet, to take focus.
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                tab?.findOnPage()
+            }
+        } label: { Label("Find on Page", systemImage: "text.magnifyingglass") }
+        .disabled(!hasPage)
+    }
+
+    private var readerRow: some View {
+        Button {
+            browser.selected?.toggleReaderMode(dark: colorScheme == .dark)
+            dismiss()
+        } label: {
+            Label(browser.selected?.isReaderActive == true ? "Exit Reader" : "Reader Mode", systemImage: "doc.plaintext")
+        }
+        .disabled(!hasPage)
+    }
+
+    private var desktopRow: some View {
+        Button {
+            browser.selected?.toggleDesktopSite()
+            dismiss()
+        } label: {
+            HStack {
+                Label("Request Desktop Site", systemImage: "desktopcomputer")
+                Spacer()
+                if browser.selected?.prefersDesktopSite == true {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                }
+            }
+        }
+        .disabled(!hasPage)
+        .accessibilityValue(browser.selected?.prefersDesktopSite == true ? "On" : "Off")
+    }
+
+    private var librarySection: some View {
+        Section {
+            Button {
+                sheet = .library
+            } label: { Label("Bookmarks and History", systemImage: "books.vertical") }
+            Button {
+                sheet = .downloads
+            } label: { Label("Downloads", systemImage: "arrow.down.circle") }
+            Button {
+                sheet = .tabs
+            } label: { Label("Tabs and Tab Groups", systemImage: "square.on.square") }
+        }
+    }
+
+    private var settingsSection: some View {
+        Section {
+            Button {
+                sheet = .settings
+            } label: { Label("All Settings", systemImage: "gearshape") }
+        } footer: {
+            Text(BurnCopy.menuFooter)
+        }
+    }
+
+    /// Every My actions button lands here.
+    private func performAction(_ item: MenuTopRowItem, tab: BrowserTab) {
         switch item {
-        case .back, .forward, .reload:
-            break
+        case .back:
+            tab.goBack()
+            dismiss()
+        case .forward:
+            tab.goForward()
+            dismiss()
+        case .reload:
+            tab.reloadOrStop()
+            dismiss()
         case .tabs:
             sheet = .tabs
         case .settings:
             sheet = .settings
         case .downloads:
             sheet = .downloads
+        case .history:
+            sheet = .history
         case .share:
             showShare = true
         case .bookmark:
@@ -2317,7 +2380,6 @@ private struct BrowserMenuSheet: View {
             dismiss()
         case .find:
             dismiss()
-            // The find bar needs the page, not the sheet, to take focus.
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 450_000_000)
                 tab.findOnPage()
@@ -2325,72 +2387,54 @@ private struct BrowserMenuSheet: View {
         case .newTab:
             browser.addTab()
             dismiss()
+        case .newPrivateTab:
+            dismiss()
+            Task { await browser.openPrivateTab() }
         case .home:
             tab.goHome()
             dismiss()
+        case .reader:
+            tab.toggleReaderMode(dark: colorScheme == .dark)
+            dismiss()
+        case .desktopSite:
+            tab.toggleDesktopSite()
+            dismiss()
+        case .privacyReport:
+            sheet = .privacyReport
         case .burn:
             confirmFlame = true
         }
     }
 }
 
-/// The customizable top row of the menu sheet. Default: Back, Forward, Reload, Share, Settings.
-private struct MenuNavigationRow: View {
-    @ObservedObject var tab: BrowserTab
-    let items: [MenuTopRowItem]
-    let onAction: (MenuTopRowItem) -> Void
+/// The rest of the page actions, shown after Show All. Unavailable rows hide themselves, as before.
+private struct MenuMorePageRows: View {
+    @ObservedObject var browser: BrowserStore
+    @Binding var sheet: BrowserSheet?
     let onDone: () -> Void
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(items) { item in
-                cell(item)
+        if let tab = browser.selected, tab.hasPage {
+            PageZoomControl(tab: tab)
+            if FeatureFlags.videoSaverEnabled {
+                VideoSaverMenuRow(tab: tab, browser: browser, sheet: $sheet)
             }
-        }
-        .buttonStyle(.borderless)
-    }
-
-    @ViewBuilder
-    private func cell(_ item: MenuTopRowItem) -> some View {
-        switch item {
-        case .back:
-            navButton("Back", icon: item.symbolName, enabled: tab.canGoBack) {
-                tab.goBack()
+            SiteBlockingMenuRows(tab: tab, onDone: onDone)
+            SiteToolsMenuRows(tab: tab)
+            NavigationLink {
+                PrivacyReportView(tab: tab)
+            } label: {
+                Label("Privacy Report", systemImage: "checklist")
+            }
+            Button {
+                browser.bookmark(tab)
                 onDone()
-            }
-        case .forward:
-            navButton("Forward", icon: item.symbolName, enabled: tab.canGoForward) {
-                tab.goForward()
+            } label: { Label("Bookmark Page", systemImage: "bookmark") }
+            Button {
+                browser.addTab()
                 onDone()
-            }
-        case .reload:
-            navButton(tab.isLoading ? "Stop" : "Reload", icon: tab.isLoading ? "xmark" : item.symbolName, enabled: tab.hasPage) {
-                tab.reloadOrStop()
-                onDone()
-            }
-        case .share, .bookmark:
-            navButton(item.shortTitle, icon: item.symbolName, enabled: tab.url != nil) { onAction(item) }
-        case .find, .home:
-            navButton(item.shortTitle, icon: item.symbolName, enabled: tab.hasPage) { onAction(item) }
-        case .tabs, .settings, .newTab, .burn, .downloads:
-            navButton(item.shortTitle, icon: item.symbolName, enabled: true) { onAction(item) }
+            } label: { Label("New Tab", systemImage: "plus") }
         }
-    }
-
-    private func navButton(_ title: String, icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.body.weight(.semibold))
-                Text(title)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .disabled(!enabled)
-        .accessibilityLabel(title)
     }
 }
 
@@ -2771,6 +2815,11 @@ private struct LibraryView: View {
     @State private var history = false
     @State private var showImporter = false
     @State private var exportURL: URL?
+
+    init(browser: BrowserStore, startsOnHistory: Bool = false) {
+        _browser = ObservedObject(wrappedValue: browser)
+        _history = State(initialValue: startsOnHistory)
+    }
     @State private var showExporter = false
     @State private var message: String?
     @State private var query = ""
@@ -3146,7 +3195,6 @@ private struct SettingsView: View {
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBar = ScrollChrome.underStatusBarDefault
     @AppStorage(ScrollChrome.collapseKey) private var collapseToolbarOnScroll = ScrollChrome.collapseDefault
-    @AppStorage(SettingsTabHaptics.storageKey) private var settingsTabHaptics = SettingsTabHaptics.defaultEnabled
     @AppStorage(HTTPSOnly.storageKey) private var httpsOnlyMode = true
     @AppStorage(BurnEffectPlan.animationKey) private var burnAnimation = true
     @AppStorage(TabSleep.storageKey) private var sleepUnusedTabs = true
@@ -3158,7 +3206,6 @@ private struct SettingsView: View {
     @AppStorage(PrivacyCover.storageKey) private var privacyCover = PrivacyCover.defaultEnabled
     @AppStorage(AppBanner.storageKey) private var appBanners = AppBanner.defaultEnabled
     @AppStorage(WebsiteLocation.modeKey) private var websiteLocationRaw = WebsiteLocationMode.ask.rawValue
-    @AppStorage(SettingsCategory.storageKey) private var selectedCategory = SettingsCategory.default.rawValue
     @State private var confirmClear = false
     @State private var confirmReset = false
     @State private var iconMessage: String?
@@ -3173,6 +3220,7 @@ private struct SettingsView: View {
     @State private var blueSlider = 0.31
     @State private var suggestIconForTheme: ZallaThemeID?
     @State private var showThemeUpsell = false
+    @State private var showDetailUpsell = false
     @AppStorage(QuickTheme.storageKey) private var quickThemeFullLook = QuickTheme.defaultEnabled
     @AppStorage(NewTabBackground.storageKey) private var newTabBackgroundRaw = NewTabBackground.standard.storageValue
     @AppStorage(ThemePacks.transitionsKey) private var themeTransitionsOn = true
@@ -3205,23 +3253,26 @@ private struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsTabStrip(selection: categoryBinding, accent: theme.primary)
-            Divider()
-            // Swipe sideways or tap a tab. Each page is its own Form, so the sections keep their normal look.
-            TabView(selection: categoryBinding) {
-                ForEach(SettingsCategory.allCases) { category in
-                    Form { content(for: category) }
-                        // Rows revealed by a switch (the custom accent controls) ease in instead of popping.
-                        .motion(.bar, value: useCustomAccent)
-                        .motion(.fade, value: iconMessage)
-                        .tag(category)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
+        List {
+            topSection
+            featuresSection
+            generalSection
+            privacySection
+            displaySection
+            toolbarSection
+            toolsSection
+            supportSection
+            promiseSection
+            versionSection
         }
+        .listStyle(.insetGrouped)
         .navigationTitle("Settings")
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                SettingsDoneButton(tint: theme.primary) { dismiss() }
+            }
+        }
         .alert("Clear browsing data and close all tabs?", isPresented: $confirmClear) {
             Button("Clear browsing data", role: .destructive) {
                 Task { await browser.clearBrowsingData(); dismiss() }
@@ -3237,27 +3288,6 @@ private struct SettingsView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
-        }
-        .alert(
-            "Use a matching app icon?",
-            isPresented: Binding(
-                get: { suggestIconForTheme != nil },
-                set: { if !$0 { suggestIconForTheme = nil } }
-            )
-        ) {
-            if let id = suggestIconForTheme {
-                let suggested = id.suggestedAppIcon
-                Button("Use \(suggested.rawValue) icon") {
-                    appIconPreference = suggested.rawValue
-                    applyIcon(suggested)
-                    suggestIconForTheme = nil
-                }
-                Button("Keep current icon", role: .cancel) { suggestIconForTheme = nil }
-            }
-        } message: {
-            if let id = suggestIconForTheme {
-                Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
-            }
         }
         .fileImporter(
             isPresented: $showImporter,
@@ -3278,369 +3308,327 @@ private struct SettingsView: View {
             Button("OK") { bookmarkMessage = nil }
         } message: { Text(bookmarkMessage ?? "") }
         .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
-        .overlay {
-            // Plays the theme's transition when a swatch applies it, like Apply in Theme packs.
-            ThemeTransitionOverlay(plan: quickThemePlan, pulse: quickThemePulse)
-        }
         .tint(theme.primary)
         .onAppear { loadCustomControls() }
     }
 
-    private var categoryBinding: Binding<SettingsCategory> {
-        Binding(
-            get: { SettingsCategory.stored(selectedCategory) },
-            set: { selectedCategory = $0.rawValue }
+    // MARK: Build 41 rows
+
+    private func label(_ row: SettingsRowID, subtitle: String? = nil, value: String? = nil) -> SettingsRowLabel {
+        SettingsRowLabel(
+            row: row,
+            subtitle: subtitle,
+            value: value,
+            tint: theme.primary,
+            locked: row.needsUnlock && !unlock.isUnlocked
         )
     }
 
-    @ViewBuilder
-    private func content(for category: SettingsCategory) -> some View {
-        switch category {
-        case .appearance: appearanceTab
-        case .privacy: privacyTab
-        case .browsing: browsingTab
-        case .tools: toolsTab
-        case .premium: premiumTab
-        case .about: aboutTab
+    private var topSection: some View {
+        Section {
+            Button {
+                if let settings = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settings)
+                }
+            } label: {
+                label(.defaultBrowser).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Zalla in the Settings app")
+            NavigationLink {
+                WidgetsSettingsView(browser: browser)
+            } label: { label(.addWidgets) }
+            Button {
+                showImporter = true
+            } label: {
+                label(.importBookmarks).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        } footer: {
+            Text(DefaultBrowser.settingsFooter)
         }
     }
 
-    @ViewBuilder
-    private var appearanceTab: some View {
-        Group {
-            Section {
-                Picker("Appearance", selection: $appearance) {
-                    ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
-                }
-                Picker("Toolbar", selection: $toolbarStyleRaw) {
-                    ForEach(ToolbarStyle.allCases) { style in
-                        Text(style.rawValue).tag(style.rawValue)
-                    }
-                }
-                Picker("Address bar", selection: $addressBarPlacementRaw) {
-                    ForEach(AddressBarPlacement.allCases) { placement in
-                        Text(placement.rawValue).tag(placement.rawValue)
-                    }
-                }
-                Toggle("Immersive layout", isOn: $immersiveLayout)
-                Toggle("Status bar matches the page", isOn: $statusBarMatchesPage)
-                    .disabled(!immersiveLayout)
-                Group {
-                    Toggle("Page under the status bar", isOn: $pageUnderStatusBar)
-                        .disabled(!immersiveLayout)
-                    Toggle("Collapse toolbar while scrolling", isOn: $collapseToolbarOnScroll)
-                }
-                Toggle("Haptic tap on Settings tabs", isOn: $settingsTabHaptics)
-                NavigationLink("Customize Toolbar") {
-                    ToolbarEditorView(theme: theme)
-                }
-                NavigationLink("Customize Menu Row") {
-                    MenuTopRowEditorView(theme: theme)
-                }
-                NavigationLink("Home personalization") {
-                    HomePersonalizationView()
-                }
-            } header: {
-                Text("Appearance")
-            } footer: {
-                Text("Classic toolbar with a bottom address bar is the default. Compact, Quick Action, and Top bar are optional. Quick Action keeps one center button that opens every control. Immersive layout lets pages run edge to edge with each control floating over the page on its own glass capsule or circle, like Safari. Turn it off for solid bars. With Immersive layout on and the address bar at the bottom, the page runs under the clock like in Safari (iOS 26 and later); turn off Page under the status bar to have the status bar area take the page's own color instead, with page content stopping below it. Status bar matches the page turns the page coloring off. Collapse toolbar while scrolling shrinks the bottom bar to a small address pill as you scroll down; scroll up or tap the pill to bring it back.")
+    private var featuresSection: some View {
+        Section {
+            NavigationLink { ContentBlockingView() } label: { label(.contentBlocking) }
+            NavigationLink { PrivacyShieldView() } label: { label(.privacyShield) }
+            if let tab = browser.selected {
+                NavigationLink { PrivacyReportView(tab: tab) } label: { label(.privacyReport) }
             }
-
-            Section {
-                ChromeStylePreview(
-                    style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
-                    placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom,
-                    isDark: previewIsDark,
-                    theme: theme
-                )
-                .padding(.vertical, 6)
-                themeRow(title: "Quick theme", ids: ZallaThemeID.featured)
-                NavigationLink {
-                    ThemePacksView()
-                } label: {
-                    Label("Explore theme packs", systemImage: "sparkles")
-                }
-                Toggle("Themes apply the full look", isOn: $quickThemeFullLook)
-                DisclosureGroup("More accents") {
-                    themeRow(title: nil, ids: ZallaThemeID.secondary)
-                }
-                Toggle("Custom accent", isOn: $useCustomAccent)
-                if useCustomAccent {
-                    ColorPicker("Color", selection: $customColor, supportsOpacity: false)
-                        .onChange(of: customColor) { _, newValue in
-                            syncFromColor(newValue)
-                        }
-                    VStack(alignment: .leading, spacing: 8) {
-                        labeledSlider("Red", value: $redSlider)
-                        labeledSlider("Green", value: $greenSlider)
-                        labeledSlider("Blue", value: $blueSlider)
-                    }
-                    .onChange(of: redSlider) { _, _ in syncFromSliders() }
-                    .onChange(of: greenSlider) { _, _ in syncFromSliders() }
-                    .onChange(of: blueSlider) { _, _ in syncFromSliders() }
-                    HStack {
-                        Text("#")
-                        TextField("Hex", text: $hexDraft)
-                            .textInputAutocapitalization(.characters)
-                            .autocorrectionDisabled()
-                            .onSubmit(applyHexDraft)
-                        Button("Apply", action: applyHexDraft)
-                    }
-                    Toggle("Gradient accent", isOn: $customAccentGradient)
-                    Button("Use closest matching icon") {
-                        let suggested = ZallaTheme.closestAppIcon(forCustomHex: customAccentHex)
-                        appIconPreference = suggested.rawValue
-                        applyIcon(suggested)
-                    }
-                }
-            } header: {
-                Text("Theme and accent")
-            } footer: {
-                Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
+            Button {
+                showThemeUpsell = true
+            } label: {
+                label(.zallaUnlock, value: unlock.isUnlocked ? "Unlocked" : "Optional").contentShape(Rectangle())
             }
-
-            Section {
-                iconGrid
-                .onChange(of: appIconPreference) { _, newValue in
-                    applyIcon(AppIconPreference(rawValue: newValue) ?? .default)
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Zalla Unlock")
+            NavigationLink { ThemePacksView() } label: { label(.themePacks) }
+            if FeatureFlags.videoSaverEnabled {
+                Toggle(isOn: $videoSaverOn) {
+                    label(.videoSaver, subtitle: VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
                 }
-                if let iconMessage {
-                    Text(iconMessage).font(.footnote).foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("App icon")
-            } footer: {
-                Text("Every accent has a matching icon, plus Dark and Tinted.")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var privacyTab: some View {
-        Group {
-            Section {
-                NavigationLink("Content Blocking") {
-                    ContentBlockingView()
-                }
-                NavigationLink("Privacy Shield") {
-                    PrivacyShieldView()
-                }
-                if let tab = browser.selected {
-                    NavigationLink("Privacy report") {
-                        PrivacyReportView(tab: tab)
-                    }
-                }
-                Toggle("Close cookie banners", isOn: $cookieBanners)
-                NavigationLink("Location") {
-                    LocationSettingsView()
-                }
-                Picker("Website location", selection: $websiteLocationRaw) {
-                    ForEach(WebsiteLocationMode.allCases) { mode in
-                        Text(mode.title).tag(mode.rawValue)
-                    }
-                }
-                .onChange(of: websiteLocationRaw) { _, _ in
+                .onChange(of: videoSaverOn) { _, _ in
                     NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
                 }
-                Toggle("HTTPS-Only Mode", isOn: $httpsOnlyMode)
-                Toggle("Burn It All fire effect", isOn: $burnAnimation)
-                Toggle(PrivacyCover.title, isOn: $privacyCover)
-                Button("Clear browsing data", role: .destructive) { confirmClear = true }
-                    .disabled(browser.clearingData)
-                Button("Reset the App", role: .destructive) { confirmReset = true }
-                    .disabled(browser.clearingData)
-                DisclosureGroup("What these do") {
-                    Text("Content Blocking stops trackers and common ads on this device. Privacy Shield cleans tracking tags from links, trims referrers, and can add fingerprinting protection, encrypted lookups for Zalla's own requests, and a proxy you set up. Location is an optional city you type in, kept on this device. Website location decides whether sites may ask for your real location: Ask lets you choose each time, Never blocks every request. Your location goes only to a site you allow, never to Zalla, and private tabs ask every time. HTTPS-Only Mode opens websites over secure connections and asks before loading a site that does not support one. Close cookie banners picks the reject or necessary-only button for you, and never presses accept. The privacy report shows what Zalla did for you, and it stays on this device. Clear browsing data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Hide page in app switcher shows a plain Zalla screen once Zalla is in the background. Face ID for private tabs and Auto-clear are part of Zalla Unlock, and live in the Premium tab. Reset the App also restores appearance, search engine, theme, icon preference, toolbar style and layout, address bar placement, HTTPS-Only Mode, content blocking settings and rules, Privacy Shield, location and website location, site CSS, tab groups, Face ID and auto-clear settings, home shortcuts, and onboarding, clears downloads, and keeps bookmarks.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Privacy")
             }
+        } header: {
+            Text(SettingsGroup.features.header ?? "")
+        } footer: {
+            Text("Zalla Unlock is optional. Core browsing, blocking, Privacy Shield, and Burn It All stay free.")
         }
     }
 
-    @ViewBuilder
-    private var browsingTab: some View {
-        Group {
-            Section {
-                SearchEngineSettingsRows()
-                Button {
-                    showImporter = true
-                } label: { Label("Import bookmarks from Safari or Chrome", systemImage: "square.and.arrow.down") }
-                Toggle("Sleep unused tabs", isOn: $sleepUnusedTabs)
-                Toggle("Swipe from edges to go back", isOn: $swipeNavigation)
-                    .onChange(of: swipeNavigation) { _, newValue in
-                        browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
-                    }
-                Toggle("Pull down to refresh", isOn: $pullToRefresh)
-                    .onChange(of: pullToRefresh) { _, newValue in
-                        browser.tabs.forEach { $0.setPullToRefresh(newValue) }
-                    }
-                Toggle("App banners", isOn: $appBanners)
-                Button {
-                    exportBookmarks()
-                } label: { Label("Export bookmarks", systemImage: "square.and.arrow.up") }
+    private var generalSection: some View {
+        Section {
+            SearchEngineSettingsRows()
+            NavigationLink { LocationSettingsView() } label: { label(.location) }
+            Picker(selection: $websiteLocationRaw) {
+                ForEach(WebsiteLocationMode.allCases) { mode in
+                    Text(mode.title).tag(mode.rawValue)
+                }
+            } label: { label(.websiteLocation) }
+            .onChange(of: websiteLocationRaw) { _, _ in
+                NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
+            }
+            Toggle(isOn: $httpsOnlyMode) { label(.httpsOnly) }
+            Toggle(isOn: $cookieBanners) { label(.cookieBanners) }
+            Toggle(isOn: $appBanners) { label(.appBanners) }
+            Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
+        } header: {
+            Text(SettingsGroup.general.header ?? "")
+        } footer: {
+            Text("Website location decides whether sites may ask for your real location. Your location goes only to a site you allow, never to Zalla. Close Cookie Banners picks reject or necessary only, and never presses accept. " + DefaultBrowser.quickActionsFooter)
+        }
+    }
+
+    private var privacySection: some View {
+        Section {
+            PremiumPrivacyRows()
+            Toggle(isOn: $privacyCover) { label(.privacyCover) }
+            Toggle(isOn: $burnAnimation) { label(.burnEffect) }
+            Button(role: .destructive) { confirmClear = true } label: { label(.clearData) }
+                .disabled(browser.clearingData)
+            Button(role: .destructive) { confirmReset = true } label: { label(.resetApp) }
+                .disabled(browser.clearingData)
+        } header: {
+            Text(SettingsGroup.privacy.header ?? "")
+        } footer: {
+            Text("Clear Browsing Data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Reset the App puts every setting back to its default and keeps bookmarks.")
+        }
+    }
+
+    private var displaySection: some View {
+        Section {
+            Picker(selection: $appearance) {
+                ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
+            } label: { label(.appearance) }
+            NavigationLink { themeDetail } label: { label(.themeAndAccent, value: useCustomAccent ? "Custom" : theme.id.displayName) }
+            NavigationLink { iconDetail } label: { label(.appIcon) }
+            NavigationLink { HomePersonalizationView() } label: { label(.newTabPage) }
+            NavigationLink { PageZoomListView() } label: { label(.pageZoom) }
+        } header: {
+            Text(SettingsGroup.display.header ?? "")
+        }
+    }
+
+    private var toolbarSection: some View {
+        Section {
+            AddressBarPicker(
+                selection: $addressBarPlacementRaw,
+                style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+                isDark: previewIsDark,
+                theme: theme
+            )
+            Picker(selection: $toolbarStyleRaw) {
+                ForEach(ToolbarStyle.allCases) { style in
+                    Text(style.rawValue).tag(style.rawValue)
+                }
+            } label: { label(.toolbarStyle) }
+            NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
+            NavigationLink { MenuTopRowEditorView(theme: theme) } label: { label(.customizeActions) }
+            Toggle(isOn: $immersiveLayout) { label(.immersive) }
+            Toggle(isOn: $statusBarMatchesPage) { label(.statusBarColor) }
+                .disabled(!immersiveLayout)
+            Toggle(isOn: $pageUnderStatusBar) { label(.pageUnderStatusBar) }
+                .disabled(!immersiveLayout)
+            Toggle(isOn: $collapseToolbarOnScroll) { label(.collapseToolbar) }
+            Toggle(isOn: $sleepUnusedTabs) { label(.sleepTabs) }
+            Toggle(isOn: $swipeNavigation) { label(.edgeSwipes) }
+                .onChange(of: swipeNavigation) { _, newValue in
+                    browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
+                }
+            Toggle(isOn: $pullToRefresh) { label(.pullToRefresh) }
+                .onChange(of: pullToRefresh) { _, newValue in
+                    browser.tabs.forEach { $0.setPullToRefresh(newValue) }
+                }
+        } header: {
+            Text(SettingsGroup.toolbarAndTabs.header ?? "")
+        } footer: {
+            Text("Classic toolbar with a bottom address bar is the default. Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bottom bar to a small address pill as you scroll down. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
+        }
+    }
+
+    private var toolsSection: some View {
+        Section {
+            NavigationLink { DownloadsView(browser: browser, showsDone: false) } label: { label(.downloads) }
+            NavigationLink { NetworkSpeedView() } label: { label(.networkSpeed) }
+            NavigationLink { WidgetsSettingsView(browser: browser) } label: { label(.widgets) }
+            Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
                 .disabled(browser.bookmarks.isEmpty)
-            } header: {
-                Text("Browsing")
-            } footer: {
-                Text("Tabs you have not opened for a while unload their page to save memory and battery. They reload when you open them. Edge swipes go back and forward, like Safari. Pull down at the top of a page to reload it. App banners show a slim Open in the app bar when a site says it has an app; Open only tries the app if it is installed and never goes to the App Store.")
-            }
+            NavigationLink { HowToListView() } label: { label(.howTo) }
+        } header: {
+            Text(SettingsGroup.tools.header ?? "")
         }
     }
 
-    @ViewBuilder
-    private var toolsTab: some View {
-        Group {
-            Section("Tools") {
-                NavigationLink {
-                    HowToListView()
-                } label: {
-                    Label("How to", systemImage: "questionmark.bubble")
-                }
-                NavigationLink {
-                    NetworkSpeedView()
-                } label: {
-                    Label("Network Speed", systemImage: "gauge.with.dots.needle.67percent")
-                }
-                NavigationLink {
-                    DownloadsView(browser: browser, showsDone: false)
-                } label: {
-                    Label("Downloads", systemImage: "arrow.down.circle")
-                }
-                NavigationLink {
-                    WidgetsSettingsView(browser: browser)
-                } label: {
-                    Label("Widgets", systemImage: "square.grid.2x2")
-                }
-            }
-
-            Section {
-                Toggle("Quick actions on the app icon", isOn: $quickActionsOn)
-                Button {
-                    if let settings = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(settings)
-                    }
-                } label: {
-                    HStack {
-                        Label("Open Zalla settings in iOS", systemImage: "safari")
-                        Spacer()
-                        Image(systemName: "arrow.up.forward.app")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
+    private var supportSection: some View {
+        Section {
+            NavigationLink { SupportZallaView(theme: theme) } label: { SupportZallaRow(theme: theme) }
+            Link(destination: URL(string: "https://zalla.gg/privacy/")!) { label(.privacyPolicy) }
                 .buttonStyle(.plain)
-                .accessibilityHint("Opens Zalla in the Settings app")
-            } header: {
-                Text("Icon and default browser")
-            } footer: {
-                Text(DefaultBrowser.settingsFooter + " " + DefaultBrowser.quickActionsFooter)
-            }
+            Link(destination: URL(string: "https://zalla.gg/support/")!) { label(.support) }
+                .buttonStyle(.plain)
+            NavigationLink { AcknowledgementsView() } label: { label(.acknowledgements) }
+            NavigationLink { AboutView() } label: { label(.about) }
+        } header: {
+            Text(SettingsGroup.support.header ?? "")
+        } footer: {
+            Text("Tips through the App Store are optional and do not unlock features. Privacy Policy and Support open zalla.gg in Safari.")
         }
     }
 
-    @ViewBuilder
-    private var premiumTab: some View {
-        Group {
-            Section {
-                Button {
-                    showThemeUpsell = true
-                } label: {
-                    HStack {
-                        Label("Zalla Unlock", systemImage: "sparkles")
-                        Spacer()
-                        Text(unlock.isUnlocked ? "Unlocked" : "Locked")
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityHint("Opens Zalla Unlock")
-                NavigationLink {
-                    ThemePacksView()
-                } label: {
-                    Label("Theme packs", systemImage: "sparkles")
-                }
-            } header: {
-                Text("Zalla Unlock")
-            } footer: {
-                Text("Zalla Unlock is optional. Core browsing, blocking, Privacy Shield, and Burn It All stay free.")
-            }
+    private var promiseSection: some View {
+        Section("Our promise") {
+            Label("No Zalla account required", systemImage: "person.crop.circle.badge.checkmark")
+            Label("No built-in analytics or advertising SDKs", systemImage: "hand.raised")
+            Label("Bookmarks and history saved on this device", systemImage: "iphone")
+            Text("Websites and your chosen search engine receive the requests you send them. Zalla does not provide a VPN or anonymity service.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
 
-            Section {
-                PremiumPrivacyRows()
-            } header: {
-                Text("Private tabs and auto-clear")
-            }
+    private var versionSection: some View {
+        Section("Version") {
+            Text("Zalla \(versionString)")
+            Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one-time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
 
-            if FeatureFlags.videoSaverEnabled {
+    // MARK: Detail screens
+
+    private var themeDetail: some View {
+        detailChrome(
+            Form {
                 Section {
-                    Toggle("Video Saver", isOn: $videoSaverOn)
-                        .onChange(of: videoSaverOn) { _, _ in
-                            NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
+                    ChromeStylePreview(
+                        style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+                        placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom,
+                        isDark: previewIsDark,
+                        theme: theme
+                    )
+                    .padding(.vertical, 6)
+                    themeRow(title: "Quick theme", ids: ZallaThemeID.featured)
+                    NavigationLink {
+                        ThemePacksView()
+                    } label: {
+                        Label("Explore theme packs", systemImage: "sparkles")
+                    }
+                    Toggle("Themes apply the full look", isOn: $quickThemeFullLook)
+                    DisclosureGroup("More accents") {
+                        themeRow(title: nil, ids: ZallaThemeID.secondary)
+                    }
+                    Toggle("Custom accent", isOn: $useCustomAccent)
+                    if useCustomAccent {
+                        ColorPicker("Color", selection: $customColor, supportsOpacity: false)
+                            .onChange(of: customColor) { _, newValue in
+                                syncFromColor(newValue)
+                            }
+                        VStack(alignment: .leading, spacing: 8) {
+                            labeledSlider("Red", value: $redSlider)
+                            labeledSlider("Green", value: $greenSlider)
+                            labeledSlider("Blue", value: $blueSlider)
                         }
+                        .onChange(of: redSlider) { _, _ in syncFromSliders() }
+                        .onChange(of: greenSlider) { _, _ in syncFromSliders() }
+                        .onChange(of: blueSlider) { _, _ in syncFromSliders() }
+                        HStack {
+                            Text("#")
+                            TextField("Hex", text: $hexDraft)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .onSubmit(applyHexDraft)
+                            Button("Apply", action: applyHexDraft)
+                        }
+                        Toggle("Gradient accent", isOn: $customAccentGradient)
+                        Button("Use closest matching icon") {
+                            let suggested = ZallaTheme.closestAppIcon(forCustomHex: customAccentHex)
+                            appIconPreference = suggested.rawValue
+                            applyIcon(suggested)
+                        }
+                    }
                 } header: {
-                    Text("Video Saver")
+                    Text("Theme and accent")
                 } footer: {
-                    Text(VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
+                    Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
                 }
             }
-        }
+            .motion(.bar, value: useCustomAccent)
+            .navigationTitle("Theme and Accent")
+        )
     }
 
-    @ViewBuilder
-    private var aboutTab: some View {
-        Group {
-            Section("Our promise") {
-                Label("No Zalla account required", systemImage: "person.crop.circle.badge.checkmark")
-                Label("No built-in analytics or advertising SDKs", systemImage: "hand.raised")
-                Label("Bookmarks and history saved on this device", systemImage: "iphone")
-                Text("Websites and your chosen search engine receive the requests you send them. Zalla does not provide a VPN or anonymity service.")
-                    .font(.footnote).foregroundStyle(.secondary)
+    private var iconDetail: some View {
+        detailChrome(
+            Form {
+                Section {
+                    iconGrid
+                    .onChange(of: appIconPreference) { _, newValue in
+                        applyIcon(AppIconPreference(rawValue: newValue) ?? .default)
+                    }
+                    if let iconMessage {
+                        Text(iconMessage).font(.footnote).foregroundStyle(.secondary)
+                    }
+                } footer: {
+                    Text("Every accent has a matching icon, plus Dark and Tinted.")
+                }
             }
+            .motion(.fade, value: iconMessage)
+            .navigationTitle("App Icon")
+        )
+    }
 
-            Section {
-                NavigationLink {
-                    SupportZallaView(theme: theme)
-                } label: {
-                    SupportZallaRow(theme: theme)
+    /// Theme and icon screens carry their own alert, Unlock sheet, and transition overlay, so they work once pushed.
+    private func detailChrome<Content: View>(_ content: Content) -> some View {
+        content
+            .navigationBarTitleDisplayMode(.inline)
+            .alert(
+                "Use a matching app icon?",
+                isPresented: Binding(
+                    get: { suggestIconForTheme != nil },
+                    set: { if !$0 { suggestIconForTheme = nil } }
+                )
+            ) {
+                if let id = suggestIconForTheme {
+                    let suggested = id.suggestedAppIcon
+                    Button("Use \(suggested.rawValue) icon") {
+                        appIconPreference = suggested.rawValue
+                        applyIcon(suggested)
+                        suggestIconForTheme = nil
+                    }
+                    Button("Keep current icon", role: .cancel) { suggestIconForTheme = nil }
                 }
-            } footer: {
-                Text("Optional tips through the App Store. They do not unlock features.")
+            } message: {
+                if let id = suggestIconForTheme {
+                    Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
+                }
             }
-
-            Section {
-                Link(destination: URL(string: "https://zalla.gg/privacy/")!) {
-                    Label("Privacy Policy", systemImage: "doc.text")
-                }
-                Link(destination: URL(string: "https://zalla.gg/support/")!) {
-                    Label("Support", systemImage: "questionmark.circle")
-                }
-                NavigationLink {
-                    AcknowledgementsView()
-                } label: {
-                    Label("Acknowledgements", systemImage: "text.book.closed")
-                }
-                NavigationLink {
-                    AboutView()
-                } label: {
-                    Label("About Zalla", systemImage: "info.circle")
-                }
-            } header: {
-                Text("Privacy and support")
-            } footer: {
-                Text("Privacy Policy and Support open zalla.gg in Safari.")
+            .sheet(isPresented: $showDetailUpsell) { ZallaUnlockSheet() }
+            .overlay {
+                ThemeTransitionOverlay(plan: quickThemePlan, pulse: quickThemePulse)
             }
-
-            Section("Version") {
-                Text("Zalla \(versionString)")
-                Text("Core browsing, blocking of trackers and common ads, Privacy Shield, HTTPS-Only Mode, Burn It All, the privacy report, and image export are free. Zalla Unlock is an optional one time purchase for stronger blocking, Face ID for private tabs, tab groups, listening to pages, per-site CSS, scheduled auto-clear, background packs, and the Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
-        }
     }
 
     private var previewIsDark: Bool {
@@ -3664,7 +3652,7 @@ private struct SettingsView: View {
         let isSelected = appIconPreference == option.rawValue
         return Button {
             if option.requiresUnlock && !unlock.isUnlocked {
-                showThemeUpsell = true
+                showDetailUpsell = true
                 return
             }
             appIconPreference = option.rawValue
@@ -3755,7 +3743,7 @@ private struct SettingsView: View {
     private func selectTheme(_ id: ZallaThemeID) {
         switch QuickTheme.action(for: id, unlocked: unlock.isUnlocked, fullLook: quickThemeFullLook) {
         case .needsUnlock:
-            showThemeUpsell = true
+            showDetailUpsell = true
         case .accentOnly:
             useCustomAccent = false
             themeID = id.rawValue

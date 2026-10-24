@@ -672,7 +672,6 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: QuickTheme.storageKey)
         defaults.removeObject(forKey: AppBanner.storageKey)
         defaults.removeObject(forKey: MenuTopRow.storageKey)
-        defaults.removeObject(forKey: SettingsTabHaptics.storageKey)
         defaults.removeObject(forKey: BurnEffectPlan.animationKey)
         defaults.removeObject(forKey: DesktopSitePreference.storageKey)
         defaults.removeObject(forKey: SearchBarWidth.storageKey)

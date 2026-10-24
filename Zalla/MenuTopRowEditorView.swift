@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Customize Menu Row: choose, reorder, and reset the actions in the top row of the Menu sheet.
+/// Customize My Actions: choose, reorder, and reset the big buttons at the top of the Menu sheet.
 /// Every action also lives further down the Menu, and Settings stays in its own Menu section.
 struct MenuTopRowEditorView: View {
     let theme: ZallaTheme
@@ -21,7 +21,7 @@ struct MenuTopRowEditorView: View {
             }
         }
         .environment(\.editMode, .constant(.active))
-        .navigationTitle("Customize Menu Row")
+        .navigationTitle("Customize My Actions")
         .navigationBarTitleDisplayMode(.inline)
         .tint(theme.primary)
         .onAppear(perform: load)
@@ -44,11 +44,11 @@ struct MenuTopRowEditorView: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Menu row: \(row.items.map(\.title).joined(separator: ", "))")
+            .accessibilityLabel("My actions: \(row.items.map(\.title).joined(separator: ", "))")
         } header: {
             Text("Preview")
         } footer: {
-            Text("This is the row of buttons at the top of the Menu. Changes apply right away. Everything you remove here stays in the Menu below it.")
+            Text("These are the big buttons at the top of the Menu. Changes apply right away. Up to eight, in two rows of four.")
         }
     }
 
@@ -78,7 +78,7 @@ struct MenuTopRowEditorView: View {
                 update { $0.remove(atOffsets: offsets) }
             }
         } header: {
-            Text("In the Menu row")
+            Text("In My actions")
         } footer: {
             Text("\(row.items.count) of \(MenuTopRow.maxItems) buttons. Drag to reorder.")
         }
@@ -105,7 +105,7 @@ struct MenuTopRowEditorView: View {
             Text("Available")
         } footer: {
             if !row.canAdd {
-                Text("The row is full. Remove a button to add another.")
+                Text("My actions is full. Remove a button to add another.")
             }
         }
     }

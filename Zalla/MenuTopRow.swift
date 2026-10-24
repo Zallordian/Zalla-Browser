@@ -1,6 +1,6 @@
 import Foundation
 
-/// An action that can sit in the top row of the main Menu sheet.
+/// An action that can sit in "My actions" at the top of the Menu sheet (the old Menu row; same storage key).
 enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
     case back
     case forward
@@ -14,6 +14,12 @@ enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
     case burn
     case downloads
     case home
+    // Build 41, for the My actions grid.
+    case history
+    case newPrivateTab
+    case reader
+    case privacyReport
+    case desktopSite
 
     var id: String { rawValue }
 
@@ -31,6 +37,11 @@ enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
         case .burn: return "Burn It All"
         case .downloads: return "Downloads"
         case .home: return "Home"
+        case .history: return "History"
+        case .newPrivateTab: return "New Private Tab"
+        case .reader: return "Reader Mode"
+        case .privacyReport: return "Privacy Report"
+        case .desktopSite: return "Desktop Site"
         }
     }
 
@@ -39,7 +50,10 @@ enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .find: return "Find"
         case .newTab: return "New tab"
-        case .burn: return "Burn"
+        case .burn: return "Burn It All"
+        case .newPrivateTab: return "Private Tab"
+        case .reader: return "Reader"
+        case .privacyReport: return "Report"
         default: return title
         }
     }
@@ -58,6 +72,11 @@ enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
         case .burn: return "flame"
         case .downloads: return "arrow.down.circle"
         case .home: return "house"
+        case .history: return "clock"
+        case .newPrivateTab: return "eye.slash"
+        case .reader: return "doc.plaintext"
+        case .privacyReport: return "checklist"
+        case .desktopSite: return "desktopcomputer"
         }
     }
 }
@@ -66,14 +85,19 @@ enum MenuTopRowItem: String, Codable, CaseIterable, Identifiable {
 /// Every action in the row also lives further down the Menu, so nothing becomes unreachable.
 struct MenuTopRow: Equatable {
     static let storageKey = "menuTopRow"
-    /// Most cells that fit across a phone without crowding the labels.
-    static let maxItems = 6
+    /// Build 41: two rows of four big buttons.
+    static let maxItems = 8
     static let minItems = 1
 
     /// Build 26 default: Back, Forward, Reload, Share, Settings. Tabs lives in the bottom bar by default now and is
     /// still one tap away in the editor. The editor stores an unchanged row as empty data, so anyone who never
     /// customized it picks up this default on its own, and a real customization is never touched.
-    static let defaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .share, .settings]
+    ///
+    /// Build 41: My actions starts with Bookmark, History, Burn It All, and New Private Tab. Anyone who customized the
+    /// old row keeps their saved buttons, under the same storage key.
+    static let defaultItems: [MenuTopRowItem] = [.bookmark, .history, .burn, .newPrivateTab]
+    /// The Build 26 to 40 default row, for tests and docs.
+    static let build26DefaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .share, .settings]
     /// The row before Build 26, for tests and docs.
     static let legacyDefaultItems: [MenuTopRowItem] = [.back, .forward, .reload, .tabs, .settings]
 

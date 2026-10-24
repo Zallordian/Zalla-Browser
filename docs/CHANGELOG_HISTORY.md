@@ -2,6 +2,15 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 41: New Menu and Settings
+- The Menu opens as a card that follows Light and Dark mode, with your real privacy numbers at the top
+- My actions grid with Bookmark, History, Burn It All, and New Private Tab by default, up to 8, editable
+- Page tools, Show All for the rest, then Bookmarks and History, Downloads, Tabs and Tab Groups, and All Settings
+- Settings is one list in clear groups: Features, General, Privacy, Display, Toolbar and Tabs, Tools, Support and About
+- Address bar placement picked from two small pictures, plus a Page Zoom list to forget saved zoom per site
+- Haptic tap on Settings tabs removed with the tab strip
+- Every existing setting keeps its saved value
+
 ## Build 40: Launch Ready
 - Version back to 1.0 so this build can go with the 1.0 App Store submission
 - Bookmarks are never overwritten when the library cannot be read, and an unreadable file is copied aside
