@@ -51,6 +51,8 @@ struct ThemeTransitionOverlay: View {
             case .neon: NeonCanvas(progress: progress)
             case .arctic: ArcticCanvas(progress: progress)
             case .blossom: BlossomCanvas(progress: progress)
+            case .snowfall, .bats, .leaves, .fireworks, .hearts, .shamrocks, .petals, .sunShimmer, .stars:
+                SeasonalCanvas(kind: playing.kind, progress: progress)
             }
         }
     }
@@ -66,6 +68,15 @@ struct ThemeTransitionOverlay: View {
         case .neon: return Color(red: 0.12, green: 0.03, blue: 0.24)
         case .arctic: return Color(red: 0.55, green: 0.8, blue: 0.93)
         case .blossom: return Color(red: 0.93, green: 0.55, blue: 0.7)
+        case .snowfall: return Color(red: 0.85, green: 0.92, blue: 1.0)
+        case .bats: return Color(red: 0.2, green: 0.08, blue: 0.24)
+        case .leaves: return Color(red: 0.6, green: 0.3, blue: 0.1)
+        case .fireworks: return Color(red: 0.08, green: 0.1, blue: 0.25)
+        case .hearts: return Color(red: 0.95, green: 0.5, blue: 0.65)
+        case .shamrocks: return Color(red: 0.12, green: 0.5, blue: 0.25)
+        case .petals: return Color(red: 0.95, green: 0.82, blue: 0.9)
+        case .sunShimmer: return Color(red: 1.0, green: 0.78, blue: 0.35)
+        case .stars: return Color(red: 0.12, green: 0.18, blue: 0.36)
         }
     }
 
@@ -1058,5 +1069,152 @@ private struct BlossomCanvas: View {
         path.addQuadCurve(to: CGPoint(x: 0, y: half), control: CGPoint(x: wide * 1.6, y: 0))
         path.closeSubpath()
         return path
+    }
+}
+
+// MARK: - Seasonal
+
+/// Build 48: light flair for the free seasonal themes. No veil over the page, just a few dozen small shapes.
+private struct SeasonalCanvas: View {
+    let kind: ThemeTransitionKind
+    let progress: Double
+
+    private static let cache: [String: [SeasonalFlair.Particle]] = {
+        var result: [String: [SeasonalFlair.Particle]] = [:]
+        for kind in [ThemeTransitionKind.snowfall, .bats, .leaves, .fireworks, .hearts, .shamrocks, .petals, .sunShimmer, .stars] {
+            result[String(describing: kind)] = SeasonalFlair.particles(for: kind)
+        }
+        return result
+    }()
+
+    var body: some View {
+        Canvas { context, size in
+            draw(&context, size: size)
+        }
+    }
+
+    private func color(_ tone: Double) -> Color {
+        switch kind {
+        case .snowfall: return .white
+        case .bats: return Color(red: 0.12, green: 0.06, blue: 0.16)
+        case .leaves:
+            return tone < 0.33 ? Color(red: 0.8, green: 0.4, blue: 0.16)
+                : (tone < 0.66 ? Color(red: 0.95, green: 0.7, blue: 0.25) : Color(red: 0.62, green: 0.24, blue: 0.1))
+        case .fireworks:
+            return tone < 0.33 ? Color(red: 0.95, green: 0.25, blue: 0.3)
+                : (tone < 0.66 ? .white : Color(red: 0.3, green: 0.5, blue: 1.0))
+        case .hearts: return tone < 0.5 ? Color(red: 0.92, green: 0.3, blue: 0.5) : Color(red: 1.0, green: 0.7, blue: 0.8)
+        case .shamrocks: return tone < 0.5 ? Color(red: 0.15, green: 0.65, blue: 0.3) : Color(red: 0.35, green: 0.8, blue: 0.45)
+        case .petals:
+            return tone < 0.33 ? Color(red: 1.0, green: 0.82, blue: 0.88)
+                : (tone < 0.66 ? Color(red: 1.0, green: 0.94, blue: 0.66) : Color(red: 0.8, green: 0.72, blue: 1.0))
+        case .sunShimmer: return Color(red: 1.0, green: 0.86, blue: 0.5)
+        default: return .white
+        }
+    }
+
+    private func draw(_ context: inout GraphicsContext, size: CGSize) {
+        let width = Double(size.width)
+        let height = Double(size.height)
+        if kind == .sunShimmer {
+            let glow = 0.35 * TransitionCurve.smooth(1 - abs(2 * progress - 1))
+            context.fill(
+                Path(ellipseIn: CGRect(x: width * 0.45, y: -width * 0.35, width: width * 0.9, height: width * 0.9)),
+                with: .radialGradient(
+                    Gradient(colors: [Color(red: 1.0, green: 0.8, blue: 0.4).opacity(glow), .clear]),
+                    center: CGPoint(x: width * 0.9, y: width * 0.1), startRadius: 0, endRadius: width * 0.45
+                )
+            )
+        }
+        for particle in Self.cache[String(describing: kind)] ?? [] {
+            guard let state = SeasonalFlair.state(of: particle, kind: kind, progress: progress) else { continue }
+            let side = particle.size * width
+            var layer = context
+            layer.translateBy(x: state.x * width, y: state.y * height)
+            layer.rotate(by: .radians(state.angle))
+            layer.opacity = state.alpha
+            let fill = GraphicsContext.Shading.color(color(particle.tone))
+            switch kind {
+            case .snowfall:
+                let r = side * 0.22
+                layer.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: 2 * r, height: 2 * r)), with: fill)
+            case .bats:
+                layer.fill(Self.bat(side * 1.4, flap: state.scale), with: fill)
+            case .leaves, .petals:
+                layer.fill(Path(ellipseIn: CGRect(x: -side * 0.5, y: -side * 0.22, width: side, height: side * 0.44)), with: fill)
+            case .hearts:
+                layer.fill(Self.heart(side * 0.8), with: fill)
+            case .shamrocks:
+                layer.fill(Self.shamrock(side * 0.8), with: fill)
+            case .fireworks:
+                Self.burst(&layer, radius: side * 3.2 * state.scale, color: color(particle.tone))
+            case .stars:
+                layer.fill(Self.star(side * 0.35), with: fill)
+            case .sunShimmer:
+                let r = side * 0.15
+                layer.fill(Path(ellipseIn: CGRect(x: -r, y: -r, width: 2 * r, height: 2 * r)), with: fill)
+            default:
+                break
+            }
+        }
+    }
+
+    private static func heart(_ s: Double) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: s * 0.45))
+        path.addCurve(to: CGPoint(x: 0, y: -s * 0.2), control1: CGPoint(x: -s * 0.9, y: -s * 0.1), control2: CGPoint(x: -s * 0.35, y: -s * 0.7))
+        path.addCurve(to: CGPoint(x: 0, y: s * 0.45), control1: CGPoint(x: s * 0.35, y: -s * 0.7), control2: CGPoint(x: s * 0.9, y: -s * 0.1))
+        path.closeSubpath()
+        return path
+    }
+
+    private static func shamrock(_ s: Double) -> Path {
+        var path = Path()
+        let r = s * 0.26
+        for angle in [-Double.pi / 2, Double.pi / 6, 5 * Double.pi / 6] {
+            let c = CGPoint(x: cos(angle) * r, y: sin(angle) * r)
+            path.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        }
+        path.addRect(CGRect(x: -s * 0.03, y: 0, width: s * 0.06, height: s * 0.55))
+        return path
+    }
+
+    private static func star(_ s: Double) -> Path {
+        var path = Path()
+        for i in 0..<10 {
+            let r = i % 2 == 0 ? s : s * 0.42
+            let a = Double(i) * Double.pi / 5 - Double.pi / 2
+            let point = CGPoint(x: cos(a) * r, y: sin(a) * r)
+            if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    /// A simple bat: two pointed wings and a small body. `flap` squashes the wings.
+    private static func bat(_ s: Double, flap: Double) -> Path {
+        var path = Path()
+        let lift = s * 0.35 * flap
+        path.move(to: CGPoint(x: 0, y: 0))
+        path.addQuadCurve(to: CGPoint(x: -s, y: -lift), control: CGPoint(x: -s * 0.5, y: -lift * 1.4))
+        path.addQuadCurve(to: CGPoint(x: 0, y: s * 0.12), control: CGPoint(x: -s * 0.5, y: s * 0.05))
+        path.addQuadCurve(to: CGPoint(x: s, y: -lift), control: CGPoint(x: s * 0.5, y: s * 0.05))
+        path.addQuadCurve(to: CGPoint(x: 0, y: 0), control: CGPoint(x: s * 0.5, y: -lift * 1.4))
+        path.addEllipse(in: CGRect(x: -s * 0.1, y: -s * 0.12, width: s * 0.2, height: s * 0.26))
+        return path
+    }
+
+    /// Twelve short sparks out from the center.
+    private static func burst(_ context: inout GraphicsContext, radius: Double, color: Color) {
+        for i in 0..<12 {
+            let a = Double(i) * Double.pi / 6
+            let tip = CGPoint(x: cos(a) * radius, y: sin(a) * radius)
+            let r = max(1.5, radius * 0.05)
+            context.fill(Path(ellipseIn: CGRect(x: tip.x - r, y: tip.y - r, width: 2 * r, height: 2 * r)), with: .color(color))
+            var trail = Path()
+            trail.move(to: CGPoint(x: tip.x * 0.6, y: tip.y * 0.6))
+            trail.addLine(to: tip)
+            context.stroke(trail, with: .color(color.opacity(0.5)), lineWidth: r)
+        }
     }
 }

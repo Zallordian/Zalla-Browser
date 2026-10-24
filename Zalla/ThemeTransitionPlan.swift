@@ -18,6 +18,131 @@ enum ThemeTransitionKind: Equatable {
     case arctic
     /// A swirl of petals sweeps across the screen.
     case blossom
+    // Build 48: light seasonal flair for the free seasonal themes. One shared particle Canvas draws them all.
+    /// Snow drifts down. Winter and Christmas.
+    case snowfall
+    /// A few bats flap across. Halloween.
+    case bats
+    /// Autumn leaves tumble down. Fall Harvest.
+    case leaves
+    /// Small firework bursts. Fourth of July and New Year's.
+    case fireworks
+    /// Hearts float up. Valentine's Day.
+    case hearts
+    /// Shamrocks drift down. Saint Patrick's Day.
+    case shamrocks
+    /// Pastel petals drift down. Spring and Easter.
+    case petals
+    /// A warm glow and rising shimmer. Summer.
+    case sunShimmer
+    /// Quiet twinkling stars. Memorial Day.
+    case stars
+
+    /// Seasonal flair is free, so it never needs Zalla Unlock.
+    var isSeasonal: Bool {
+        switch self {
+        case .snowfall, .bats, .leaves, .fireworks, .hearts, .shamrocks, .petals, .sunShimmer, .stars: return true
+        default: return false
+        }
+    }
+}
+
+/// Which seasonal flair goes with which seasonal theme.
+enum SeasonalFlair {
+    static func kind(for id: ZallaThemeID) -> ThemeTransitionKind? {
+        switch id {
+        case .winter, .christmas: return .snowfall
+        case .halloween: return .bats
+        case .harvest: return .leaves
+        case .fourthOfJuly, .newYear: return .fireworks
+        case .valentines: return .hearts
+        case .stPatricks: return .shamrocks
+        case .spring, .easter: return .petals
+        case .summer: return .sunShimmer
+        case .memorialDay: return .stars
+        default: return nil
+        }
+    }
+
+    /// One particle. Positions are fractions of the screen; size is a fraction of the width.
+    struct Particle: Equatable {
+        var x: Double
+        var y: Double
+        var size: Double
+        var delay: Double
+        var drift: Double
+        var spin: Double
+        var tone: Double
+    }
+
+    /// Where a particle is at one moment. Nil when it is not on screen.
+    struct State: Equatable {
+        var x: Double
+        var y: Double
+        var angle: Double
+        var alpha: Double
+        var scale: Double
+    }
+
+    static func count(for kind: ThemeTransitionKind) -> Int {
+        switch kind {
+        case .snowfall: return 46
+        case .bats: return 7
+        case .fireworks: return 5
+        case .stars: return 24
+        case .sunShimmer: return 18
+        default: return 28
+        }
+    }
+
+    static func particles(for kind: ThemeTransitionKind) -> [Particle] {
+        guard kind.isSeasonal else { return [] }
+        var generator = SeededGenerator(seed: UInt64(count(for: kind)) * 131 + UInt64(String(describing: kind).count))
+        return (0..<count(for: kind)).map { _ in
+            Particle(
+                x: Double.random(in: 0.04...0.96, using: &generator),
+                y: Double.random(in: 0.08...0.7, using: &generator),
+                size: Double.random(in: 0.025...0.055, using: &generator),
+                delay: Double.random(in: 0...0.35, using: &generator),
+                drift: Double.random(in: -0.12...0.12, using: &generator),
+                spin: Double.random(in: -3...3, using: &generator),
+                tone: Double.random(in: 0...1, using: &generator)
+            )
+        }
+    }
+
+    /// Fades a particle in at the start of its life and out at the end.
+    static func envelope(_ t: Double) -> Double {
+        TransitionCurve.smooth(min(t / 0.2, 1)) * TransitionCurve.smooth(min((1 - t) / 0.3, 1))
+    }
+
+    static func state(of p: Particle, kind: ThemeTransitionKind, progress: Double) -> State? {
+        let life = 1 - 0.35
+        let t = (TransitionCurve.clamp(progress) - p.delay) / life
+        guard t > 0, t < 1 else { return nil }
+        let fade = envelope(t)
+        switch kind {
+        case .snowfall, .leaves, .shamrocks, .petals:
+            let speed = kind == .snowfall ? 0.9 : 1.1
+            let sway = 0.03 * sin(t * 6 + p.spin)
+            return State(x: p.x + p.drift * t + sway, y: -0.05 + speed * t, angle: p.spin * t, alpha: fade, scale: 1)
+        case .hearts:
+            return State(x: p.x + 0.03 * sin(t * 5 + p.spin), y: 1.04 - 0.9 * t, angle: 0.2 * sin(t * 4), alpha: fade, scale: 1)
+        case .bats:
+            let leftToRight = p.tone < 0.5
+            let x = leftToRight ? -0.1 + 1.2 * t : 1.1 - 1.2 * t
+            return State(x: x, y: p.y * 0.8 + 0.04 * sin(t * 9 + p.spin), angle: leftToRight ? 0 : Double.pi,
+                         alpha: fade, scale: 0.6 + 0.4 * abs(sin(t * 28 + p.spin)))
+        case .fireworks:
+            return State(x: p.x, y: p.y * 0.7 + 0.05, angle: 0, alpha: fade, scale: TransitionCurve.easeOutCubic(t))
+        case .stars:
+            return State(x: p.x, y: p.y, angle: 0, alpha: fade * (0.55 + 0.45 * sin(t * 12 + p.spin)), scale: 1)
+        case .sunShimmer:
+            return State(x: p.x, y: 1 - 0.6 * t - p.y * 0.3, angle: 0, alpha: fade * 0.8, scale: 1)
+        default:
+            return nil
+        }
+    }
 }
 
 /// How fast theme transitions play. Normal is about a second.

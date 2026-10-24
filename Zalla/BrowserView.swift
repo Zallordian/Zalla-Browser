@@ -3514,7 +3514,7 @@ private struct SettingsView: View {
 
     private var quickThemePlan: ThemeTransitionPlan? {
         ThemeTransitionPlan.make(
-            kind: quickThemeKind, unlocked: unlock.isUnlocked, enabled: themeTransitionsOn,
+            kind: quickThemeKind, unlocked: unlock.isUnlocked || quickThemeKind.isSeasonal, enabled: themeTransitionsOn,
             reduceMotion: reduceMotion, speed: ThemeTransitionSpeed(stored: themeTransitionSpeedRaw)
         )
     }
@@ -4282,6 +4282,10 @@ private struct SettingsView: View {
             useCustomAccent = false
             themeID = id.rawValue
             suggestIconForTheme = id
+            if let flair = SeasonalFlair.kind(for: id) {
+                quickThemeKind = flair
+                quickThemePulse += 1
+            }
         case .fullPack(let pack):
             useCustomAccent = false
             themeID = pack.themeID.rawValue

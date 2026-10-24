@@ -133,8 +133,14 @@ enum ThemePacks {
     /// Zalla Unlock, and the switch on. Reduce Motion still plays, as a quick fade.
     static func activeTransition(themeID: String, useCustomAccent: Bool, unlocked: Bool, enabled: Bool,
                                  reduceMotion: Bool, speed: ThemeTransitionSpeed) -> ThemeTransitionPlan? {
-        guard !useCustomAccent, let pack = pack(for: themeID) else { return nil }
-        return ThemeTransitionPlan.make(kind: pack.transition, unlocked: unlocked, enabled: enabled,
+        guard !useCustomAccent else { return nil }
+        if let pack = pack(for: themeID) {
+            return ThemeTransitionPlan.make(kind: pack.transition, unlocked: unlocked, enabled: enabled,
+                                            reduceMotion: reduceMotion, speed: speed)
+        }
+        // Build 48: seasonal themes are free, so their flair plays without Zalla Unlock.
+        guard let id = ZallaThemeID(rawValue: themeID), let kind = SeasonalFlair.kind(for: id) else { return nil }
+        return ThemeTransitionPlan.make(kind: kind, unlocked: true, enabled: enabled,
                                         reduceMotion: reduceMotion, speed: speed)
     }
 }

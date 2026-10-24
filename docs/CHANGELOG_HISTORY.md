@@ -2,6 +2,11 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 48: Seasonal Refresh Flair
+- Each seasonal theme now has its own short refresh animation, played when you pull to refresh or pick the theme: snowfall for Winter and Christmas, bats for Halloween, drifting leaves for Fall Harvest, small fireworks for Fourth of July and New Year's, floating hearts for Valentine's Day, shamrocks for Saint Patrick's Day, petals for Spring and Easter, a warm sun shimmer for Summer, and quiet stars for Memorial Day
+- They're free like the seasonal themes, play only while that theme is on, and follow the Theme transitions switch and speed
+- With Reduce Motion on, they play as a quick, still color fade
+
 ## Build 47: Seasonal Themes and New Pro Themes
 - Free seasonal themes show up in Theme and Accent under Seasonal, each only during its season, with a small "Available until" date: New Year's (December 26 to January 7), Winter (December through February), Valentine's Day (February 1 to 15), Saint Patrick's Day (March 1 to 18), Easter (two weeks before Easter Sunday through the Monday after), Spring (March 19 to May 31), Memorial Day (the nine days before Memorial Day and the day itself), Summer (June through August), Fourth of July (June 24 to July 7), Halloween (October 1 to November 1), Fall Harvest (October and November, through Thanksgiving), and Christmas (December 1 to 26)
 - If your seasonal theme's season ends, it stays on and shows as Out of season until you pick something else. After that it comes back next season
