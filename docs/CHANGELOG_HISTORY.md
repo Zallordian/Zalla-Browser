@@ -2,6 +2,14 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 43: Cleaner Safari Style Bar
+- Back and Forward leave the bar when there is nowhere to go, like Safari, and the pill grows into their space
+- They come back with a fade and a small scale in the same spring. Reduce Motion gets a fade
+- Buttons keep fixed sizes, so only the pill's width changes
+- Page loading no longer redraws the whole browser on every tick, and the tab only reports values that changed
+- The Safari style bar and pill are now small views of their own, which keeps them quick to draw
+- Classic is unchanged
+
 ## Build 42: Safari Style Bar
 - New default bottom bar in the style of Safari on iOS 26: slim (48 points), floating over the page with no band or separator
 - Back, Forward (faded when there is nothing to go forward to), a pill with the bold page title over the lock and domain, reload inside the pill, Tabs, and More

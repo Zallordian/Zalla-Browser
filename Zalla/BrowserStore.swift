@@ -908,7 +908,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     let webView: WKWebView
     @Published var title = "New tab"
     @Published var url: URL?
-    @Published var progress = 0.0
+    /// Build 43: page load progress lives in its own small object, so only the loading line redraws on each tick,
+    /// not every view that watches the tab.
+    let loadProgress = LoadProgress()
+    var progress = 0.0 {
+        didSet { loadProgress.update(progress) }
+    }
     @Published var isLoading = false
     @Published var canGoBack = false
     @Published var canGoForward = false
@@ -1102,15 +1107,18 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     private func refresh() {
         // A tab waiting to be restored or woken keeps showing its saved title and address.
         if !isReaderActive, httpsFallback == nil, pendingRestore == nil, !newTabHistory.isParked {
-            title = webView.title ?? webView.url?.host ?? "New tab"
-            url = webView.url
+            // Build 43: assign only real changes. A @Published write always tells every observer to redraw, and this
+            // runs on every progress tick, so unchanged values used to redraw the whole browser many times a load.
+            let newTitle = webView.title ?? webView.url?.host ?? "New tab"
+            if title != newTitle { title = newTitle }
+            if url != webView.url { url = webView.url }
         }
         progress = webView.estimatedProgress
-        isLoading = webView.isLoading
-        canGoBack = canNavigateBack
-        canGoForward = canNavigateForward
+        if isLoading != webView.isLoading { isLoading = webView.isLoading }
+        if canGoBack != canNavigateBack { canGoBack = canNavigateBack }
+        if canGoForward != canNavigateForward { canGoForward = canNavigateForward }
         if pullRefreshPending, !webView.isLoading { endPullRefresh() }
-        hasOnlySecureContent = webView.hasOnlySecureContent
+        if hasOnlySecureContent != webView.hasOnlySecureContent { hasOnlySecureContent = webView.hasOnlySecureContent }
     }
 
     func load(_ url: URL) {
@@ -2243,5 +2251,26 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             try? await Task.sleep(nanoseconds: 2_200_000_000)
             if self?.toast == message { self?.toast = nil }
         }
+    }
+}
+
+
+/// Build 43: the loading value for one tab. Views that draw a loading line observe this instead of the whole tab.
+final class LoadProgress: ObservableObject {
+    @Published private(set) var value = 0.0
+
+    func update(_ newValue: Double) {
+        let next = LoadProgress.published(current: value, incoming: newValue)
+        if next != value { value = next }
+    }
+
+    /// Small steps are skipped so the line moves smoothly without a redraw per tick. Start and finish always land.
+    static let step = 0.02
+
+    static func published(current: Double, incoming: Double) -> Double {
+        let clamped = min(max(incoming, 0), 1)
+        if clamped <= 0 || clamped >= 1 { return clamped }
+        if clamped < current { return clamped }
+        return clamped - current >= step ? clamped : current
     }
 }

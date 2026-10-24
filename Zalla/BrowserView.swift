@@ -996,8 +996,8 @@ private struct TabContent: View {
     private func classicAddressBlock(includeNav: Bool) -> some View {
         VStack(spacing: showsCollapsedToolbar ? 0 : 10) {
             if tab.isLoading {
-                ProgressView(value: tab.progress).tint(theme.primary).accessibilityLabel("Page loading")
-                    .motion(.progress, value: tab.progress)
+                TabProgressBar(progress: tab.loadProgress, tint: theme.primary)
+                    .accessibilityLabel("Page loading")
             }
             if tab.hasPage || isEditingClassicAddress || addressFocused {
                 classicAddressField
@@ -1272,8 +1272,7 @@ private struct TabContent: View {
     private var quickActionToolbar: some View {
         VStack(spacing: 8) {
             if tab.isLoading {
-                ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
-                    .motion(.progress, value: tab.progress)
+                TabProgressBar(progress: tab.loadProgress, tint: theme.primary).padding(.horizontal, 24)
             }
             if isEditingCompactAddress {
                 // Reuse the Compact editing pill so focus, submit, and cancel behave the same.
@@ -1534,44 +1533,23 @@ private struct TabContent: View {
     private var bottomBarFloats: Bool {
         immersiveLayout || usesSafariBar
     }
-    private var safariSpring: Animation {
-        reduceMotion
-            ? .easeInOut(duration: 0.2)
-            : .spring(response: SafariBarMetrics.springResponse, dampingFraction: SafariBarMetrics.springDamping)
-    }
-
     /// Back, Forward, the pill, Tabs, More, in the order the toolbar editor keeps (the Compact list).
-    /// Every control has a fixed size, so scrolling only changes opacity, scale, and the pill's width in one spring.
+    /// Build 43: Back and Forward leave the bar entirely when there is nowhere to go, like Safari, and the pill grows
+    /// into their space in the same spring. The row itself is `SafariBarRow`, a small view of its own.
     private var safariToolbar: some View {
-        HStack(spacing: showsCollapsedToolbar ? 0 : SafariBarMetrics.spacing) {
-            if !isEditingCompactAddress, !toolbarLayout.compactLeading.isEmpty {
-                HStack(spacing: SafariBarMetrics.spacing) {
-                    ForEach(toolbarLayout.compactLeading) { kind in
-                        safariItem(kind)
-                    }
-                }
-                .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
-                .transition(.move(edge: .leading).combined(with: .opacity))
+        SafariBarRow(
+            leading: SafariBarMetrics.visibleItems(toolbarLayout.compactLeading, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward),
+            trailing: SafariBarMetrics.visibleItems(toolbarLayout.compactTrailing, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward),
+            collapsed: showsCollapsedToolbar,
+            editing: isEditingCompactAddress,
+            reduceMotion: reduceMotion,
+            item: { kind in safariItem(kind) },
+            pill: {
+                safariPill
+                    .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
+                    .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
             }
-
-            safariPill
-                .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
-                .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
-
-            if !isEditingCompactAddress, !toolbarLayout.compactTrailing.isEmpty {
-                HStack(spacing: SafariBarMetrics.spacing) {
-                    ForEach(toolbarLayout.compactTrailing) { kind in
-                        safariItem(kind)
-                    }
-                }
-                .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-        }
-        .padding(.horizontal, SafariBarMetrics.edgeMargin)
-        .animation(safariSpring, value: isEditingCompactAddress)
-        .animation(safariSpring, value: tab.canGoBack)
-        .animation(safariSpring, value: tab.canGoForward)
+        )
     }
 
     @ViewBuilder
@@ -1600,84 +1578,23 @@ private struct TabContent: View {
         }
     }
 
-    /// Bold page title on top, lock and domain below in smaller gray text, reload on the right.
+    /// The pill's content is `SafariPillView`; only the editing field stays here because it owns the focus state.
     private var safariPill: some View {
-        HStack(spacing: showsCollapsedToolbar ? 0 : 8) {
-            if isEditingCompactAddress {
-                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search or enter a website", text: $address)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .keyboardType(.webSearch)
-                    .submitLabel(.go)
-                    .focused($addressFocused)
-                    .onSubmit { submitAddress() }
-                    .accessibilityLabel("Search or website address")
-                    .onAppear {
-                        addressFocused = true
-                        DispatchQueue.main.async {
-                            UIResponder.currentFirstResponder()?.selectAll(nil)
-                        }
-                    }
-                Button {
-                    cancelCompactAddressEditing()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityLabel("Cancel address editing")
-                .frame(minWidth: 44, minHeight: 44)
-            } else {
-                if !toolbarLayout.compact.contains(.tabs) {
-                    tabsButtonCompact
-                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
-                }
-                Spacer(minLength: 0)
-                    .frame(maxWidth: showsCollapsedToolbar ? .infinity : 0)
-                VStack(alignment: .center, spacing: 0) {
-                    Text(showsCollapsedToolbar ? AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage) : compactTitle)
-                        .font(showsCollapsedToolbar ? .footnote.weight(.semibold) : .subheadline.weight(.bold))
-                        .lineLimit(1)
-                        .foregroundStyle(.primary)
-                        .contentTransition(.opacity)
-                    if tab.hasPage {
-                        compactSubtitle
-                            .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: false))
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                Spacer(minLength: 0)
-                    .frame(maxWidth: showsCollapsedToolbar ? .infinity : 0)
-                if tab.hasPage {
-                    compactReloadButton
-                        .frame(width: 28, height: 28)
-                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: showsCollapsedToolbar ? SafariBarMetrics.collapsedHeight : SafariBarMetrics.height)
-        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
-        .overlay(alignment: .bottom) {
-            // Loading draws inside the pill, so the bar never grows or shifts while a page loads.
-            if tab.isLoading, !isEditingCompactAddress {
-                GeometryReader { geo in
-                    Capsule()
-                        .fill(theme.primary)
-                        .frame(width: max(geo.size.width * CGFloat(tab.progress), 6), height: SafariBarMetrics.progressHeight)
-                }
-                .frame(height: SafariBarMetrics.progressHeight)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 3)
-                .allowsHitTesting(false)
-                .transition(.opacity)
-            }
-        }
-        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
-        .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
-        .contentShape(Capsule())
+        SafariPillView(
+            title: showsCollapsedToolbar ? AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage) : compactTitle,
+            hasPage: tab.hasPage,
+            isLoading: tab.isLoading,
+            collapsed: showsCollapsedToolbar,
+            editing: isEditingCompactAddress,
+            showsTabsInPill: !toolbarLayout.compact.contains(.tabs),
+            reduceMotion: reduceMotion,
+            progress: tab.loadProgress,
+            tint: theme.primary,
+            field: { safariAddressField },
+            tabsButton: { tabsButtonCompact },
+            subtitle: { compactSubtitle },
+            reload: { compactReloadButton }
+        )
         .modifier(CompactPillInteractionModifier(
             isEditing: isEditingCompactAddress,
             onBeginEditing: tapCompactAddress,
@@ -1685,11 +1602,39 @@ private struct TabContent: View {
         ))
     }
 
+    @ViewBuilder
+    private var safariAddressField: some View {
+        Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+            .foregroundStyle(.secondary)
+        TextField("Search or enter a website", text: $address)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .keyboardType(.webSearch)
+            .submitLabel(.go)
+            .focused($addressFocused)
+            .onSubmit { submitAddress() }
+            .accessibilityLabel("Search or website address")
+            .onAppear {
+                addressFocused = true
+                DispatchQueue.main.async {
+                    UIResponder.currentFirstResponder()?.selectAll(nil)
+                }
+            }
+        Button {
+            cancelCompactAddressEditing()
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .font(.body)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityLabel("Cancel address editing")
+        .frame(minWidth: 44, minHeight: 44)
+    }
+
     private var compactToolbar: some View {
         VStack(spacing: 8) {
             if tab.isLoading {
-                ProgressView(value: tab.progress).tint(theme.primary).padding(.horizontal, 24)
-                    .motion(.progress, value: tab.progress)
+                TabProgressBar(progress: tab.loadProgress, tint: theme.primary).padding(.horizontal, 24)
             }
             HStack(spacing: showsCollapsedToolbar ? 0 : 12) {
                 // While editing, the side buttons slide away and the pill springs out to fill the row.
@@ -4030,5 +3975,151 @@ private struct SettingsView: View {
                 bookmarkMessage = error.localizedDescription
             }
         }
+    }
+}
+
+
+// MARK: - Build 43 Safari style bar views
+
+/// The loading bar for Classic, Compact, and Quick Action. It watches only the tab's progress, so a progress tick
+/// redraws this bar and nothing else.
+private struct TabProgressBar: View {
+    @ObservedObject var progress: LoadProgress
+    let tint: Color
+
+    var body: some View {
+        ProgressView(value: progress.value)
+            .tint(tint)
+            .motion(.progress, value: progress.value)
+    }
+}
+
+/// The thin loading line inside the Safari style pill. An overlay with a fixed height, so the bar never moves.
+private struct SafariProgressLine: View {
+    @ObservedObject var progress: LoadProgress
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            Capsule()
+                .fill(tint)
+                .frame(width: max(geo.size.width * CGFloat(progress.value), 6), height: SafariBarMetrics.progressHeight)
+                .animation(.easeOut(duration: 0.25), value: progress.value)
+        }
+        .frame(height: SafariBarMetrics.progressHeight)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One row: buttons left of the pill, the pill, buttons right of it. Buttons that leave (Back or Forward with
+/// nowhere to go) fade and scale out, and the pill takes their space in the same spring. Every button has a fixed
+/// size, so only the pill's width changes.
+private struct SafariBarRow<Item: View, Pill: View>: View {
+    let leading: [ToolbarItemKind]
+    let trailing: [ToolbarItemKind]
+    let collapsed: Bool
+    let editing: Bool
+    let reduceMotion: Bool
+    @ViewBuilder let item: (ToolbarItemKind) -> Item
+    @ViewBuilder let pill: () -> Pill
+
+    private var spring: Animation {
+        reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: SafariBarMetrics.springResponse, dampingFraction: SafariBarMetrics.springDamping)
+    }
+
+    private var buttonTransition: AnyTransition {
+        reduceMotion ? .opacity : .scale(scale: SafariBarMetrics.hiddenButtonScale).combined(with: .opacity)
+    }
+
+    var body: some View {
+        HStack(spacing: collapsed ? 0 : SafariBarMetrics.spacing) {
+            if !editing {
+                ForEach(leading) { kind in
+                    item(kind)
+                        .frame(width: SafariBarMetrics.buttonSize, height: SafariBarMetrics.buttonSize)
+                        .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
+                        .transition(buttonTransition)
+                }
+            }
+            pill()
+            if !editing {
+                ForEach(trailing) { kind in
+                    item(kind)
+                        .frame(width: SafariBarMetrics.buttonSize, height: SafariBarMetrics.buttonSize)
+                        .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
+                        .transition(buttonTransition)
+                }
+            }
+        }
+        .frame(height: SafariBarMetrics.height)
+        .padding(.horizontal, SafariBarMetrics.edgeMargin)
+        .animation(spring, value: leading)
+        .animation(spring, value: trailing)
+        .animation(spring, value: editing)
+    }
+}
+
+/// Bold page title over the lock and domain, reload on the right, or the address field while editing.
+private struct SafariPillView<Field: View, TabsButton: View, Subtitle: View, Reload: View>: View {
+    let title: String
+    let hasPage: Bool
+    let isLoading: Bool
+    let collapsed: Bool
+    let editing: Bool
+    let showsTabsInPill: Bool
+    let reduceMotion: Bool
+    let progress: LoadProgress
+    let tint: Color
+    @ViewBuilder let field: () -> Field
+    @ViewBuilder let tabsButton: () -> TabsButton
+    @ViewBuilder let subtitle: () -> Subtitle
+    @ViewBuilder let reload: () -> Reload
+
+    var body: some View {
+        HStack(spacing: collapsed ? 0 : 8) {
+            if editing {
+                field()
+            } else {
+                if showsTabsInPill {
+                    tabsButton()
+                        .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
+                }
+                VStack(alignment: .center, spacing: 0) {
+                    Text(title)
+                        .font(collapsed ? .footnote.weight(.semibold) : .subheadline.weight(.bold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                        .contentTransition(.opacity)
+                    if hasPage {
+                        subtitle()
+                            .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: false))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                if hasPage {
+                    reload()
+                        .frame(width: 28, height: 28)
+                        .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity)
+        .frame(height: collapsed ? SafariBarMetrics.collapsedHeight : SafariBarMetrics.height)
+        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        .overlay(alignment: .bottom) {
+            if isLoading, !editing {
+                SafariProgressLine(progress: progress, tint: tint)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 3)
+                    .transition(.opacity)
+            }
+        }
+        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        .contentShape(Capsule())
     }
 }

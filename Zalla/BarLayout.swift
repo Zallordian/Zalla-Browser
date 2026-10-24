@@ -56,6 +56,21 @@ enum SafariBarMetrics {
     static let springResponse: Double = 0.34
     static let springDamping: Double = 0.86
 
+    /// Build 43: scale a Back or Forward button grows from as it comes back, and shrinks to as it leaves.
+    static let hiddenButtonScale: CGFloat = 0.6
+
+    /// Build 43, like Safari: Back is left out when there is nothing to go back to, and Forward when there is
+    /// nothing to go forward to. Every other button keeps its place.
+    static func visibleItems(_ items: [ToolbarItemKind], canGoBack: Bool, canGoForward: Bool) -> [ToolbarItemKind] {
+        items.filter { kind in
+            switch kind {
+            case .back: return canGoBack
+            case .forward: return canGoForward
+            default: return true
+            }
+        }
+    }
+
     static func opacity(enabled: Bool) -> Double {
         enabled ? 1 : disabledOpacity
     }
