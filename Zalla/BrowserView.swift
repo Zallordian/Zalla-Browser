@@ -4006,6 +4006,7 @@ private struct SettingsView: View {
                     )
                     .padding(.vertical, 6)
                     themeRow(title: "Quick theme", ids: ZallaThemeID.featured)
+                    seasonalRow
                     NavigationLink {
                         ThemePacksView()
                     } label: {
@@ -4047,7 +4048,7 @@ private struct SettingsView: View {
                 } header: {
                     Text("Theme and accent")
                 } footer: {
-                    Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom need Zalla Unlock, and so does the full Space look. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
+                    Text("Tap a theme to apply it: the accent, and for a theme pack also its app icon, new tab background, and refresh transition. Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, Cherry Blossom, Northwoods, Lake Superior, Midnight Ember, Aurora, and OLED Void need Zalla Unlock, and so does the full Space look. Seasonal themes are free and show up during their season. Themes are optional, and turning off Themes apply the full look makes a tap set the accent only. Zalla Red remains the default. Custom colors map to the closest matching accent icon.")
                 }
             }
             .motion(.bar, value: useCustomAccent)
@@ -4067,7 +4068,7 @@ private struct SettingsView: View {
                         Text(iconMessage).font(.footnote).foregroundStyle(.secondary)
                     }
                 } footer: {
-                    Text("Every accent has a matching icon, plus Dark and Tinted.")
+                    Text("Every accent has a matching icon, plus Dark and Tinted. Seasonal icons show up during their season.")
                 }
             }
             .motion(.fade, value: iconMessage)
@@ -4088,7 +4089,7 @@ private struct SettingsView: View {
             ) {
                 if let id = suggestIconForTheme {
                     let suggested = id.suggestedAppIcon
-                    Button("Use \(suggested.rawValue) icon") {
+                    Button("Use \(suggested.displayName) icon") {
                         appIconPreference = suggested.rawValue
                         applyIcon(suggested)
                         suggestIconForTheme = nil
@@ -4097,7 +4098,7 @@ private struct SettingsView: View {
                 }
             } message: {
                 if let id = suggestIconForTheme {
-                    Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.rawValue) icon.")
+                    Text("\(id.displayName) pairs well with the \(id.suggestedAppIcon.displayName) icon.")
                 }
             }
             .sheet(isPresented: $showDetailUpsell) { ZallaUnlockSheet() }
@@ -4116,7 +4117,8 @@ private struct SettingsView: View {
 
     private var iconGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 12)], spacing: 14) {
-            ForEach(AppIconPreference.allCases) { option in
+            // Seasonal icons show only in season, except the one in use, which stays until it is changed.
+            ForEach(AppIconPreference.allCases.filter { $0.canPick(on: SeasonDay(Date())) || $0.rawValue == appIconPreference }) { option in
                 iconOption(option)
             }
         }
@@ -4130,6 +4132,7 @@ private struct SettingsView: View {
                 showDetailUpsell = true
                 return
             }
+            guard option.canPick(on: SeasonDay(Date())) else { return }
             appIconPreference = option.rawValue
         } label: {
             VStack(spacing: 6) {
@@ -4159,6 +4162,60 @@ private struct SettingsView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(option.displayName) icon")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    /// Free holiday and season themes. Only the ones in season show, plus the chosen one if its season ended.
+    @ViewBuilder
+    private var seasonalRow: some View {
+        let today = SeasonDay(Date())
+        let chosen = useCustomAccent ? nil : ZallaThemeID(rawValue: themeID)
+        let ids = SeasonalWindows.pickerList(on: today, chosen: chosen)
+        if !ids.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Seasonal")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 12) {
+                    ForEach(ids) { id in
+                        let swatch = ZallaTheme.theme(for: id)
+                        let isChosen = !useCustomAccent && themeID == id.rawValue
+                        let caption = SeasonalWindows.caption(for: id, on: today)
+                        Button {
+                            selectTheme(id)
+                        } label: {
+                            VStack(spacing: 4) {
+                                Circle()
+                                    .fill(swatch.gradient)
+                                    .frame(width: 34, height: 34)
+                                    .overlay {
+                                        if isChosen {
+                                            Image(systemName: "checkmark")
+                                                .font(.caption.bold())
+                                                .foregroundStyle(.white)
+                                        }
+                                    }
+                                    .scaleEffect(isChosen ? 1.1 : 1)
+                                    .motion(.pop, value: isChosen)
+                                Text(id.displayName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                Text(caption)
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(.tertiary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(id.displayName), \(caption)")
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     @ViewBuilder
@@ -4216,6 +4273,8 @@ private struct SettingsView: View {
     /// A swatch tap. Packs apply the whole look, plain accents set the color, locked themes open Zalla Unlock.
     /// Either way the custom accent is switched off, as before.
     private func selectTheme(_ id: ZallaThemeID) {
+        // An out of season theme can stay applied but can't be picked again.
+        guard SeasonalWindows.canPick(id, on: SeasonDay(Date())) else { return }
         switch QuickTheme.action(for: id, unlocked: unlock.isUnlocked, fullLook: quickThemeFullLook) {
         case .needsUnlock:
             showDetailUpsell = true

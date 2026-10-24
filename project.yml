@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "46"
+    CURRENT_PROJECT_VERSION: "47"
 targets:
   Zalla:
     type: application
@@ -151,13 +151,81 @@ targets:
               CFBundleIconFiles:
                 - AppIconCherryBlossom
               UIPrerenderedIcon: false
+            AppIconNorthwoods:
+              CFBundleIconFiles:
+                - AppIconNorthwoods
+              UIPrerenderedIcon: false
+            AppIconLakeSuperior:
+              CFBundleIconFiles:
+                - AppIconLakeSuperior
+              UIPrerenderedIcon: false
+            AppIconMidnightEmber:
+              CFBundleIconFiles:
+                - AppIconMidnightEmber
+              UIPrerenderedIcon: false
+            AppIconAurora:
+              CFBundleIconFiles:
+                - AppIconAurora
+              UIPrerenderedIcon: false
+            AppIconOLEDVoid:
+              CFBundleIconFiles:
+                - AppIconOLEDVoid
+              UIPrerenderedIcon: false
+            AppIconNewYear:
+              CFBundleIconFiles:
+                - AppIconNewYear
+              UIPrerenderedIcon: false
+            AppIconWinter:
+              CFBundleIconFiles:
+                - AppIconWinter
+              UIPrerenderedIcon: false
+            AppIconValentines:
+              CFBundleIconFiles:
+                - AppIconValentines
+              UIPrerenderedIcon: false
+            AppIconStPatricks:
+              CFBundleIconFiles:
+                - AppIconStPatricks
+              UIPrerenderedIcon: false
+            AppIconEaster:
+              CFBundleIconFiles:
+                - AppIconEaster
+              UIPrerenderedIcon: false
+            AppIconSpring:
+              CFBundleIconFiles:
+                - AppIconSpring
+              UIPrerenderedIcon: false
+            AppIconMemorialDay:
+              CFBundleIconFiles:
+                - AppIconMemorialDay
+              UIPrerenderedIcon: false
+            AppIconSummer:
+              CFBundleIconFiles:
+                - AppIconSummer
+              UIPrerenderedIcon: false
+            AppIconFourthOfJuly:
+              CFBundleIconFiles:
+                - AppIconFourthOfJuly
+              UIPrerenderedIcon: false
+            AppIconHalloween:
+              CFBundleIconFiles:
+                - AppIconHalloween
+              UIPrerenderedIcon: false
+            AppIconHarvest:
+              CFBundleIconFiles:
+                - AppIconHarvest
+              UIPrerenderedIcon: false
+            AppIconChristmas:
+              CFBundleIconFiles:
+                - AppIconChristmas
+              UIPrerenderedIcon: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zalla.browser
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconDark AppIconTinted AppIconOrange AppIconYellow AppIconGreen AppIconBlue AppIconIndigo AppIconViolet AppIconOcean AppIconForest AppIconSpace AppIconJungle AppIconVolcano AppIconDeepOcean AppIconRetroArcade AppIconNeonCity AppIconArctic AppIconCherryBlossom
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: AppIconDark AppIconTinted AppIconOrange AppIconYellow AppIconGreen AppIconBlue AppIconIndigo AppIconViolet AppIconOcean AppIconForest AppIconSpace AppIconJungle AppIconVolcano AppIconDeepOcean AppIconRetroArcade AppIconNeonCity AppIconArctic AppIconCherryBlossom AppIconNorthwoods AppIconLakeSuperior AppIconMidnightEmber AppIconAurora AppIconOLEDVoid AppIconNewYear AppIconWinter AppIconValentines AppIconStPatricks AppIconEaster AppIconSpring AppIconMemorialDay AppIconSummer AppIconFourthOfJuly AppIconHalloween AppIconHarvest AppIconChristmas
   # Widgets (Build 29). Own bundle ID, own provisioning profile, same App Group as the app.
   # To drop widgets entirely: remove this target, the ZallaWidgets dependency above, and the ZallaWidgets folder.
   # See docs/WIDGETS.md for the Apple Developer portal steps this target needs before it can be signed.

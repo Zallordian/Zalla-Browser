@@ -2,6 +2,12 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 47: Seasonal Themes and New Pro Themes
+- Free seasonal themes show up in Theme and Accent under Seasonal, each only during its season, with a small "Available until" date: New Year's (December 26 to January 7), Winter (December through February), Valentine's Day (February 1 to 15), Saint Patrick's Day (March 1 to 18), Easter (two weeks before Easter Sunday through the Monday after), Spring (March 19 to May 31), Memorial Day (the nine days before Memorial Day and the day itself), Summer (June through August), Fourth of July (June 24 to July 7), Halloween (October 1 to November 1), Fall Harvest (October and November, through Thanksgiving), and Christmas (December 1 to 26)
+- If your seasonal theme's season ends, it stays on and shows as Out of season until you pick something else. After that it comes back next season
+- Five new Zalla Unlock themes: Northwoods, Lake Superior, Midnight Ember, Aurora, and OLED Void
+- Every new theme has its own matching app icon. Seasonal icons follow the same seasons, and Pro icons need Zalla Unlock
+
 ## Build 46: Shorter Settings
 - Settings opens on a short list, like the iOS Settings app: General, Appearance, Toolbar and Tabs, Home and New Tab, Search, Privacy and Security, Websites, Downloads and Tools, and About and Support
 - Each row opens its own page, and rarely used switches still sit behind More options on that page

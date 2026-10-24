@@ -19,6 +19,25 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
     case neonCity
     case arctic
     case cherryBlossom
+    // Build 47 Pro accents (Zalla Unlock), each with its own icon.
+    case northwoods
+    case lakeSuperior
+    case midnightEmber
+    case aurora
+    case oledVoid
+    // Build 47 free seasonal themes, pickable only in their window (SeasonalThemes.swift).
+    case newYear
+    case winter
+    case valentines
+    case stPatricks
+    case easter
+    case spring
+    case memorialDay
+    case summer
+    case fourthOfJuly
+    case halloween
+    case harvest
+    case christmas
 
     var id: String { rawValue }
 
@@ -26,9 +45,19 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
     var requiresUnlock: Bool {
         switch self {
         case .jungle, .volcano, .deepOcean, .arcade, .neonCity, .arctic, .cherryBlossom: return true
+        case .northwoods, .lakeSuperior, .midnightEmber, .aurora, .oledVoid: return true
         default: return false
         }
     }
+
+    /// Free holiday and season themes. They show in the picker only during their window.
+    var isSeasonal: Bool { ZallaThemeID.seasonal.contains(self) }
+
+    /// Seasonal themes in calendar order.
+    static var seasonal: [ZallaThemeID] { [.newYear, .winter, .valentines, .stPatricks, .easter, .spring, .memorialDay, .summer, .fourthOfJuly, .halloween, .harvest, .christmas] }
+
+    /// Build 47 Pro accents.
+    static var pro: [ZallaThemeID] { [.northwoods, .lakeSuperior, .midnightEmber, .aurora, .oledVoid] }
 
     var displayName: String {
         switch self {
@@ -49,11 +78,28 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .neonCity: return "Neon City"
         case .arctic: return "Arctic"
         case .cherryBlossom: return "Cherry Blossom"
+        case .northwoods: return "Northwoods"
+        case .lakeSuperior: return "Lake Superior"
+        case .midnightEmber: return "Midnight Ember"
+        case .aurora: return "Aurora"
+        case .oledVoid: return "OLED Void"
+        case .newYear: return "New Year's"
+        case .winter: return "Winter"
+        case .valentines: return "Valentine's Day"
+        case .stPatricks: return "Saint Patrick's Day"
+        case .easter: return "Easter"
+        case .spring: return "Spring"
+        case .memorialDay: return "Memorial Day"
+        case .summer: return "Summer"
+        case .fourthOfJuly: return "Fourth of July"
+        case .halloween: return "Halloween"
+        case .harvest: return "Fall Harvest"
+        case .christmas: return "Christmas"
         }
     }
 
     /// Featured accents shown first in Settings (refined, not a wall of chips).
-    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space, .jungle, .volcano, .deepOcean, .arcade, .neonCity, .arctic, .cherryBlossom] }
+    static var featured: [ZallaThemeID] { [.zallaRed, .ocean, .forest, .space, .jungle, .volcano, .deepOcean, .arcade, .neonCity, .arctic, .cherryBlossom, .northwoods, .lakeSuperior, .midnightEmber, .aurora, .oledVoid] }
 
     /// Secondary rainbow accents, presented more quietly.
     static var secondary: [ZallaThemeID] {
@@ -80,6 +126,23 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .neonCity: return .neonCity
         case .arctic: return .arctic
         case .cherryBlossom: return .cherryBlossom
+        case .northwoods: return .northwoods
+        case .lakeSuperior: return .lakeSuperior
+        case .midnightEmber: return .midnightEmber
+        case .aurora: return .aurora
+        case .oledVoid: return .oledVoid
+        case .newYear: return .newYear
+        case .winter: return .winter
+        case .valentines: return .valentines
+        case .stPatricks: return .stPatricks
+        case .easter: return .easter
+        case .spring: return .spring
+        case .memorialDay: return .memorialDay
+        case .summer: return .summer
+        case .fourthOfJuly: return .fourthOfJuly
+        case .halloween: return .halloween
+        case .harvest: return .harvest
+        case .christmas: return .christmas
         }
     }
 
@@ -103,6 +166,23 @@ enum ZallaThemeID: String, CaseIterable, Identifiable, Codable {
         case .neonCity: return "E83CFF"
         case .arctic: return "5AB8E8"
         case .cherryBlossom: return "F0709C"
+        case .northwoods: return "2E6B4F"
+        case .lakeSuperior: return "4A6F8F"
+        case .midnightEmber: return "C2361F"
+        case .aurora: return "3FD9A0"
+        case .oledVoid: return "9AA4B5"
+        case .newYear: return "D4AF37"
+        case .winter: return "6FA8DC"
+        case .valentines: return "E0457B"
+        case .stPatricks: return "1FA64A"
+        case .easter: return "B79CF0"
+        case .spring: return "6CC070"
+        case .memorialDay: return "3A5BA8"
+        case .summer: return "FFB020"
+        case .fourthOfJuly: return "D7263D"
+        case .halloween: return "F07A1A"
+        case .harvest: return "C8642A"
+        case .christmas: return "C8102E"
         }
     }
 }
@@ -121,7 +201,7 @@ extension ZallaTheme {
         }
         var best = ZallaThemeID.zallaRed
         var bestDistance = Double.greatestFiniteMagnitude
-        for id in ZallaThemeID.allCases where !id.requiresUnlock {
+        for id in ZallaThemeID.allCases where !id.requiresUnlock && !id.isSeasonal {
             let distance = colorDistance((r, g, b), rgbComponents(from: id.primaryHex))
             if distance < bestDistance {
                 bestDistance = distance
@@ -216,6 +296,40 @@ struct ZallaTheme: Equatable {
             return ZallaTheme(id: id, primary: hex("5AB8E8"), bright: hex("8AD2F5"), deep: hex("2A7BAF"), highlight: hex("CBEFFF"), gradientEnd: hex("7FA8F5"))
         case .cherryBlossom:
             return ZallaTheme(id: id, primary: hex("F0709C"), bright: hex("FF92B8"), deep: hex("B03F68"), highlight: hex("FFC2D6"), gradientEnd: hex("E86FB8"))
+        case .northwoods:
+            return ZallaTheme(id: id, primary: hex("2E6B4F"), bright: hex("4A8F6C"), deep: hex("173D2C"), highlight: hex("F2B84B"), gradientEnd: hex("D49A3A"))
+        case .lakeSuperior:
+            return ZallaTheme(id: id, primary: hex("4A6F8F"), bright: hex("6B8FAF"), deep: hex("2B4560"), highlight: hex("FF7A2F"), gradientEnd: hex("7F95A8"))
+        case .midnightEmber:
+            return ZallaTheme(id: id, primary: hex("C2361F"), bright: hex("E85A33"), deep: hex("6E160C"), highlight: hex("FFB067"), gradientEnd: hex("F07A24"))
+        case .aurora:
+            return ZallaTheme(id: id, primary: hex("3FD9A0"), bright: hex("6FF0BE"), deep: hex("1E7F66"), highlight: hex("B48CFF"), gradientEnd: hex("8A5CF0"))
+        case .oledVoid:
+            return ZallaTheme(id: id, primary: hex("9AA4B5"), bright: hex("C3CAD6"), deep: hex("5E6675"), highlight: hex("E6EAF0"), gradientEnd: hex("9AA4B5"), usesGradientAccent: false)
+        case .newYear:
+            return ZallaTheme(id: id, primary: hex("D4AF37"), bright: hex("F0CF60"), deep: hex("8F7420"), highlight: hex("FFF1B0"), gradientEnd: hex("C0C6D0"))
+        case .winter:
+            return ZallaTheme(id: id, primary: hex("6FA8DC"), bright: hex("9CC8EE"), deep: hex("3C6E9E"), highlight: hex("E6F3FF"), gradientEnd: hex("8FA0E8"))
+        case .valentines:
+            return ZallaTheme(id: id, primary: hex("E0457B"), bright: hex("FF6F9C"), deep: hex("A0234F"), highlight: hex("FFC1D3"), gradientEnd: hex("C2185B"))
+        case .stPatricks:
+            return ZallaTheme(id: id, primary: hex("1FA64A"), bright: hex("3FCB6B"), deep: hex("0F6B2E"), highlight: hex("F2D16B"), gradientEnd: hex("2E8B57"))
+        case .easter:
+            return ZallaTheme(id: id, primary: hex("B79CF0"), bright: hex("CDB8FF"), deep: hex("7A60B8"), highlight: hex("FFF0A8"), gradientEnd: hex("8FD6C8"))
+        case .spring:
+            return ZallaTheme(id: id, primary: hex("6CC070"), bright: hex("8FDB8F"), deep: hex("3E8A45"), highlight: hex("FFD1E0"), gradientEnd: hex("E88AB0"))
+        case .memorialDay:
+            return ZallaTheme(id: id, primary: hex("3A5BA8"), bright: hex("5A7BC8"), deep: hex("1C2F5C"), highlight: hex("D23C3C"), gradientEnd: hex("B33A3A"))
+        case .summer:
+            return ZallaTheme(id: id, primary: hex("FFB020"), bright: hex("FFC94D"), deep: hex("C77A00"), highlight: hex("FFE38A"), gradientEnd: hex("FF6A4D"))
+        case .fourthOfJuly:
+            return ZallaTheme(id: id, primary: hex("D7263D"), bright: hex("F04A5E"), deep: hex("8F1626"), highlight: hex("FFFFFF"), gradientEnd: hex("2F5DCC"))
+        case .halloween:
+            return ZallaTheme(id: id, primary: hex("F07A1A"), bright: hex("FF9A3D"), deep: hex("A8480A"), highlight: hex("B26BFF"), gradientEnd: hex("8E3FD6"))
+        case .harvest:
+            return ZallaTheme(id: id, primary: hex("C8642A"), bright: hex("E0853F"), deep: hex("8A3D17"), highlight: hex("F2C14E"), gradientEnd: hex("A6451F"))
+        case .christmas:
+            return ZallaTheme(id: id, primary: hex("C8102E"), bright: hex("E8394F"), deep: hex("7F0A1C"), highlight: hex("F4D58D"), gradientEnd: hex("1E7B45"))
         }
     }
 
@@ -312,6 +426,23 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
     case neonCity = "NeonCity"
     case arctic = "Arctic"
     case cherryBlossom = "CherryBlossom"
+    case northwoods = "Northwoods"
+    case lakeSuperior = "LakeSuperior"
+    case midnightEmber = "MidnightEmber"
+    case aurora = "Aurora"
+    case oledVoid = "OLEDVoid"
+    case newYear = "NewYear"
+    case winter = "Winter"
+    case valentines = "Valentines"
+    case stPatricks = "StPatricks"
+    case easter = "Easter"
+    case spring = "Spring"
+    case memorialDay = "MemorialDay"
+    case summer = "Summer"
+    case fourthOfJuly = "FourthOfJuly"
+    case halloween = "Halloween"
+    case harvest = "Harvest"
+    case christmas = "Christmas"
 
     var id: String { rawValue }
 
@@ -322,6 +453,15 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
         case .arcade: return "Retro Arcade"
         case .neonCity: return "Neon City"
         case .cherryBlossom: return "Cherry Blossom"
+        case .lakeSuperior: return "Lake Superior"
+        case .midnightEmber: return "Midnight Ember"
+        case .oledVoid: return "OLED Void"
+        case .newYear: return "New Year's"
+        case .valentines: return "Valentine's Day"
+        case .stPatricks: return "Saint Patrick's Day"
+        case .memorialDay: return "Memorial Day"
+        case .fourthOfJuly: return "Fourth of July"
+        case .harvest: return "Fall Harvest"
         default: return rawValue
         }
     }
@@ -330,6 +470,7 @@ enum AppIconPreference: String, CaseIterable, Identifiable {
     var requiresUnlock: Bool {
         switch self {
         case .jungle, .volcano, .deepOcean, .arcade, .neonCity, .arctic, .cherryBlossom: return true
+        case .northwoods, .lakeSuperior, .midnightEmber, .aurora, .oledVoid: return true
         default: return false
         }
     }

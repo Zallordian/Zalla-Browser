@@ -58,7 +58,7 @@ final class QuickThemeTests: XCTestCase {
     }
 
     func testTheFeaturedSwatchGridHasElevenThemes() {
-        XCTAssertEqual(ZallaThemeID.featured.count, 11)
+        XCTAssertEqual(ZallaThemeID.featured.count, 16)
         XCTAssertEqual(Set(ZallaThemeID.featured).count, 11, "No swatch is listed twice")
         XCTAssertEqual(ZallaThemeID.featured.suffix(3), [.neonCity, .arctic, .cherryBlossom])
         XCTAssertTrue(Set(ZallaThemeID.featured).isDisjoint(with: ZallaThemeID.secondary))
