@@ -1,5 +1,6 @@
 import XCTest
 import PDFKit
+import UIKit
 @testable import Zalla
 
 /// Build 48: Edit PDF gating, naming, and the saved signature.
