@@ -480,3 +480,97 @@ struct PDFEditorView: View {
         .background(.bar)
     }
 }
+
+/// Build 49: the private temporary copy used when Edit PDF is tapped on a PDF in a tab.
+enum PDFTabCopy {
+    static func looksLikePDF(_ data: Data) -> Bool {
+        data.count > 4 && data.prefix(1024).range(of: Data("%PDF".utf8)) != nil
+    }
+
+    static var folder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("TabPDF", isDirectory: true) }
+
+    static func safeName(_ name: String) -> String {
+        let cleaned = name.components(separatedBy: CharacterSet(charactersIn: "/\\:?%*|\"<>")).joined()
+        let base = cleaned.isEmpty ? "Document" : cleaned
+        return base.lowercased().hasSuffix(".pdf") ? base : base + ".pdf"
+    }
+
+    static func write(_ data: Data, name: String) -> URL? {
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let target = folder.appendingPathComponent(safeName(name))
+        do {
+            try data.write(to: target, options: [.atomic, .completeFileProtection])
+            return target
+        } catch {
+            return nil
+        }
+    }
+}
+
+/// Build 49: Download and Edit PDF, floating over a PDF shown in a tab.
+struct PDFTabActions: View {
+    @ObservedObject var browser: BrowserStore
+    @ObservedObject var tab: BrowserTab
+    @ObservedObject private var unlock = ZallaUnlock.shared
+    @State private var editing: PDFDocumentItem?
+    @State private var showUnlock = false
+    @State private var working = false
+    @State private var failed = false
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if let notice = tab.downloadNotice {
+                Text(notice)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .transition(.opacity)
+            }
+            if tab.isShowingPDF {
+                HStack(spacing: 10) {
+                    Button {
+                        browser.downloadPage(in: tab)
+                    } label: {
+                        Label("Download", systemImage: "arrow.down.circle")
+                    }
+                    Button {
+                        edit()
+                    } label: {
+                        if working {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Label("Edit PDF", systemImage: unlock.isUnlocked ? "pencil.tip.crop.circle" : "lock.fill")
+                        }
+                    }
+                    .disabled(working)
+                    .accessibilityLabel(unlock.isUnlocked ? "Edit PDF" : "Edit PDF, needs Zalla Unlock")
+                }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.bordered)
+                .padding(6)
+                .background(.regularMaterial, in: Capsule())
+            }
+        }
+        .sheet(isPresented: $showUnlock) { ZallaUnlockSheet() }
+        .fullScreenCover(item: $editing) { item in PDFEditorView(url: item.url) }
+        .alert("Couldn't open this PDF for editing", isPresented: $failed) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Try Download, then Edit PDF from Downloads.")
+        }
+    }
+
+    @MainActor
+    private func edit() {
+        guard PDFEditorGate.action(unlocked: unlock.isUnlocked) == .edit else {
+            showUnlock = true
+            return
+        }
+        working = true
+        Task {
+            let copy = await tab.fetchPDFCopy()
+            working = false
+            if let copy { editing = PDFDocumentItem(url: copy) } else { failed = true }
+        }
+    }
+}

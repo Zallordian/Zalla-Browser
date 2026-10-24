@@ -409,6 +409,11 @@ private struct TabContent: View {
             .motion(.fade, value: tab.isPickingElement)
             .zIndex(5)
 
+            PDFTabActions(browser: browser, tab: tab)
+                .padding(.top, topChromeHeight + 8)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .zIndex(5)
+
             ThemeTransitionOverlay(
                 plan: ThemePacks.activeTransition(
                     themeID: themeID,

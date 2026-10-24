@@ -755,6 +755,20 @@ final class BrowserStore: ObservableObject {
 
     /// Build 40: starts a failed download again from its original address, in a tab of the same kind (private or not),
     /// so it keeps that tab's cookies and proxy. The old entry is replaced by the new one.
+    /// Build 49: the Download button over a PDF in a tab.
+    func downloadPage(in tab: BrowserTab) {
+        guard let url = tab.webView.url else { return }
+        tab.webView.startDownload(using: URLRequest(url: url)) { [weak self, weak tab] download in
+            MainActor.assumeIsolated {
+                guard let self, let tab else { return }
+                let response = URLResponse(url: url, mimeType: "application/pdf", expectedContentLength: -1, textEncodingName: nil)
+                self.beginDownload(tab: tab, download: download, response: response, sourceURL: url)
+                tab.downloadNotice = "Saved to Downloads"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak tab] in tab?.downloadNotice = nil }
+            }
+        }
+    }
+
     func retryDownload(_ record: DownloadRecord) {
         guard DownloadsStore.canRetry(record) else { return }
         let tab: BrowserTab
@@ -927,6 +941,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         didSet { loadProgress.update(progress) }
     }
     @Published var isLoading = false
+    /// Build 49: the tab is showing a PDF, so Download and Edit PDF appear over it.
+    @Published var isShowingPDF = false
+    @Published var downloadNotice: String?
+    private var lastResponseWasPDF = false
     @Published var canGoBack = false
     @Published var canGoForward = false
     @Published var hasPage = false
@@ -1117,6 +1135,30 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
                 forMainFrameOnly: spec.mainFrameOnly
             ))
         }
+    }
+
+    /// A navigation turned into a download. Clear the loading bar and say where the file went.
+    private func settleAfterDownload() {
+        refresh()
+        if !webView.isLoading, progress < 1 { progress = 0 }
+        if isLoading, !webView.isLoading { isLoading = false }
+        endPullRefresh()
+        downloadNotice = "Saved to Downloads"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in self?.downloadNotice = nil }
+    }
+
+    /// Build 49: a private copy of the PDF in this tab for the editor. Uses the tab's own cookies, so signed in
+    /// PDFs work, and stays on the device. Returns nil if it isn't really a PDF.
+    func fetchPDFCopy() async -> URL? {
+        guard let pdfURL = webView.url, ["http", "https"].contains(pdfURL.scheme?.lowercased() ?? "") else { return nil }
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        let session = ShieldRuntime.pageRequestSession(cookies: cookies)
+        defer { session.finishTasksAndInvalidate() }
+        var request = URLRequest(url: pdfURL)
+        request.timeoutInterval = 30
+        guard let result = try? await session.data(for: request), PDFTabCopy.looksLikePDF(result.0) else { return nil }
+        let data = result.0
+        return PDFTabCopy.write(data, name: pdfURL.lastPathComponent)
     }
 
     private func refresh() {
@@ -1724,6 +1766,8 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        isShowingPDF = lastResponseWasPDF || webView.url?.pathExtension.lowercased() == "pdf"
+        lastResponseWasPDF = false
         // Count an upgrade only once the secure page has actually loaded, never when it was merely attempted.
         if let upgraded = pendingHTTPSUpgrade, !isPrivate,
            webView.url?.scheme?.lowercased() == "https",
@@ -1969,10 +2013,19 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
                  decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         let response = navigationResponse.response
+        if navigationResponse.isForMainFrame { lastResponseWasPDF = false }
+        if DownloadsStore.isInlinePDF(response: response) {
+            // Build 49: WebKit draws PDFs itself. Show it in the tab, with Download and Edit PDF on top.
+            if navigationResponse.isForMainFrame { lastResponseWasPDF = true }
+            decisionHandler(.allow)
+            return
+        }
         if navigationResponse.canShowMIMEType == false || DownloadsStore.isLikelyDownload(response: response) {
             pendingDownloadResponse = response
             pendingDownloadURL = response.url ?? url
             decisionHandler(.download)
+            // The page stays as it was, so make sure the loading bar doesn't hang on a load that became a download.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.settleAfterDownload() }
             return
         }
         decisionHandler(.allow)

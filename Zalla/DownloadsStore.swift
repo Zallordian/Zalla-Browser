@@ -181,6 +181,22 @@ enum DownloadsStore {
         }
     }
 
+    /// Build 49: a PDF the site serves normally (no "attachment" header) opens in the tab, like Safari.
+    /// Before this, every PDF was turned into a silent download, so tapping a PDF link looked like it loaded forever.
+    static func isInlinePDF(response: URLResponse) -> Bool {
+        if let http = response as? HTTPURLResponse,
+           let disposition = http.value(forHTTPHeaderField: "Content-Disposition")?.lowercased(),
+           disposition.contains("attachment") {
+            return false
+        }
+        if let scheme = response.url?.scheme?.lowercased(), scheme != "http", scheme != "https" { return false }
+        let mime = response.mimeType?.lowercased() ?? ""
+        if mime == "application/pdf" || mime == "application/x-pdf" { return true }
+        // Some servers label PDFs as generic binary. Trust the .pdf path then.
+        let generic = mime.isEmpty || mime == "application/octet-stream" || mime == "binary/octet-stream"
+        return generic && (response.url?.pathExtension.lowercased() == "pdf")
+    }
+
     /// Heuristic for responses that should become downloads rather than inline navigation.
     static func isLikelyDownload(response: URLResponse) -> Bool {
         if let http = response as? HTTPURLResponse {

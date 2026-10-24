@@ -2,6 +2,12 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 49: PDFs Open in the Tab
+- Tapping a PDF link now opens the PDF right in the tab, like Safari. Before, Zalla quietly saved every PDF to Downloads and left the page looking like it was still loading
+- A PDF in a tab has Download and Edit PDF buttons at the top. Edit PDF is part of Zalla Unlock and shows a lock without it
+- Files a site marks as downloads still go to Downloads, and you now see "Saved to Downloads" when that happens
+- The loading bar clears whenever a link turns into a download
+
 ## Build 48: Seasonal Refresh Flair
 - Each seasonal theme now has its own short refresh animation, played when you pull to refresh or pick the theme: snowfall for Winter and Christmas, bats for Halloween, drifting leaves for Fall Harvest, small fireworks for Fourth of July and New Year's, floating hearts for Valentine's Day, shamrocks for Saint Patrick's Day, petals for Spring and Easter, a warm sun shimmer for Summer, and quiet stars for Memorial Day
 - They're free like the seasonal themes, play only while that theme is on, and follow the Theme transitions switch and speed
