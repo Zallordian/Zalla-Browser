@@ -51,7 +51,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
     // Display
     case appearance, themeAndAccent, appIcon, newTabPage, pageZoom
     // Toolbar and Tabs
-    case addressBar, toolbarStyle, customizeToolbar, customizeActions, immersive, statusBarColor
+    case addressBar, barLayout, toolbarStyle, customizeToolbar, customizeActions, immersive, statusBarColor
     case pageUnderStatusBar, collapseToolbar, sleepTabs, edgeSwipes, pullToRefresh
     // Tools
     case downloads, networkSpeed, widgets, exportBookmarks, howTo
@@ -67,7 +67,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .searchEngine, .location, .websiteLocation, .httpsOnly, .cookieBanners, .appBanners, .iconQuickActions: return .general
         case .privateTabLock, .autoClear, .privacyCover, .burnEffect, .clearData, .resetApp: return .privacy
         case .appearance, .themeAndAccent, .appIcon, .newTabPage, .pageZoom: return .display
-        case .addressBar, .toolbarStyle, .customizeToolbar, .customizeActions, .immersive, .statusBarColor,
+        case .addressBar, .barLayout, .toolbarStyle, .customizeToolbar, .customizeActions, .immersive, .statusBarColor,
              .pageUnderStatusBar, .collapseToolbar, .sleepTabs, .edgeSwipes, .pullToRefresh: return .toolbarAndTabs
         case .downloads, .networkSpeed, .widgets, .exportBookmarks, .howTo: return .tools
         case .supportZalla, .privacyPolicy, .support, .acknowledgements, .about: return .support
@@ -104,6 +104,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .newTabPage: return "New Tab Page"
         case .pageZoom: return "Page Zoom"
         case .addressBar: return "Address Bar"
+        case .barLayout: return "Bar Layout"
         case .toolbarStyle: return "Toolbar Style"
         case .customizeToolbar: return "Customize Toolbar"
         case .customizeActions: return "Customize My Actions"
@@ -157,6 +158,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .newTabPage: return "rectangle.on.rectangle"
         case .pageZoom: return "textformat.size"
         case .addressBar: return "rectangle.bottomhalf.inset.filled"
+        case .barLayout: return "rectangle.bottomthird.inset.filled"
         case .toolbarStyle: return "menubar.rectangle"
         case .customizeToolbar: return "slider.horizontal.3"
         case .customizeActions: return "square.grid.2x2.fill"
@@ -186,7 +188,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
              .immersive, .statusBarColor, .pageUnderStatusBar, .collapseToolbar, .sleepTabs, .edgeSwipes, .pullToRefresh,
              .videoSaver:
             return .toggle
-        case .searchEngine, .websiteLocation, .appearance, .addressBar, .toolbarStyle:
+        case .searchEngine, .websiteLocation, .appearance, .addressBar, .barLayout, .toolbarStyle:
             return .picker
         case .importBookmarks, .exportBookmarks, .zallaUnlock:
             return .action
@@ -249,6 +251,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
                                   "homeShowSlider", "homeLogoStyle", "homeWelcomeMode", "homeUserName", "newTabBackground"]
         case .pageZoom: return ["pageZoomByHost"]
         case .addressBar: return ["addressBarPlacement"]
+        case .barLayout: return ["bottomBarLayout"]
         case .toolbarStyle: return ["toolbarStyle"]
         case .customizeToolbar: return ["toolbarLayout", "searchBarWidth"]
         case .customizeActions: return ["menuTopRow"]

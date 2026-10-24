@@ -2,6 +2,14 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 42: Safari Style Bar
+- New default bottom bar in the style of Safari on iOS 26: slim (48 points), floating over the page with no band or separator
+- Back, Forward (faded when there is nothing to go forward to), a pill with the bold page title over the lock and domain, reload inside the pill, Tabs, and More
+- Closer to the screen edges with even spacing, and every change animates with one spring
+- Loading shows as a thin line inside the pill, so the bar never shifts while a page loads
+- Settings, Toolbar and Tabs, Bar Layout: Safari style or Classic. Classic brings back the earlier bars
+- Customize Toolbar edits the Safari style buttons, and the accent color still tints Back and Forward
+
 ## Build 41: New Menu and Settings
 - The Menu opens as a card that follows Light and Dark mode, with your real privacy numbers at the top
 - My actions grid with Bookmark, History, Burn It All, and New Private Tab by default, up to 8, editable

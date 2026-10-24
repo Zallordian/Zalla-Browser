@@ -140,6 +140,7 @@ private struct TabContent: View {
     @AppStorage(ToolbarLayout.storageKey) private var toolbarLayoutData = Data()
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidthValue = SearchBarWidth.full
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
+    @AppStorage(BarLayout.storageKey) private var barLayoutRaw = BarLayout.defaultLayout.rawValue
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBarOn = ScrollChrome.underStatusBarDefault
     @AppStorage(ScrollChrome.collapseKey) private var collapseOnScrollOn = ScrollChrome.collapseDefault
@@ -252,9 +253,9 @@ private struct TabContent: View {
     private var bottomBarPadding: CGFloat {
         ScrollChrome.bottomPadding(
             collapsed: showsCollapsedToolbar,
-            immersive: immersiveLayout,
+            immersive: bottomBarFloats,
             homeIndicatorInset: homeIndicatorInset
-        )
+        ) + (usesSafariBar && !showsCollapsedToolbar ? SafariBarMetrics.bottomGap : 0)
     }
     private func setToolbarCollapsed(_ collapsed: Bool) {
         guard collapsed != toolbarCollapsed else { return }
@@ -300,7 +301,7 @@ private struct TabContent: View {
         ImmersiveLayout.bottomContentInset(
             barHeight: bottomChromeHeight,
             homeIndicatorInset: homeIndicatorInset,
-            immersive: immersiveLayout
+            immersive: bottomBarFloats
         )
     }
 
@@ -620,11 +621,11 @@ private struct TabContent: View {
             .padding(.bottom, bottomBarPadding)
             // Solid bars own their whole band. Floating controls only catch touches on themselves,
             // so the page stays live in the gaps between them.
-            .solidHitArea(!immersiveLayout)
+            .solidHitArea(!bottomBarFloats)
             .background(ChromeHeightReader(key: BottomChromeHeightKey.self))
         }
         // Immersive: the bar group runs to the physical bottom edge (the keyboard still lifts it).
-        .ignoresSafeArea(.container, edges: immersiveLayout ? .bottom : [])
+        .ignoresSafeArea(.container, edges: bottomBarFloats ? .bottom : [])
         .onPreferenceChange(TopChromeHeightKey.self) { topChromeHeight = $0 }
         .onPreferenceChange(BottomChromeHeightKey.self) { height in
             // While the bar is collapsed the page keeps the full bar's inset, so the end of the page never
@@ -788,6 +789,15 @@ private struct TabContent: View {
 
     @ViewBuilder
     private var bottomChrome: some View {
+        if usesSafariBar {
+            safariToolbar
+        } else {
+            legacyBottomChrome
+        }
+    }
+
+    @ViewBuilder
+    private var legacyBottomChrome: some View {
         switch toolbarStyle {
         case .classic:
             classicToolbar
@@ -1514,6 +1524,167 @@ private struct TabContent: View {
         beginCompactAddressEditing()
     }
 
+    // MARK: - Build 42 Safari style bar
+
+    /// True when the bottom bar is drawn the Safari way: slim, floating, no band behind it.
+    private var usesSafariBar: Bool {
+        BarLayout.usesSafariBar(layout: BarLayout.stored(barLayoutRaw), style: toolbarStyle, placement: addressBarPlacement)
+    }
+    /// The bottom bar floats over the page in the immersive layout and always in Safari style.
+    private var bottomBarFloats: Bool {
+        immersiveLayout || usesSafariBar
+    }
+    private var safariSpring: Animation {
+        reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: SafariBarMetrics.springResponse, dampingFraction: SafariBarMetrics.springDamping)
+    }
+
+    /// Back, Forward, the pill, Tabs, More, in the order the toolbar editor keeps (the Compact list).
+    /// Every control has a fixed size, so scrolling only changes opacity, scale, and the pill's width in one spring.
+    private var safariToolbar: some View {
+        HStack(spacing: showsCollapsedToolbar ? 0 : SafariBarMetrics.spacing) {
+            if !isEditingCompactAddress, !toolbarLayout.compactLeading.isEmpty {
+                HStack(spacing: SafariBarMetrics.spacing) {
+                    ForEach(toolbarLayout.compactLeading) { kind in
+                        safariItem(kind)
+                    }
+                }
+                .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
+                .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+
+            safariPill
+                .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
+                .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
+
+            if !isEditingCompactAddress, !toolbarLayout.compactTrailing.isEmpty {
+                HStack(spacing: SafariBarMetrics.spacing) {
+                    ForEach(toolbarLayout.compactTrailing) { kind in
+                        safariItem(kind)
+                    }
+                }
+                .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .padding(.horizontal, SafariBarMetrics.edgeMargin)
+        .animation(safariSpring, value: isEditingCompactAddress)
+        .animation(safariSpring, value: tab.canGoBack)
+        .animation(safariSpring, value: tab.canGoForward)
+    }
+
+    @ViewBuilder
+    private func safariItem(_ kind: ToolbarItemKind) -> some View {
+        switch kind {
+        case .back:
+            compactHoldCircle(icon: "chevron.left", enabled: tab.canGoBack, label: "Back", kind: .back,
+                              size: SafariBarMetrics.buttonSize) { tab.goBack() }
+        case .forward:
+            compactHoldCircle(icon: "chevron.right", enabled: tab.canGoForward, label: "Forward", kind: .forward,
+                              size: SafariBarMetrics.buttonSize) { tab.goForward() }
+        case .tabs:
+            compactCircle(icon: "square.on.square", enabled: true, label: "Tabs, \(browser.tabs.count) open",
+                          size: SafariBarMetrics.buttonSize) { sheet = .tabs }
+                .contextMenu { tabsContextMenu }
+        case .menu:
+            compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu", size: SafariBarMetrics.buttonSize) {
+                sheet = .menu
+            }
+        case .share:
+            compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page",
+                          size: SafariBarMetrics.buttonSize) { showShare = true }
+        default:
+            compactCircle(icon: toolbarSymbol(kind), enabled: isToolbarItemEnabled(kind), label: toolbarTitle(kind),
+                          size: SafariBarMetrics.buttonSize) { performToolbarItem(kind) }
+        }
+    }
+
+    /// Bold page title on top, lock and domain below in smaller gray text, reload on the right.
+    private var safariPill: some View {
+        HStack(spacing: showsCollapsedToolbar ? 0 : 8) {
+            if isEditingCompactAddress {
+                Image(systemName: tab.isPrivate ? "eye.slash" : "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                TextField("Search or enter a website", text: $address)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.webSearch)
+                    .submitLabel(.go)
+                    .focused($addressFocused)
+                    .onSubmit { submitAddress() }
+                    .accessibilityLabel("Search or website address")
+                    .onAppear {
+                        addressFocused = true
+                        DispatchQueue.main.async {
+                            UIResponder.currentFirstResponder()?.selectAll(nil)
+                        }
+                    }
+                Button {
+                    cancelCompactAddressEditing()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Cancel address editing")
+                .frame(minWidth: 44, minHeight: 44)
+            } else {
+                if !toolbarLayout.compact.contains(.tabs) {
+                    tabsButtonCompact
+                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
+                }
+                Spacer(minLength: 0)
+                    .frame(maxWidth: showsCollapsedToolbar ? .infinity : 0)
+                VStack(alignment: .center, spacing: 0) {
+                    Text(showsCollapsedToolbar ? AddressDisplay.collapsedLabel(url: tab.url, hasPage: tab.hasPage) : compactTitle)
+                        .font(showsCollapsedToolbar ? .footnote.weight(.semibold) : .subheadline.weight(.bold))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                        .contentTransition(.opacity)
+                    if tab.hasPage {
+                        compactSubtitle
+                            .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: false))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                Spacer(minLength: 0)
+                    .frame(maxWidth: showsCollapsedToolbar ? .infinity : 0)
+                if tab.hasPage {
+                    compactReloadButton
+                        .frame(width: 28, height: 28)
+                        .modifier(CollapsingControls(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion, zeroWidth: true))
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: showsCollapsedToolbar ? SafariBarMetrics.collapsedHeight : SafariBarMetrics.height)
+        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        .overlay(alignment: .bottom) {
+            // Loading draws inside the pill, so the bar never grows or shifts while a page loads.
+            if tab.isLoading, !isEditingCompactAddress {
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(theme.primary)
+                        .frame(width: max(geo.size.width * CGFloat(tab.progress), 6), height: SafariBarMetrics.progressHeight)
+                }
+                .frame(height: SafariBarMetrics.progressHeight)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 3)
+                .allowsHitTesting(false)
+                .transition(.opacity)
+            }
+        }
+        .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        .contentShape(Capsule())
+        .modifier(CompactPillInteractionModifier(
+            isEditing: isEditingCompactAddress,
+            onBeginEditing: tapCompactAddress,
+            onCancelEditing: cancelCompactAddressEditing
+        ))
+    }
+
     private var compactToolbar: some View {
         VStack(spacing: 8) {
             if tab.isLoading {
@@ -1725,11 +1896,11 @@ private struct TabContent: View {
         isEditingClassicAddress = false
     }
 
-    private func compactCircle(icon: String, enabled: Bool, label: String, action: @escaping () -> Void) -> some View {
+    private func compactCircle(icon: String, enabled: Bool, label: String, size: CGFloat? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(barIconFont)
-                .frame(width: barSize(44), height: barSize(44))
+                .frame(width: size ?? barSize(44), height: size ?? barSize(44))
                 .background(.ultraThinMaterial, in: Circle())
                 .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
                 .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
@@ -1739,12 +1910,12 @@ private struct TabContent: View {
         .accessibilityLabel(label)
     }
 
-    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, action: @escaping () -> Void) -> some View {
+    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, size: CGFloat? = nil, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .font(barIconFont)
             // Accent when there is somewhere to go, like the other bar buttons; dim when not.
             .foregroundStyle(enabled ? theme.primary : Color.primary)
-            .frame(width: barSize(48), height: barSize(48))
+            .frame(width: size ?? barSize(48), height: size ?? barSize(48))
             .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
             .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
@@ -3192,6 +3363,7 @@ private struct SettingsView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
+    @AppStorage(BarLayout.storageKey) private var barLayoutRaw = BarLayout.defaultLayout.rawValue
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBar = ScrollChrome.underStatusBarDefault
     @AppStorage(ScrollChrome.collapseKey) private var collapseToolbarOnScroll = ScrollChrome.collapseDefault
@@ -3440,6 +3612,11 @@ private struct SettingsView: View {
                 isDark: previewIsDark,
                 theme: theme
             )
+            Picker(selection: $barLayoutRaw) {
+                ForEach(BarLayout.allCases) { layout in
+                    Text(layout.title).tag(layout.rawValue)
+                }
+            } label: { label(.barLayout) }
             Picker(selection: $toolbarStyleRaw) {
                 ForEach(ToolbarStyle.allCases) { style in
                     Text(style.rawValue).tag(style.rawValue)
@@ -3465,7 +3642,7 @@ private struct SettingsView: View {
         } header: {
             Text(SettingsGroup.toolbarAndTabs.header ?? "")
         } footer: {
-            Text("Classic toolbar with a bottom address bar is the default. Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bottom bar to a small address pill as you scroll down. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
+            Text(BarLayout.settingsFooter + " Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bottom bar to a small address pill as you scroll down. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
         }
     }
 

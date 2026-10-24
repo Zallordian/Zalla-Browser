@@ -8,6 +8,7 @@ struct ToolbarEditorView: View {
     @AppStorage(ToolbarStyle.storageKey) private var toolbarStyleRaw = ToolbarStyle.classic.rawValue
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage("appearance") private var appearance = "System"
+    @AppStorage(BarLayout.storageKey) private var barLayoutRaw = BarLayout.defaultLayout.rawValue
     @AppStorage(SearchBarWidth.storageKey) private var searchBarWidth = SearchBarWidth.full
     @Environment(\.colorScheme) private var colorScheme
     @State private var target: ToolbarEditTarget = .classic
@@ -158,7 +159,11 @@ struct ToolbarEditorView: View {
         guard !didLoad else { return }
         didLoad = true
         layout = ToolbarLayout.decode(layoutData)
-        target = ToolbarEditTarget.forStyle(ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic)
+        target = BarLayout.editTarget(
+            layout: BarLayout.stored(barLayoutRaw),
+            style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+            placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
+        )
     }
 
     private func update(_ change: (inout ToolbarLayout) -> Void) {
