@@ -3012,6 +3012,7 @@ private struct TabPreviewCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
+                    FaviconView(host: tab.url?.host, size: 16, isPrivate: tab.isPrivate)
                     Text(tab.title).font(.subheadline.weight(.semibold)).lineLimit(1)
                     if tab.isPrivate {
                         Text("Private")
@@ -3144,9 +3145,12 @@ private struct LibraryView: View {
                     browser.selected?.load(page.url)
                     dismiss()
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(page.title).lineLimit(1)
-                        Text(page.url.absoluteString).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    HStack(spacing: 12) {
+                        FaviconView(host: page.url.host, size: 24)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(page.title).lineLimit(1)
+                            Text(page.url.absoluteString).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                 }
                 .swipeActions(edge: .trailing, allowsFullSwipe: !history) {

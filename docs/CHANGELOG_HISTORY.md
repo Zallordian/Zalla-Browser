@@ -10,6 +10,9 @@ The in-app What's new shows only the public 1.0 entry. This is the full TestFlig
 - Everything happens on your iPhone. Nothing is uploaded, and your original file stays as it was
 - You can save one signature for next time. It stays on this device, isn't backed up, and you can delete it from the signature screen. Burn It All keeps it, like your bookmarks and downloads, and Reset the App deletes it
 - Without Zalla Unlock you can still open and read PDFs, and Edit PDF shows a lock
+- Site icons: tabs, bookmarks, and history now show each site's own icon. Zalla reads the icons the page itself lists, picks the sharpest one, and falls back to the site's favicon.ico. Icons come straight from the site, never from a third party service, and a small copy is kept on this iPhone
+- Sites Zalla hasn't visited yet get a letter tile in your accent color instead of a plain globe
+- Private tabs don't fetch or keep icons, and Burn It All and Clear Browsing Data clear them
 
 ## Build 47: Seasonal Themes and New Pro Themes
 - Free seasonal themes show up in Theme and Accent under Seasonal, each only during its season, with a small "Available until" date: New Year's (December 26 to January 7), Winter (December through February), Valentine's Day (February 1 to 15), Saint Patrick's Day (March 1 to 18), Easter (two weeks before Easter Sunday through the Monday after), Spring (March 19 to May 31), Memorial Day (the nine days before Memorial Day and the day itself), Summer (June through August), Fourth of July (June 24 to July 7), Halloween (October 1 to November 1), Fall Harvest (October and November, through Thanksgiving), and Christmas (December 1 to 26)

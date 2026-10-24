@@ -516,6 +516,7 @@ final class BrowserStore: ObservableObject {
     /// The old web views are torn down before the new tab is made, so no page, process, or in-memory list survives.
     func burnEverything() async {
         PageSnapshotCache.shared.removeAll()
+        FaviconStore.shared.removeAll()
         guard !isBurning else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: BurnEffectPlan.pendingKey)
@@ -588,6 +589,7 @@ final class BrowserStore: ObservableObject {
 
     func clearBrowsingData() async {
         PageSnapshotCache.shared.removeAll()
+        FaviconStore.shared.removeAll()
         clearingData = true
         sessionSavingEnabled = false
         clearSavedSession()
@@ -645,6 +647,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: "themeID")
         defaults.removeObject(forKey: "appIconPreference")
         SignatureStore.shared.delete()
+        FaviconStore.shared.removeAll()
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.removeObject(forKey: AddressBarPlacement.storageKey)
         defaults.removeObject(forKey: BarLayout.storageKey)
@@ -1765,6 +1768,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         if !isPrivate { onSessionChange?() }
         guard !isPrivate, !isReaderActive, let url, ["http", "https"].contains(url.scheme ?? "") else { return }
         onVisit?(SavedPage(title: title, url: url))
+        // Build 48: read the page's own icon links. Regular tabs only.
+        let pageURL = url
+        webView.evaluateJavaScript(FaviconPicker.script) { result, _ in
+            let raw = result as? [[String: Any]] ?? []
+            let links = raw.map { $0.compactMapValues { $0 as? String } }
+            Task { @MainActor in FaviconStore.shared.update(pageURL: pageURL, links: links) }
+        }
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
