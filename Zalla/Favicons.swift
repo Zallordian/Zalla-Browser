@@ -97,7 +97,7 @@ enum FaviconPicker {
               let icons = object["icons"] as? [[String: Any]] else { return [] }
         return icons.compactMap { icon in
             guard let src = icon["src"] as? String else { return nil }
-            var link = ["href": src, "rel": "manifest"]
+            var link = ["href": src, "rel": "manifest-icon"]
             if let sizes = icon["sizes"] as? String { link["sizes"] = sizes }
             if let type = icon["type"] as? String { link["type"] = type }
             return link
@@ -195,7 +195,7 @@ final class FaviconStore: ObservableObject {
                     return l
                 }
             }
-            let iconLinks = all.filter { $0["rel"] != "manifest" || $0["sizes"] != nil || $0["type"] != nil }
+            let iconLinks = all.filter { $0["rel"] != "manifest" }
             let order = FaviconPicker.ordered(FaviconPicker.candidates(from: iconLinks, pageURL: pageURL), pageURL: pageURL)
             for url in order {
                 guard let data = await download(url), let image = Self.decode(data) else { continue }
