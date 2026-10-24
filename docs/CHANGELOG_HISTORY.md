@@ -2,6 +2,16 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 44: Smoother Browsing
+- Scrolling down shrinks the Safari style bar to just the site name; tap it or scroll up to bring it back, in the same spring
+- Swipe the address bar left or right to slide to the next or previous tab
+- Going back and switching tabs show the page's last picture at once, so there is no blank flash. Pictures stay in memory, are never kept for private tabs, and are cleared by Burn It All
+- A light tap on tab switch, pull to refresh, and when Back first appears, with a Haptics switch
+- Quiet toolbar colors: gray icons in the Safari style bar, with the accent only when pressed and on the loading line
+- The page title fades from one page to the next
+- Settings sections keep rarely used rows behind More options
+- Every new behavior has its own switch in Toolbar and Tabs, More options. Classic is unchanged
+
 ## Build 43: Cleaner Safari Style Bar
 - Back and Forward leave the bar when there is nowhere to go, like Safari, and the pill grows into their space
 - They come back with a fade and a small scale in the same spring. Reduce Motion gets a fade

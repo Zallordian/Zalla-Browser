@@ -53,6 +53,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
     // Toolbar and Tabs
     case addressBar, barLayout, toolbarStyle, customizeToolbar, customizeActions, immersive, statusBarColor
     case pageUnderStatusBar, collapseToolbar, sleepTabs, edgeSwipes, pullToRefresh
+    case pillSwipeTabs, pageSnapshots, browsingHaptics, quietAccent, titleCrossfade
     // Tools
     case downloads, networkSpeed, widgets, exportBookmarks, howTo
     // Support and About
@@ -68,7 +69,8 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .privateTabLock, .autoClear, .privacyCover, .burnEffect, .clearData, .resetApp: return .privacy
         case .appearance, .themeAndAccent, .appIcon, .newTabPage, .pageZoom: return .display
         case .addressBar, .barLayout, .toolbarStyle, .customizeToolbar, .customizeActions, .immersive, .statusBarColor,
-             .pageUnderStatusBar, .collapseToolbar, .sleepTabs, .edgeSwipes, .pullToRefresh: return .toolbarAndTabs
+             .pageUnderStatusBar, .collapseToolbar, .sleepTabs, .edgeSwipes, .pullToRefresh,
+             .pillSwipeTabs, .pageSnapshots, .browsingHaptics, .quietAccent, .titleCrossfade: return .toolbarAndTabs
         case .downloads, .networkSpeed, .widgets, .exportBookmarks, .howTo: return .tools
         case .supportZalla, .privacyPolicy, .support, .acknowledgements, .about: return .support
         }
@@ -115,6 +117,11 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .sleepTabs: return "Sleep Unused Tabs"
         case .edgeSwipes: return "Swipe From Edges to Go Back"
         case .pullToRefresh: return "Pull Down to Refresh"
+        case .pillSwipeTabs: return "Swipe the Address Bar to Change Tabs"
+        case .pageSnapshots: return "Instant Page Previews"
+        case .browsingHaptics: return "Haptics"
+        case .quietAccent: return "Quiet Toolbar Colors"
+        case .titleCrossfade: return "Fade Between Page Titles"
         case .downloads: return "Downloads"
         case .networkSpeed: return "Network Speed"
         case .widgets: return "Widgets"
@@ -169,6 +176,11 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .sleepTabs: return "moon.zzz"
         case .edgeSwipes: return "hand.draw"
         case .pullToRefresh: return "arrow.down.circle"
+        case .pillSwipeTabs: return "hand.draw.fill"
+        case .pageSnapshots: return "photo.on.rectangle"
+        case .browsingHaptics: return "iphone.radiowaves.left.and.right"
+        case .quietAccent: return "circle.dashed"
+        case .titleCrossfade: return "textformat"
         case .downloads: return "arrow.down.circle"
         case .networkSpeed: return "gauge.with.dots.needle.67percent"
         case .widgets: return "square.grid.2x2"
@@ -186,7 +198,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         switch self {
         case .httpsOnly, .cookieBanners, .appBanners, .iconQuickActions, .privateTabLock, .privacyCover, .burnEffect,
              .immersive, .statusBarColor, .pageUnderStatusBar, .collapseToolbar, .sleepTabs, .edgeSwipes, .pullToRefresh,
-             .videoSaver:
+             .videoSaver, .pillSwipeTabs, .pageSnapshots, .browsingHaptics, .quietAccent, .titleCrossfade:
             return .toggle
         case .searchEngine, .websiteLocation, .appearance, .addressBar, .barLayout, .toolbarStyle:
             return .picker
@@ -211,6 +223,9 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .privacyCover: return "Shows a plain Zalla screen in the background"
         case .resetApp: return "Bookmarks are kept"
         case .pageZoom: return "Saved per site"
+        case .pageSnapshots: return "Kept in memory, never for private tabs"
+        case .browsingHaptics: return "Tab switch, pull to refresh, and Back"
+        case .quietAccent: return "Gray icons, accent when pressed"
         default: return nil
         }
     }
@@ -262,11 +277,31 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .sleepTabs: return ["sleepUnusedTabs"]
         case .edgeSwipes: return ["swipeNavigation"]
         case .pullToRefresh: return ["pullToRefresh"]
+        case .pillSwipeTabs: return ["pillSwipeSwitchesTabs"]
+        case .pageSnapshots: return ["pageSnapshotPreviews"]
+        case .browsingHaptics: return ["browsingHaptics"]
+        case .quietAccent: return ["safariBarQuietAccent"]
+        case .titleCrossfade: return ["pillTitleCrossfade"]
         case .widgets, .addWidgets: return ["widgetsShareData", "searchKeyboardReady"]
         default: return []
         }
     }
 
     /// Every key the new layout covers.
+    static let moreOptionsTitle = "More options"
+
+    /// Build 44: rows tucked behind More options in their section.
+    var inMoreOptions: Bool {
+        switch self {
+        case .appBanners, .iconQuickActions, .privacyCover, .burnEffect, .pageZoom,
+             .statusBarColor, .pageUnderStatusBar, .sleepTabs, .edgeSwipes, .pullToRefresh,
+             .pillSwipeTabs, .pageSnapshots, .browsingHaptics, .quietAccent, .titleCrossfade,
+             .networkSpeed, .exportBookmarks:
+            return true
+        default:
+            return false
+        }
+    }
+
     static var coveredKeys: Set<String> { Set(allCases.flatMap(\.storageKeys)) }
 }

@@ -23,6 +23,8 @@ final class BrowserStore: ObservableObject {
         didSet {
             if let old = oldValue, old != selectedID {
                 tabs.first { $0.id == old }?.lastActiveAt = Date()
+                // Build 44: the tab's last picture covers the page until it draws, so switching never flashes blank.
+                selected?.showSwitchSnapshot()
             }
             selected?.lastActiveAt = Date()
             if !holdingRestoreForBlocker { selected?.restoreIfNeeded() }
@@ -31,6 +33,8 @@ final class BrowserStore: ObservableObject {
             scheduleSessionSave()
         }
     }
+    /// Build 44: where the next tab's page starts after a pill swipe, read once by the new tab's view.
+    var pendingSwipeEntryOffset: CGFloat?
     /// Tab groups (Zalla Unlock). Membership is stored on each tab and saved with the session.
     @Published private(set) var groups: [TabGroup] = TabGroupStore.load()
     /// True while private tabs are hidden behind Face ID. Starts locked when the lock is on.
@@ -511,6 +515,7 @@ final class BrowserStore: ObservableObject {
     /// if Zalla is closed halfway. Nothing is restored on the next launch.
     /// The old web views are torn down before the new tab is made, so no page, process, or in-memory list survives.
     func burnEverything() async {
+        PageSnapshotCache.shared.removeAll()
         guard !isBurning else { return }
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: BurnEffectPlan.pendingKey)
@@ -582,6 +587,7 @@ final class BrowserStore: ObservableObject {
     }
 
     func clearBrowsingData() async {
+        PageSnapshotCache.shared.removeAll()
         clearingData = true
         sessionSavingEnabled = false
         clearSavedSession()
@@ -610,6 +616,7 @@ final class BrowserStore: ObservableObject {
 
     /// Destructive reset used by Settings. Bookmarks are kept by default.
     func resetApp(keepingBookmarks: Bool = true) async {
+        PageSnapshotCache.shared.removeAll()
         clearingData = true
         sessionSavingEnabled = false
         clearSavedSession()
@@ -640,6 +647,7 @@ final class BrowserStore: ObservableObject {
         defaults.removeObject(forKey: ToolbarStyle.storageKey)
         defaults.removeObject(forKey: AddressBarPlacement.storageKey)
         defaults.removeObject(forKey: BarLayout.storageKey)
+        BrowsingPolish.allKeys.forEach { defaults.removeObject(forKey: $0) }
         defaults.removeObject(forKey: HTTPSOnly.storageKey)
         defaults.removeObject(forKey: ToolbarLayout.storageKey)
         defaults.removeObject(forKey: "useCustomAccent")
@@ -930,6 +938,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var pageError: FriendlyError?
     @Published var externalURL: URL?
     @Published var previewImage: UIImage?
+    /// Build 44: a picture shown over the page for a moment while going back or switching tabs.
+    @Published private(set) var transitionSnapshot: UIImage?
+    private var transitionSnapshotToken = 0
     @Published var isReaderActive = false
     @Published var readerAvailable = false
     /// Tab group this tab belongs to (Zalla Unlock). Never set on private tabs.
@@ -1153,7 +1164,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func goBack() {
         switch newTabHistory.backStep(webCanGoBack: webView.canGoBack, pageShown: hasPage) {
-        case .web: webView.goBack()
+        case .web:
+            showSnapshot(for: webView.backForwardList.backItem?.url)
+            webView.goBack()
         case .showNewTab: showNewTabPage(rewind: false)
         case .showPage, .none: break
         }
@@ -1161,7 +1174,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func goForward() {
         switch newTabHistory.forwardStep(webCanGoForward: webView.canGoForward) {
-        case .web: webView.goForward()
+        case .web:
+            showSnapshot(for: webView.backForwardList.forwardItem?.url)
+            webView.goForward()
         case .showPage: showParkedPage()
         case .showNewTab, .none: break
         }
@@ -1451,7 +1466,40 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func goToBackForwardItem(_ item: WKBackForwardListItem) {
         isReaderActive = false
         readerOriginalURL = nil
+        showSnapshot(for: item.url)
         webView.go(to: item)
+    }
+
+    // MARK: Build 44 snapshots
+
+    /// Covers the page with the cached picture of `url`, if there is one, until the page commits.
+    func showSnapshot(for url: URL?) {
+        guard !isPrivate, BrowsingPolish.snapshotsOn, let image = PageSnapshotCache.shared.image(for: url) else { return }
+        transitionSnapshot = image
+        clearTransitionSnapshot(after: 1.5)
+    }
+
+    /// Covers the page with this tab's last picture when it becomes the open tab. An awake tab clears it almost at
+    /// once; a sleeping or restoring tab keeps it until its page commits.
+    func showSwitchSnapshot() {
+        guard !isPrivate, BrowsingPolish.snapshotsOn, hasPage, !isReaderActive, let image = previewImage else { return }
+        transitionSnapshot = image
+        let waiting = isSleeping || pendingRestore != nil
+        clearTransitionSnapshot(after: waiting ? 2.0 : 0.15)
+    }
+
+    func clearTransitionSnapshot(after delay: Double = 0) {
+        transitionSnapshotToken += 1
+        let token = transitionSnapshotToken
+        guard delay > 0 else {
+            if transitionSnapshot != nil { transitionSnapshot = nil }
+            return
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard let self, self.transitionSnapshotToken == token else { return }
+            if self.transitionSnapshot != nil { self.transitionSnapshot = nil }
+        }
     }
 
     func goToHistoryListItem(_ item: HistoryListItem, direction: HoldRevealKind) {
@@ -1481,6 +1529,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         controller.removeAllUserScripts()
         webView.removeFromSuperview()
         previewImage = nil
+        transitionSnapshot = nil
     }
 
     /// Shows a dialog for this tab and remembers it, so closing the tab can answer it.
@@ -1524,7 +1573,9 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         config.rect = webView.bounds
         webView.takeSnapshot(with: config) { [weak self] image, _ in
             Task { @MainActor in
-                self?.previewImage = image
+                guard let self else { return }
+                self.previewImage = image
+                if let image { PageSnapshotCache.shared.store(image, for: self.url, isPrivate: self.isPrivate) }
             }
         }
     }
@@ -1680,6 +1731,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
         stripCount = 0
         applyStoredPageZoom()
         easePageIn()
+        if transitionSnapshot != nil { clearTransitionSnapshot(after: 0.12) }
         // A new page reports its own videos. Nothing from the last page carries over.
         if !videoCandidates.isEmpty { videoCandidates = [] }
         if videoProtected { videoProtected = false }
@@ -1715,6 +1767,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        clearTransitionSnapshot()
         endPullRefresh()
         if let original = pendingHTTPSUpgrade {
             if HTTPSOnly.isUpgradeFailure(error) {
@@ -1730,6 +1783,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        clearTransitionSnapshot()
         endPullRefresh()
         show(error)
     }
@@ -2186,7 +2240,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             pullRefreshControl?.endRefreshing()
             return
         }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        BrowsingHaptic.play(.pullToRefresh)
         pullRefreshPending = true
         reloadForUser()
         // A page that never reports back must not leave the spinner turning.

@@ -187,6 +187,13 @@ private struct TabContent: View {
     @State private var appliedStatusBarScheme: ColorScheme?
     /// True while the bottom toolbar is shrunk to the address pill because the page scrolled down (Build 35).
     @State private var toolbarCollapsed = false
+    /// Build 44: how far the page follows a swipe on the Safari style pill.
+    @State private var pageSwipeOffset: CGFloat = 0
+    @AppStorage(BrowsingPolish.pillSwipeKey) private var pillSwipeOn = BrowsingPolish.pillSwipeDefault
+    @AppStorage(BrowsingPolish.snapshotsKey) private var snapshotsOn = BrowsingPolish.snapshotsDefault
+    @AppStorage(BrowsingPolish.hapticsKey) private var hapticsOn = BrowsingPolish.hapticsDefault
+    @AppStorage(BrowsingPolish.quietAccentKey) private var quietAccentOn = BrowsingPolish.quietAccentDefault
+    @AppStorage(BrowsingPolish.titleCrossfadeKey) private var titleCrossfadeOn = BrowsingPolish.titleCrossfadeDefault
 
     private var theme: ZallaTheme {
         ZallaTheme.resolved(themeID: themeID, useCustom: useCustomAccent, customHex: customAccentHex)
@@ -262,7 +269,9 @@ private struct TabContent: View {
         // Build 36: one spring for the whole morph. Reduce Motion gets a plain fade (no scaling, see the modifiers).
         let animation: Animation = reduceMotion
             ? .easeInOut(duration: 0.2)
-            : .spring(response: 0.35, dampingFraction: 0.86)
+            : (usesSafariBar
+                ? .spring(response: SafariBarMetrics.springResponse, dampingFraction: SafariBarMetrics.springDamping)
+                : .spring(response: 0.35, dampingFraction: 0.86))
         withAnimation(animation) {
             toolbarCollapsed = collapsed
         }
@@ -320,6 +329,13 @@ private struct TabContent: View {
                 // Container only: the keyboard still resizes the page like before. While the status bar strip is
                 // painted the page frame starts below the clock (top safe area respected), so a site's fixed
                 // header is not hidden under the strip. Otherwise edge to edge, as in Build 23.
+                .overlay(alignment: .top) {
+                    if snapshotsOn, let snapshot = tab.transitionSnapshot {
+                        TransitionSnapshotView(image: snapshot)
+                    }
+                }
+                .animation(.easeOut(duration: 0.18), value: tab.transitionSnapshot)
+                .offset(x: pageSwipeOffset)
                 .ignoresSafeArea(.container, edges: webSurfaceIgnoredEdges)
             } else {
                 NewTabView(
@@ -333,6 +349,17 @@ private struct TabContent: View {
                 .safeAreaPadding(.top, topChromeHeight)
                 .safeAreaPadding(.bottom, bottomContentInset)
                 .overlay(alignment: .trailing) { newTabForwardSwipe }
+                .offset(x: pageSwipeOffset)
+            }
+
+            if pageSwipeOffset != 0 {
+                TabSwipeNeighbor(
+                    image: swipeNeighbor(for: Double(pageSwipeOffset))?.previewImage,
+                    offset: pageSwipeOffset,
+                    width: UIScreen.main.bounds.width
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
             }
 
             statusBarStrip
@@ -453,6 +480,13 @@ private struct TabContent: View {
             }
         }
         .onChange(of: browser.addressFocusRequestedAt) { _, _ in startAddressFocusRequest() }
+        .onChange(of: tab.canGoBack) { was, now in
+            // Build 44: one light tap when Back first shows up in the Safari style bar.
+            if usesSafariBar, BrowsingHaptic.backAppeared(was: was, now: now, sameTab: true) {
+                BrowsingHaptic.play(.backAppeared, enabled: hapticsOn)
+            }
+        }
+        .onAppear { slideInAfterTabSwipe() }
         // Build 39: a keyboard for a field on the page brings the full toolbar back, like address editing does.
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             setToolbarCollapsed(false)
@@ -1557,24 +1591,24 @@ private struct TabContent: View {
         switch kind {
         case .back:
             compactHoldCircle(icon: "chevron.left", enabled: tab.canGoBack, label: "Back", kind: .back,
-                              size: SafariBarMetrics.buttonSize) { tab.goBack() }
+                              size: SafariBarMetrics.buttonSize, quiet: quietAccentOn) { tab.goBack() }
         case .forward:
             compactHoldCircle(icon: "chevron.right", enabled: tab.canGoForward, label: "Forward", kind: .forward,
-                              size: SafariBarMetrics.buttonSize) { tab.goForward() }
+                              size: SafariBarMetrics.buttonSize, quiet: quietAccentOn) { tab.goForward() }
         case .tabs:
-            compactCircle(icon: "square.on.square", enabled: true, label: "Tabs, \(browser.tabs.count) open",
-                          size: SafariBarMetrics.buttonSize) { sheet = .tabs }
+            safariCircle(icon: "square.on.square", enabled: true, label: "Tabs, \(browser.tabs.count) open",
+                          quiet: quietAccentOn) { sheet = .tabs }
                 .contextMenu { tabsContextMenu }
         case .menu:
-            compactCircle(icon: "ellipsis", enabled: true, label: "Browser menu", size: SafariBarMetrics.buttonSize) {
+            safariCircle(icon: "ellipsis", enabled: true, label: "Browser menu", quiet: quietAccentOn) {
                 sheet = .menu
             }
         case .share:
-            compactCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page",
-                          size: SafariBarMetrics.buttonSize) { showShare = true }
+            safariCircle(icon: "square.and.arrow.up", enabled: tab.url != nil, label: "Share page",
+                          quiet: quietAccentOn) { showShare = true }
         default:
-            compactCircle(icon: toolbarSymbol(kind), enabled: isToolbarItemEnabled(kind), label: toolbarTitle(kind),
-                          size: SafariBarMetrics.buttonSize) { performToolbarItem(kind) }
+            safariCircle(icon: toolbarSymbol(kind), enabled: isToolbarItemEnabled(kind), label: toolbarTitle(kind),
+                          quiet: quietAccentOn) { performToolbarItem(kind) }
         }
     }
 
@@ -1590,16 +1624,81 @@ private struct TabContent: View {
             reduceMotion: reduceMotion,
             progress: tab.loadProgress,
             tint: theme.primary,
+            crossfadeTitle: titleCrossfadeOn && !reduceMotion,
             field: { safariAddressField },
             tabsButton: { tabsButtonCompact },
             subtitle: { compactSubtitle },
             reload: { compactReloadButton }
         )
+        // Build 44: quiet accent keeps the pill's own buttons neutral too. The loading line keeps the accent.
+        .tint(quietAccentOn ? SafariBarButtonStyle.quietColor : theme.primary)
         .modifier(CompactPillInteractionModifier(
             isEditing: isEditingCompactAddress,
             onBeginEditing: tapCompactAddress,
             onCancelEditing: cancelCompactAddressEditing
         ))
+        .simultaneousGesture(pillSwipeGesture, including: pillSwipeActive ? .all : .subviews)
+    }
+
+    // MARK: Build 44 pill swipe between tabs
+
+    private var pillSwipeActive: Bool {
+        pillSwipeOn && !isEditingCompactAddress && !showsCollapsedToolbar && browser.tabs.count > 1
+    }
+
+    /// Tabs a pill swipe moves through: the same kind (private or not) and the same tab group as this one.
+    private var swipeTabIDs: [UUID] {
+        browser.tabs.filter { $0.isPrivate == tab.isPrivate && $0.groupID == tab.groupID }.map(\.id)
+    }
+
+    private func swipeNeighbor(for translation: Double) -> BrowserTab? {
+        guard let id = TabSwipe.neighbor(in: swipeTabIDs, current: tab.id, translation: translation) else { return nil }
+        return browser.tabs.first { $0.id == id }
+    }
+
+    private var pillSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                let dx = Double(value.translation.width)
+                guard abs(dx) > abs(Double(value.translation.height)) else { return }
+                let hasNeighbor = swipeNeighbor(for: dx) != nil
+                pageSwipeOffset = CGFloat(TabSwipe.displayedOffset(translation: dx, hasNeighbor: hasNeighbor))
+            }
+            .onEnded { value in
+                let dx = Double(value.translation.width)
+                let width = Double(UIScreen.main.bounds.width)
+                let target = swipeNeighbor(for: dx)
+                let commit = TabSwipe.shouldCommit(
+                    translation: dx,
+                    predictedEnd: Double(value.predictedEndTranslation.width),
+                    width: width,
+                    hasNeighbor: target != nil
+                )
+                guard commit, let target else {
+                    withAnimation(swipeSpring) { pageSwipeOffset = 0 }
+                    return
+                }
+                // The new tab's page starts where its preview was and springs into place (see slideInAfterTabSwipe).
+                browser.pendingSwipeEntryOffset = CGFloat(dx < 0 ? width + dx : -width + dx)
+                BrowsingHaptic.play(.tabSwitch, enabled: hapticsOn)
+                browser.selectedID = target.id
+            }
+    }
+
+    private var swipeSpring: Animation {
+        reduceMotion
+            ? .easeInOut(duration: 0.2)
+            : .spring(response: SafariBarMetrics.springResponse, dampingFraction: SafariBarMetrics.springDamping)
+    }
+
+    private func slideInAfterTabSwipe() {
+        guard let start = browser.pendingSwipeEntryOffset else { return }
+        browser.pendingSwipeEntryOffset = nil
+        guard !reduceMotion else { return }
+        pageSwipeOffset = start
+        DispatchQueue.main.async {
+            withAnimation(swipeSpring) { pageSwipeOffset = 0 }
+        }
     }
 
     @ViewBuilder
@@ -1855,11 +1954,27 @@ private struct TabContent: View {
         .accessibilityLabel(label)
     }
 
-    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, size: CGFloat? = nil, action: @escaping () -> Void) -> some View {
+    /// Build 44: a round Safari style button. Quiet draws the icon neutral gray, and accent only while pressed.
+    private func safariCircle(icon: String, enabled: Bool, label: String, quiet: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(barIconFont)
+                .frame(width: SafariBarMetrics.buttonSize, height: SafariBarMetrics.buttonSize)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        }
+        .buttonStyle(SafariBarButtonStyle(accent: theme.primary, quiet: quiet))
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.35)
+        .accessibilityLabel(label)
+    }
+
+    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, size: CGFloat? = nil, quiet: Bool = false, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .font(barIconFont)
             // Accent when there is somewhere to go, like the other bar buttons; dim when not.
-            .foregroundStyle(enabled ? theme.primary : Color.primary)
+            .foregroundStyle(quiet ? SafariBarButtonStyle.quietColor : (enabled ? theme.primary : Color.primary))
             .frame(width: size ?? barSize(48), height: size ?? barSize(48))
             .background(.ultraThinMaterial, in: Circle())
             .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
@@ -3309,6 +3424,11 @@ private struct SettingsView: View {
     @AppStorage(AddressBarPlacement.storageKey) private var addressBarPlacementRaw = AddressBarPlacement.bottom.rawValue
     @AppStorage(ImmersiveLayout.storageKey) private var immersiveLayout = ImmersiveLayout.defaultEnabled
     @AppStorage(BarLayout.storageKey) private var barLayoutRaw = BarLayout.defaultLayout.rawValue
+    @AppStorage(BrowsingPolish.pillSwipeKey) private var pillSwipeOn = BrowsingPolish.pillSwipeDefault
+    @AppStorage(BrowsingPolish.snapshotsKey) private var snapshotsOn = BrowsingPolish.snapshotsDefault
+    @AppStorage(BrowsingPolish.hapticsKey) private var hapticsOn = BrowsingPolish.hapticsDefault
+    @AppStorage(BrowsingPolish.quietAccentKey) private var quietAccentOn = BrowsingPolish.quietAccentDefault
+    @AppStorage(BrowsingPolish.titleCrossfadeKey) private var titleCrossfadeOn = BrowsingPolish.titleCrossfadeDefault
     @AppStorage(PageColor.storageKey) private var statusBarMatchesPage = PageColor.defaultEnabled
     @AppStorage(ScrollChrome.underStatusBarKey) private var pageUnderStatusBar = ScrollChrome.underStatusBarDefault
     @AppStorage(ScrollChrome.collapseKey) private var collapseToolbarOnScroll = ScrollChrome.collapseDefault
@@ -3510,8 +3630,10 @@ private struct SettingsView: View {
             }
             Toggle(isOn: $httpsOnlyMode) { label(.httpsOnly) }
             Toggle(isOn: $cookieBanners) { label(.cookieBanners) }
-            Toggle(isOn: $appBanners) { label(.appBanners) }
-            Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
+            MoreOptionsGroup {
+                Toggle(isOn: $appBanners) { label(.appBanners) }
+                Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
+            }
         } header: {
             Text(SettingsGroup.general.header ?? "")
         } footer: {
@@ -3522,8 +3644,10 @@ private struct SettingsView: View {
     private var privacySection: some View {
         Section {
             PremiumPrivacyRows()
-            Toggle(isOn: $privacyCover) { label(.privacyCover) }
-            Toggle(isOn: $burnAnimation) { label(.burnEffect) }
+            MoreOptionsGroup {
+                Toggle(isOn: $privacyCover) { label(.privacyCover) }
+                Toggle(isOn: $burnAnimation) { label(.burnEffect) }
+            }
             Button(role: .destructive) { confirmClear = true } label: { label(.clearData) }
                 .disabled(browser.clearingData)
             Button(role: .destructive) { confirmReset = true } label: { label(.resetApp) }
@@ -3543,7 +3667,9 @@ private struct SettingsView: View {
             NavigationLink { themeDetail } label: { label(.themeAndAccent, value: useCustomAccent ? "Custom" : theme.id.displayName) }
             NavigationLink { iconDetail } label: { label(.appIcon) }
             NavigationLink { HomePersonalizationView() } label: { label(.newTabPage) }
-            NavigationLink { PageZoomListView() } label: { label(.pageZoom) }
+            MoreOptionsGroup {
+                NavigationLink { PageZoomListView() } label: { label(.pageZoom) }
+            }
         } header: {
             Text(SettingsGroup.display.header ?? "")
         }
@@ -3570,36 +3696,52 @@ private struct SettingsView: View {
             NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
             NavigationLink { MenuTopRowEditorView(theme: theme) } label: { label(.customizeActions) }
             Toggle(isOn: $immersiveLayout) { label(.immersive) }
-            Toggle(isOn: $statusBarMatchesPage) { label(.statusBarColor) }
-                .disabled(!immersiveLayout)
-            Toggle(isOn: $pageUnderStatusBar) { label(.pageUnderStatusBar) }
-                .disabled(!immersiveLayout)
             Toggle(isOn: $collapseToolbarOnScroll) { label(.collapseToolbar) }
-            Toggle(isOn: $sleepUnusedTabs) { label(.sleepTabs) }
-            Toggle(isOn: $swipeNavigation) { label(.edgeSwipes) }
-                .onChange(of: swipeNavigation) { _, newValue in
-                    browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
-                }
-            Toggle(isOn: $pullToRefresh) { label(.pullToRefresh) }
-                .onChange(of: pullToRefresh) { _, newValue in
-                    browser.tabs.forEach { $0.setPullToRefresh(newValue) }
-                }
+            MoreOptionsGroup { toolbarMoreOptions }
         } header: {
             Text(SettingsGroup.toolbarAndTabs.header ?? "")
         } footer: {
-            Text(BarLayout.settingsFooter + " Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bottom bar to a small address pill as you scroll down. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
+            Text(BarLayout.settingsFooter + " Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bar to the site name as you scroll down; tap it or scroll up to bring it back. More options holds the rest, like swiping the pill to change tabs. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
         }
+    }
+
+    /// Build 44: the rarely changed Toolbar and Tabs switches, including the new Safari style polish.
+    @ViewBuilder
+    private var toolbarMoreOptions: some View {
+        Toggle(isOn: $pillSwipeOn) { label(.pillSwipeTabs) }
+        Toggle(isOn: $snapshotsOn) { label(.pageSnapshots) }
+            .onChange(of: snapshotsOn) { _, on in
+                if !on { PageSnapshotCache.shared.removeAll() }
+            }
+        Toggle(isOn: $hapticsOn) { label(.browsingHaptics) }
+        Toggle(isOn: $quietAccentOn) { label(.quietAccent) }
+        Toggle(isOn: $titleCrossfadeOn) { label(.titleCrossfade) }
+        Toggle(isOn: $statusBarMatchesPage) { label(.statusBarColor) }
+            .disabled(!immersiveLayout)
+        Toggle(isOn: $pageUnderStatusBar) { label(.pageUnderStatusBar) }
+            .disabled(!immersiveLayout)
+        Toggle(isOn: $sleepUnusedTabs) { label(.sleepTabs) }
+        Toggle(isOn: $swipeNavigation) { label(.edgeSwipes) }
+            .onChange(of: swipeNavigation) { _, newValue in
+                browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
+            }
+        Toggle(isOn: $pullToRefresh) { label(.pullToRefresh) }
+            .onChange(of: pullToRefresh) { _, newValue in
+                browser.tabs.forEach { $0.setPullToRefresh(newValue) }
+            }
     }
 
     private var toolsSection: some View {
         Section {
             NavigationLink { DownloadsView(browser: browser, showsDone: false) } label: { label(.downloads) }
-            NavigationLink { NetworkSpeedView() } label: { label(.networkSpeed) }
             NavigationLink { WidgetsSettingsView(browser: browser) } label: { label(.widgets) }
-            Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
-                .buttonStyle(.plain)
-                .disabled(browser.bookmarks.isEmpty)
             NavigationLink { HowToListView() } label: { label(.howTo) }
+            MoreOptionsGroup {
+                NavigationLink { NetworkSpeedView() } label: { label(.networkSpeed) }
+                Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .disabled(browser.bookmarks.isEmpty)
+            }
         } header: {
             Text(SettingsGroup.tools.header ?? "")
         }
@@ -4054,7 +4196,7 @@ private struct SafariBarRow<Item: View, Pill: View>: View {
                 }
             }
         }
-        .frame(height: SafariBarMetrics.height)
+        .frame(height: collapsed ? SafariBarMetrics.collapsedHeight : SafariBarMetrics.height)
         .padding(.horizontal, SafariBarMetrics.edgeMargin)
         .animation(spring, value: leading)
         .animation(spring, value: trailing)
@@ -4073,6 +4215,7 @@ private struct SafariPillView<Field: View, TabsButton: View, Subtitle: View, Rel
     let reduceMotion: Bool
     let progress: LoadProgress
     let tint: Color
+    let crossfadeTitle: Bool
     @ViewBuilder let field: () -> Field
     @ViewBuilder let tabsButton: () -> TabsButton
     @ViewBuilder let subtitle: () -> Subtitle
@@ -4088,11 +4231,7 @@ private struct SafariPillView<Field: View, TabsButton: View, Subtitle: View, Rel
                         .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
                 }
                 VStack(alignment: .center, spacing: 0) {
-                    Text(title)
-                        .font(collapsed ? .footnote.weight(.semibold) : .subheadline.weight(.bold))
-                        .lineLimit(1)
-                        .foregroundStyle(.primary)
-                        .contentTransition(.opacity)
+                    SafariPillTitle(title: title, collapsed: collapsed, crossfade: crossfadeTitle)
                     if hasPage {
                         subtitle()
                             .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: false))
@@ -4121,5 +4260,79 @@ private struct SafariPillView<Field: View, TabsButton: View, Subtitle: View, Rel
         .overlay(Capsule().stroke(Color.primary.opacity(0.08), lineWidth: 1))
         .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
         .contentShape(Capsule())
+    }
+}
+
+
+// MARK: - Build 44 views
+
+/// The pill title. With crossfade on, a new title fades in over the old one instead of swapping.
+private struct SafariPillTitle: View {
+    let title: String
+    let collapsed: Bool
+    let crossfade: Bool
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(collapsed ? .footnote.weight(.semibold) : .subheadline.weight(.bold))
+                .lineLimit(1)
+                .foregroundStyle(.primary)
+                .id(crossfade ? title : "")
+                .transition(.opacity)
+        }
+        .animation(crossfade ? .easeInOut(duration: 0.22) : nil, value: title)
+    }
+}
+
+/// Quiet Safari style buttons: neutral gray icons, the accent only while pressed.
+private struct SafariBarButtonStyle: ButtonStyle {
+    static let quietColor = Color.primary.opacity(0.78)
+    let accent: Color
+    let quiet: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(quiet && !configuration.isPressed ? SafariBarButtonStyle.quietColor : accent)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
+    }
+}
+
+/// The last picture of a page, laid over it while it draws after going back or switching tabs.
+private struct TransitionSnapshotView: View {
+    let image: UIImage
+
+    var body: some View {
+        Image(uiImage: image)
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .transition(.opacity)
+    }
+}
+
+/// The tab beside this one, sliding in from the side the page is moving away from.
+private struct TabSwipeNeighbor: View {
+    let image: UIImage?
+    let offset: CGFloat
+    let width: CGFloat
+
+    var body: some View {
+        ZStack {
+            Color(uiColor: .systemBackground)
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .clipped()
+            }
+        }
+        .offset(x: offset < 0 ? offset + width : offset - width)
+        .accessibilityHidden(true)
     }
 }

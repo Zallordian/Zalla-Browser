@@ -172,3 +172,18 @@ struct PageZoomListView: View {
         PageZoom.save(store)
     }
 }
+
+/// Build 44: rarely changed rows sit behind "More options" at the end of a section, closed by default.
+struct MoreOptionsGroup<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    @State private var expanded = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            content()
+        } label: {
+            Text(SettingsRowID.moreOptionsTitle)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
