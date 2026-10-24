@@ -3533,20 +3533,19 @@ private struct SettingsView: View {
         return "\(marketing) (\(build))"
     }
 
+    @State private var settingsQuery = ""
+
     var body: some View {
         List {
-            topSection
-            featuresSection
-            generalSection
-            privacySection
-            displaySection
-            toolbarSection
-            toolsSection
-            supportSection
-            promiseSection
-            versionSection
+            if settingsQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                mainScreen
+            } else {
+                searchScreen
+            }
         }
         .listStyle(.insetGrouped)
+        .searchable(text: $settingsQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search Settings")
+        .autocorrectionDisabled()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -3593,6 +3592,116 @@ private struct SettingsView: View {
         .onAppear { loadCustomControls() }
     }
 
+    // MARK: Build 46 main screen and search
+
+    @ViewBuilder
+    private var mainScreen: some View {
+        ForEach(Array(SettingsPage.mainScreenGroups.enumerated()), id: \.offset) { _, pages in
+            Section {
+                ForEach(pages) { page in
+                    NavigationLink { pageDetail(page) } label: { pageLabel(page) }
+                }
+            }
+        }
+        Section {
+            Text("Zalla \(versionString)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+        }
+    }
+
+    private func pageLabel(_ page: SettingsPage) -> some View {
+        HStack(spacing: 12) {
+            SettingsIconTile(symbol: page.symbol, tint: tileColor(page))
+            Text(page.title)
+        }
+    }
+
+    private func tileColor(_ page: SettingsPage) -> Color {
+        switch page.tileColorName {
+        case "gray": return .gray
+        case "indigo": return .indigo
+        case "orange": return .orange
+        case "green": return .green
+        case "teal": return .teal
+        case "cyan": return .cyan
+        case "pink": return .pink
+        default: return .blue
+        }
+    }
+
+    @ViewBuilder
+    private var searchScreen: some View {
+        let results = SettingsRowID.searchResults(settingsQuery)
+        if results.isEmpty {
+            ContentUnavailableView.search(text: settingsQuery)
+                .listRowBackground(Color.clear)
+        } else {
+            ForEach(results) { result in
+                Section(result.page.title) {
+                    ForEach(searchRows(result.rows), id: \.self) { row in
+                        rowView(row)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Face ID and Auto-clear draw together, so a search for either shows the pair once.
+    private func searchRows(_ rows: [SettingsRowID]) -> [SettingsRowID] {
+        var seen: [SettingsRowID] = []
+        for row in rows {
+            let drawn = row == .autoClear ? SettingsRowID.privateTabLock : row
+            if !seen.contains(drawn) { seen.append(drawn) }
+        }
+        return seen
+    }
+
+    private func pageDetail(_ page: SettingsPage) -> some View {
+        List {
+            Section {
+                ForEach(page.mainRows.filter { $0.kind != .destructive }, id: \.self) { row in
+                    rowView(row)
+                }
+                if !page.moreRows.isEmpty {
+                    MoreOptionsGroup {
+                        ForEach(page.moreRows, id: \.self) { row in
+                            rowView(row)
+                        }
+                    }
+                }
+            } footer: {
+                if let text = footer(for: page) { Text(text) }
+            }
+            let destructive = page.mainRows.filter { $0.kind == .destructive }
+            if !destructive.isEmpty {
+                Section {
+                    ForEach(destructive, id: \.self) { row in rowView(row) }
+                }
+            }
+            if page == .about {
+                promiseSection
+                versionSection
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(page.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .tint(theme.primary)
+    }
+
+    private func footer(for page: SettingsPage) -> String? {
+        switch page {
+        case .general: return DefaultBrowser.settingsFooter + " " + DefaultBrowser.quickActionsFooter
+        case .toolbarAndTabs: return BarLayout.settingsFooter + " " + (page.footer ?? "")
+        case .privacy: return (page.footer ?? "") + " " + BurnCopy.settingsHelp
+        case .about: return page.footer
+        default: return page.footer
+        }
+    }
+
     // MARK: Build 41 rows
 
     private func label(_ row: SettingsRowID, subtitle: String? = nil, value: String? = nil) -> SettingsRowLabel {
@@ -3605,8 +3714,26 @@ private struct SettingsView: View {
         )
     }
 
-    private var topSection: some View {
-        Section {
+    /// Build 46: one live row, drawn the same on its page and in search results. Split by page to keep type checking quick.
+    @ViewBuilder
+    private func rowView(_ row: SettingsRowID) -> some View {
+        switch row.page {
+        case .general: generalRow(row)
+        case .appearance: appearanceRow(row)
+        case .toolbarAndTabs: toolbarAndTabsRow(row)
+        case .homeAndNewTab: homeAndNewTabRow(row)
+        case .search: searchRow(row)
+        case .privacy: privacyRow(row)
+        case .websites: websitesRow(row)
+        case .downloadsAndTools: downloadsAndToolsRow(row)
+        case .about: aboutRow(row)
+        }
+    }
+
+    @ViewBuilder
+    private func generalRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .defaultBrowser:
             Button {
                 if let settings = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settings)
@@ -3616,35 +3743,169 @@ private struct SettingsView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint("Opens Zalla in the Settings app")
-            NavigationLink {
-                WidgetsSettingsView(browser: browser)
-            } label: { label(.addWidgets) }
-            Button {
-                showImporter = true
-            } label: {
-                label(.importBookmarks).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        } footer: {
-            Text(DefaultBrowser.settingsFooter)
+        case .importBookmarks:
+            Button { showImporter = true } label: { label(.importBookmarks).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+        case .iconQuickActions:
+            Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
+        case .exportBookmarks:
+            Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .disabled(browser.bookmarks.isEmpty)
+        default:
+            EmptyView()
         }
     }
 
-    private var featuresSection: some View {
-        Section {
+    @ViewBuilder
+    private func appearanceRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .themePacks:
+            NavigationLink { ThemePacksView() } label: { label(.themePacks) }
+        case .appearance:
+            Picker(selection: $appearance) {
+                ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
+            } label: { label(.appearance) }
+        case .themeAndAccent:
+            NavigationLink { themeDetail } label: { label(.themeAndAccent, value: useCustomAccent ? "Custom" : theme.id.displayName) }
+        case .appIcon:
+            NavigationLink { iconDetail } label: { label(.appIcon) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func toolbarAndTabsRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .addressBar:
+            AddressBarPicker(
+                selection: $addressBarPlacementRaw,
+                style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+                isDark: previewIsDark,
+                theme: theme
+            )
+        case .barLayout:
+            Picker(selection: $barLayoutRaw) {
+                ForEach(BarLayout.allCases) { layout in
+                    Text(layout.title).tag(layout.rawValue)
+                }
+            } label: { label(.barLayout) }
+        case .toolbarStyle:
+            Picker(selection: $toolbarStyleRaw) {
+                ForEach(ToolbarStyle.allCases) { style in
+                    Text(style.rawValue).tag(style.rawValue)
+                }
+            } label: { label(.toolbarStyle) }
+        case .customizeToolbar:
+            NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
+        case .customizeActions:
+            NavigationLink { MenuTopRowEditorView(theme: theme) } label: { label(.customizeActions) }
+        case .immersive:
+            Toggle(isOn: $immersiveLayout) { label(.immersive) }
+        case .statusBarColor:
+            Toggle(isOn: $statusBarMatchesPage) { label(.statusBarColor) }
+                .disabled(!immersiveLayout)
+        case .pageUnderStatusBar:
+            Toggle(isOn: $pageUnderStatusBar) { label(.pageUnderStatusBar) }
+                .disabled(!immersiveLayout)
+        case .collapseToolbar:
+            Toggle(isOn: $collapseToolbarOnScroll) { label(.collapseToolbar) }
+        case .sleepTabs:
+            Toggle(isOn: $sleepUnusedTabs) { label(.sleepTabs) }
+        case .edgeSwipes:
+            Toggle(isOn: $swipeNavigation) { label(.edgeSwipes) }
+                .onChange(of: swipeNavigation) { _, newValue in
+                    browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
+                }
+        case .pullToRefresh:
+            Toggle(isOn: $pullToRefresh) { label(.pullToRefresh) }
+                .onChange(of: pullToRefresh) { _, newValue in
+                    browser.tabs.forEach { $0.setPullToRefresh(newValue) }
+                }
+        case .pillSwipeTabs:
+            Toggle(isOn: $pillSwipeOn) { label(.pillSwipeTabs) }
+        case .pageSnapshots:
+            Toggle(isOn: $snapshotsOn) { label(.pageSnapshots) }
+                .onChange(of: snapshotsOn) { _, on in
+                    if !on { PageSnapshotCache.shared.removeAll() }
+                }
+        case .browsingHaptics:
+            Toggle(isOn: $hapticsOn) { label(.browsingHaptics) }
+        case .quietAccent:
+            Toggle(isOn: $quietAccentOn) { label(.quietAccent) }
+        case .titleCrossfade:
+            Toggle(isOn: $titleCrossfadeOn) { label(.titleCrossfade) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func homeAndNewTabRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .addWidgets:
+            NavigationLink { WidgetsSettingsView(browser: browser) } label: { label(.addWidgets) }
+        case .newTabPage:
+            NavigationLink { HomePersonalizationView() } label: { label(.newTabPage) }
+        case .widgets:
+            NavigationLink { WidgetsSettingsView(browser: browser) } label: { label(.widgets) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func searchRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .searchEngine:
+            SearchEngineSettingsRows()
+        case .location:
+            NavigationLink { LocationSettingsView() } label: { label(.location) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func privacyRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .contentBlocking:
             NavigationLink { ContentBlockingView() } label: { label(.contentBlocking) }
+        case .privacyShield:
             NavigationLink { PrivacyShieldView() } label: { label(.privacyShield) }
+        case .privacyReport:
             if let tab = browser.selected {
                 NavigationLink { PrivacyReportView(tab: tab) } label: { label(.privacyReport) }
             }
-            Button {
-                showThemeUpsell = true
-            } label: {
-                label(.zallaUnlock, value: unlock.isUnlocked ? "Unlocked" : "Optional").contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens Zalla Unlock")
-            NavigationLink { ThemePacksView() } label: { label(.themePacks) }
+        case .httpsOnly:
+            Toggle(isOn: $httpsOnlyMode) { label(.httpsOnly) }
+        case .cookieBanners:
+            Toggle(isOn: $cookieBanners) { label(.cookieBanners) }
+        case .privateTabLock:
+            PremiumPrivacyRows()
+        case .autoClear:
+            // Drawn by PremiumPrivacyRows together with Face ID for private tabs.
+            EmptyView()
+        case .privacyCover:
+            Toggle(isOn: $privacyCover) { label(.privacyCover) }
+        case .burnEffect:
+            Toggle(isOn: $burnAnimation) { label(.burnEffect) }
+        case .clearData:
+            Button(role: .destructive) { confirmClear = true } label: { label(.clearData) }
+                .disabled(browser.clearingData)
+        case .resetApp:
+            Button(role: .destructive) { confirmReset = true } label: { label(.resetApp) }
+                .disabled(browser.clearingData)
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func websitesRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .videoSaver:
             if FeatureFlags.videoSaverEnabled {
                 Toggle(isOn: $videoSaverOn) {
                     label(.videoSaver, subtitle: VideoSaver.settingsFooter(unlocked: unlock.isUnlocked))
@@ -3653,17 +3914,7 @@ private struct SettingsView: View {
                     NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
                 }
             }
-        } header: {
-            Text(SettingsGroup.features.header ?? "")
-        } footer: {
-            Text("Zalla Unlock is optional. Core browsing, blocking, Privacy Shield, and Burn It All stay free.")
-        }
-    }
-
-    private var generalSection: some View {
-        Section {
-            SearchEngineSettingsRows()
-            NavigationLink { LocationSettingsView() } label: { label(.location) }
+        case .websiteLocation:
             Picker(selection: $websiteLocationRaw) {
                 ForEach(WebsiteLocationMode.allCases) { mode in
                     Text(mode.title).tag(mode.rawValue)
@@ -3672,138 +3923,54 @@ private struct SettingsView: View {
             .onChange(of: websiteLocationRaw) { _, _ in
                 NotificationCenter.default.post(name: .zallaScriptsChanged, object: nil)
             }
-            Toggle(isOn: $httpsOnlyMode) { label(.httpsOnly) }
-            Toggle(isOn: $cookieBanners) { label(.cookieBanners) }
-            MoreOptionsGroup {
-                Toggle(isOn: $appBanners) { label(.appBanners) }
-                Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
-            }
-        } header: {
-            Text(SettingsGroup.general.header ?? "")
-        } footer: {
-            Text("Website location decides whether sites may ask for your real location. Your location goes only to a site you allow, never to Zalla. Close Cookie Banners picks reject or necessary only, and never presses accept. " + DefaultBrowser.quickActionsFooter)
+        case .appBanners:
+            Toggle(isOn: $appBanners) { label(.appBanners) }
+        case .pageZoom:
+            NavigationLink { PageZoomListView() } label: { label(.pageZoom) }
+        default:
+            EmptyView()
         }
     }
 
-    private var privacySection: some View {
-        Section {
-            PremiumPrivacyRows()
-            MoreOptionsGroup {
-                Toggle(isOn: $privacyCover) { label(.privacyCover) }
-                Toggle(isOn: $burnAnimation) { label(.burnEffect) }
-            }
-            Button(role: .destructive) { confirmClear = true } label: { label(.clearData) }
-                .disabled(browser.clearingData)
-            Button(role: .destructive) { confirmReset = true } label: { label(.resetApp) }
-                .disabled(browser.clearingData)
-        } header: {
-            Text(SettingsGroup.privacy.header ?? "")
-        } footer: {
-            Text("Clear Browsing Data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. \(BurnCopy.settingsHelp) Reset the App puts every setting back to its default and keeps bookmarks.")
-        }
-    }
-
-    private var displaySection: some View {
-        Section {
-            Picker(selection: $appearance) {
-                ForEach(["System", "Light", "Dark"], id: \.self) { Text($0).tag($0) }
-            } label: { label(.appearance) }
-            NavigationLink { themeDetail } label: { label(.themeAndAccent, value: useCustomAccent ? "Custom" : theme.id.displayName) }
-            NavigationLink { iconDetail } label: { label(.appIcon) }
-            NavigationLink { HomePersonalizationView() } label: { label(.newTabPage) }
-            MoreOptionsGroup {
-                NavigationLink { PageZoomListView() } label: { label(.pageZoom) }
-            }
-        } header: {
-            Text(SettingsGroup.display.header ?? "")
-        }
-    }
-
-    private var toolbarSection: some View {
-        Section {
-            AddressBarPicker(
-                selection: $addressBarPlacementRaw,
-                style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
-                isDark: previewIsDark,
-                theme: theme
-            )
-            Picker(selection: $barLayoutRaw) {
-                ForEach(BarLayout.allCases) { layout in
-                    Text(layout.title).tag(layout.rawValue)
-                }
-            } label: { label(.barLayout) }
-            Picker(selection: $toolbarStyleRaw) {
-                ForEach(ToolbarStyle.allCases) { style in
-                    Text(style.rawValue).tag(style.rawValue)
-                }
-            } label: { label(.toolbarStyle) }
-            NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
-            NavigationLink { MenuTopRowEditorView(theme: theme) } label: { label(.customizeActions) }
-            Toggle(isOn: $immersiveLayout) { label(.immersive) }
-            Toggle(isOn: $collapseToolbarOnScroll) { label(.collapseToolbar) }
-            MoreOptionsGroup { toolbarMoreOptions }
-        } header: {
-            Text(SettingsGroup.toolbarAndTabs.header ?? "")
-        } footer: {
-            Text(BarLayout.settingsFooter + " Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bar to the site name as you scroll down; tap it or scroll up to bring it back. More options holds the rest, like swiping the pill to change tabs. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them.")
-        }
-    }
-
-    /// Build 44: the rarely changed Toolbar and Tabs switches, including the new Safari style polish.
     @ViewBuilder
-    private var toolbarMoreOptions: some View {
-        Toggle(isOn: $pillSwipeOn) { label(.pillSwipeTabs) }
-        Toggle(isOn: $snapshotsOn) { label(.pageSnapshots) }
-            .onChange(of: snapshotsOn) { _, on in
-                if !on { PageSnapshotCache.shared.removeAll() }
-            }
-        Toggle(isOn: $hapticsOn) { label(.browsingHaptics) }
-        Toggle(isOn: $quietAccentOn) { label(.quietAccent) }
-        Toggle(isOn: $titleCrossfadeOn) { label(.titleCrossfade) }
-        Toggle(isOn: $statusBarMatchesPage) { label(.statusBarColor) }
-            .disabled(!immersiveLayout)
-        Toggle(isOn: $pageUnderStatusBar) { label(.pageUnderStatusBar) }
-            .disabled(!immersiveLayout)
-        Toggle(isOn: $sleepUnusedTabs) { label(.sleepTabs) }
-        Toggle(isOn: $swipeNavigation) { label(.edgeSwipes) }
-            .onChange(of: swipeNavigation) { _, newValue in
-                browser.tabs.forEach { $0.setSwipeNavigation(newValue) }
-            }
-        Toggle(isOn: $pullToRefresh) { label(.pullToRefresh) }
-            .onChange(of: pullToRefresh) { _, newValue in
-                browser.tabs.forEach { $0.setPullToRefresh(newValue) }
-            }
-    }
-
-    private var toolsSection: some View {
-        Section {
+    private func downloadsAndToolsRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .downloads:
             NavigationLink { DownloadsView(browser: browser, showsDone: false) } label: { label(.downloads) }
-            NavigationLink { WidgetsSettingsView(browser: browser) } label: { label(.widgets) }
+        case .networkSpeed:
+            NavigationLink { NetworkSpeedView() } label: { label(.networkSpeed) }
+        case .howTo:
             NavigationLink { HowToListView() } label: { label(.howTo) }
-            MoreOptionsGroup {
-                NavigationLink { NetworkSpeedView() } label: { label(.networkSpeed) }
-                Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
-                    .buttonStyle(.plain)
-                    .disabled(browser.bookmarks.isEmpty)
-            }
-        } header: {
-            Text(SettingsGroup.tools.header ?? "")
+        default:
+            EmptyView()
         }
     }
 
-    private var supportSection: some View {
-        Section {
+    @ViewBuilder
+    private func aboutRow(_ row: SettingsRowID) -> some View {
+        switch row {
+        case .zallaUnlock:
+            Button {
+                showThemeUpsell = true
+            } label: {
+                label(.zallaUnlock, value: unlock.isUnlocked ? "Unlocked" : "Optional").contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Zalla Unlock")
+        case .supportZalla:
             NavigationLink { SupportZallaView(theme: theme) } label: { SupportZallaRow(theme: theme) }
+        case .privacyPolicy:
             Link(destination: URL(string: "https://zalla.gg/privacy/")!) { label(.privacyPolicy) }
                 .buttonStyle(.plain)
+        case .support:
             Link(destination: URL(string: "https://zalla.gg/support/")!) { label(.support) }
                 .buttonStyle(.plain)
+        case .acknowledgements:
             NavigationLink { AcknowledgementsView() } label: { label(.acknowledgements) }
+        case .about:
             NavigationLink { AboutView() } label: { label(.about) }
-        } header: {
-            Text(SettingsGroup.support.header ?? "")
-        } footer: {
-            Text("Tips through the App Store are optional and do not unlock features. Privacy Policy and Support open zalla.gg in Safari.")
+        default:
+            EmptyView()
         }
     }
 

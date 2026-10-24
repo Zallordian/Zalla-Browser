@@ -2,6 +2,12 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 46: Shorter Settings
+- Settings opens on a short list, like the iOS Settings app: General, Appearance, Toolbar and Tabs, Home and New Tab, Search, Privacy and Security, Websites, Downloads and Tools, and About and Support
+- Each row opens its own page, and rarely used switches still sit behind More options on that page
+- A search field at the top finds any setting by name or by words like "dark mode" or "ad blocker", and you can flip it right from the results
+- No settings were removed, and every saved choice stays as it was
+
 ## Build 45: Safari Spacing
 - The Safari style bar keeps 32 points from each screen edge however many buttons show, scaled down on screens narrower than 375 points and never under 20
 - The bar sits 19 points above the bottom of the screen, like Safari
