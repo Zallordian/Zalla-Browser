@@ -258,11 +258,15 @@ private struct TabContent: View {
         toolbarCollapsed && canCollapseToolbar
     }
     private var bottomBarPadding: CGFloat {
-        ScrollChrome.bottomPadding(
+        // Build 45: the Safari style bar sits a fixed gap above the bottom of the screen, like Safari.
+        if usesSafariBar {
+            return SafariBarMetrics.bottomInset(collapsed: showsCollapsedToolbar, homeIndicatorInset: homeIndicatorInset)
+        }
+        return ScrollChrome.bottomPadding(
             collapsed: showsCollapsedToolbar,
             immersive: bottomBarFloats,
             homeIndicatorInset: homeIndicatorInset
-        ) + (usesSafariBar && !showsCollapsedToolbar ? SafariBarMetrics.bottomGap : 0)
+        )
     }
     private func setToolbarCollapsed(_ collapsed: Bool) {
         guard collapsed != toolbarCollapsed else { return }
@@ -1572,18 +1576,59 @@ private struct TabContent: View {
     /// into their space in the same spring. The row itself is `SafariBarRow`, a small view of its own.
     private var safariToolbar: some View {
         SafariBarRow(
-            leading: SafariBarMetrics.visibleItems(toolbarLayout.compactLeading, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward),
-            trailing: SafariBarMetrics.visibleItems(toolbarLayout.compactTrailing, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward),
+            leading: SafariBarMetrics.segments(
+                SafariBarMetrics.visibleItems(toolbarLayout.compactLeading, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward)
+            ),
+            trailing: SafariBarMetrics.segments(
+                SafariBarMetrics.visibleItems(toolbarLayout.compactTrailing, canGoBack: tab.canGoBack, canGoForward: tab.canGoForward)
+            ),
+            sideInset: SafariBarMetrics.sideInset(screenWidth: UIScreen.main.bounds.width),
             collapsed: showsCollapsedToolbar,
             editing: isEditingCompactAddress,
             reduceMotion: reduceMotion,
-            item: { kind in safariItem(kind) },
+            item: { segment in safariSegment(segment) },
             pill: {
                 safariPill
                     .searchBarWidth(isEditingCompactAddress ? SearchBarWidth.full : searchBarWidthValue)
                     .modifier(CollapsingAddressBar(collapsed: showsCollapsedToolbar, reduceMotion: reduceMotion))
             }
         )
+    }
+
+    @ViewBuilder
+    private func safariSegment(_ segment: SafariBarSegment) -> some View {
+        switch segment {
+        case .single(let kind):
+            safariItem(kind)
+        case .nav(let kinds):
+            // Always the capsule, so going from one button to two resizes the same glass instead of swapping it.
+            safariNavCapsule(kinds)
+        }
+    }
+
+    /// Build 45: Back and Forward share one glass capsule, like Safari.
+    private func safariNavCapsule(_ kinds: [ToolbarItemKind]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(kinds) { kind in
+                safariNavButton(kind)
+                    .frame(width: SafariBarMetrics.width(of: .nav(kinds)) / CGFloat(max(kinds.count, 1)), height: SafariBarMetrics.buttonSize)
+                    .transition(.opacity)
+            }
+        }
+        .background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        .overlay(Capsule(style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+    }
+
+    @ViewBuilder
+    private func safariNavButton(_ kind: ToolbarItemKind) -> some View {
+        if kind == .forward {
+            compactHoldCircle(icon: "chevron.right", enabled: tab.canGoForward, label: "Forward", kind: .forward,
+                              size: SafariBarMetrics.buttonSize, quiet: quietAccentOn, chrome: false) { tab.goForward() }
+        } else {
+            compactHoldCircle(icon: "chevron.left", enabled: tab.canGoBack, label: "Back", kind: .back,
+                              size: SafariBarMetrics.buttonSize, quiet: quietAccentOn, chrome: false) { tab.goBack() }
+        }
     }
 
     @ViewBuilder
@@ -1970,15 +2015,14 @@ private struct TabContent: View {
         .accessibilityLabel(label)
     }
 
-    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, size: CGFloat? = nil, quiet: Bool = false, action: @escaping () -> Void) -> some View {
+    private func compactHoldCircle(icon: String, enabled: Bool, label: String, kind: HoldRevealKind, size: CGFloat? = nil, quiet: Bool = false, chrome: Bool = true, action: @escaping () -> Void) -> some View {
         Image(systemName: icon)
             .font(barIconFont)
             // Accent when there is somewhere to go, like the other bar buttons; dim when not.
             .foregroundStyle(quiet ? SafariBarButtonStyle.quietColor : (enabled ? theme.primary : Color.primary))
             .frame(width: size ?? barSize(48), height: size ?? barSize(48))
-            .background(.ultraThinMaterial, in: Circle())
-            .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
-            .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+            // Build 45: inside the shared Back and Forward capsule the button draws no circle of its own.
+            .modifier(HoldCircleChrome(on: chrome))
             .opacity(enabled ? 1 : 0.35)
             .accessibilityLabel(label)
             .contentShape(Circle().scale(1.25))
@@ -4158,12 +4202,14 @@ private struct SafariProgressLine: View {
 /// nowhere to go) fade and scale out, and the pill takes their space in the same spring. Every button has a fixed
 /// size, so only the pill's width changes.
 private struct SafariBarRow<Item: View, Pill: View>: View {
-    let leading: [ToolbarItemKind]
-    let trailing: [ToolbarItemKind]
+    let leading: [SafariBarSegment]
+    let trailing: [SafariBarSegment]
+    /// Build 45: the same on both sides however many buttons show.
+    let sideInset: CGFloat
     let collapsed: Bool
     let editing: Bool
     let reduceMotion: Bool
-    @ViewBuilder let item: (ToolbarItemKind) -> Item
+    @ViewBuilder let item: (SafariBarSegment) -> Item
     @ViewBuilder let pill: () -> Pill
 
     private var spring: Animation {
@@ -4179,25 +4225,25 @@ private struct SafariBarRow<Item: View, Pill: View>: View {
     var body: some View {
         HStack(spacing: collapsed ? 0 : SafariBarMetrics.spacing) {
             if !editing {
-                ForEach(leading) { kind in
-                    item(kind)
-                        .frame(width: SafariBarMetrics.buttonSize, height: SafariBarMetrics.buttonSize)
+                ForEach(leading) { segment in
+                    item(segment)
+                        .frame(width: SafariBarMetrics.width(of: segment), height: SafariBarMetrics.buttonSize)
                         .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
                         .transition(buttonTransition)
                 }
             }
             pill()
             if !editing {
-                ForEach(trailing) { kind in
-                    item(kind)
-                        .frame(width: SafariBarMetrics.buttonSize, height: SafariBarMetrics.buttonSize)
+                ForEach(trailing) { segment in
+                    item(segment)
+                        .frame(width: SafariBarMetrics.width(of: segment), height: SafariBarMetrics.buttonSize)
                         .modifier(CollapsingControls(collapsed: collapsed, reduceMotion: reduceMotion, zeroWidth: true))
                         .transition(buttonTransition)
                 }
             }
         }
         .frame(height: collapsed ? SafariBarMetrics.collapsedHeight : SafariBarMetrics.height)
-        .padding(.horizontal, SafariBarMetrics.edgeMargin)
+        .padding(.horizontal, sideInset)
         .animation(spring, value: leading)
         .animation(spring, value: trailing)
         .animation(spring, value: editing)
@@ -4334,5 +4380,22 @@ private struct TabSwipeNeighbor: View {
         }
         .offset(x: offset < 0 ? offset + width : offset - width)
         .accessibilityHidden(true)
+    }
+}
+
+
+/// Build 45: the glass circle around a Back or Forward button, left off inside the shared capsule.
+private struct HoldCircleChrome: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        if on {
+            content
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                .shadow(color: .black.opacity(0.16), radius: 10, y: 3)
+        } else {
+            content
+        }
     }
 }

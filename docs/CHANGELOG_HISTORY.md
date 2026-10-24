@@ -2,6 +2,13 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 45: Safari Spacing
+- The Safari style bar keeps 32 points from each screen edge however many buttons show, scaled down on screens narrower than 375 points and never under 20
+- The bar sits 19 points above the bottom of the screen, like Safari
+- Back and Forward share one capsule. With only one of them usable it shrinks to a circle, and with neither it hides
+- Buttons are 48 points with 8 points between them, and the address pill takes the rest of the row
+- Collapse, address bar swipe, haptics, quiet colors, and the spring are unchanged. Classic is unchanged
+
 ## Build 44: Smoother Browsing
 - Scrolling down shrinks the Safari style bar to just the site name; tap it or scroll up to bring it back, in the same spring
 - Swipe the address bar left or right to slide to the next or previous tab

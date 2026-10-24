@@ -39,14 +39,76 @@ enum SafariBarMetrics {
     static let height: CGFloat = 48
     /// Pill height while the bar is collapsed to the domain.
     static let collapsedHeight: CGFloat = 36
-    /// Round buttons beside the pill.
-    static let buttonSize: CGFloat = 44
-    /// Space from the screen edges.
-    static let edgeMargin: CGFloat = 10
+    /// Build 45: round buttons beside the pill, as tall as the pill, like Safari.
+    static let buttonSize: CGFloat = 48
+    /// Build 45: Back and Forward together in one capsule, like Safari.
+    static let navCapsuleWidth: CGFloat = 92
     /// Even space between every control in the row.
-    static let spacing: CGFloat = 6
-    /// Gap above the home indicator while expanded.
-    static let bottomGap: CGFloat = 2
+    static let spacing: CGFloat = 8
+
+    /// Build 45: the side inset is the same however many buttons show. 32 points on screens 375 points wide and up,
+    /// scaled down on narrower screens, and never under 20.
+    static let minimumSideInset: CGFloat = 32
+    static let sideInsetFloor: CGFloat = 20
+    static let sideInsetReferenceWidth: CGFloat = 375
+
+    static func sideInset(screenWidth: CGFloat) -> CGFloat {
+        guard screenWidth > 0, screenWidth < sideInsetReferenceWidth else { return minimumSideInset }
+        return max(sideInsetFloor, (minimumSideInset * screenWidth / sideInsetReferenceWidth).rounded())
+    }
+
+    /// Build 45: the bar's bottom sits this far above the bottom of the screen, home indicator area included,
+    /// like Safari. While collapsed the pill keeps its Build 37 lift above the home indicator.
+    static let bottomEdgeGap: CGFloat = 19
+
+    static func bottomInset(collapsed: Bool, homeIndicatorInset: CGFloat) -> CGFloat {
+        collapsed ? max(homeIndicatorInset, 0) + ScrollChrome.pillLift : bottomEdgeGap
+    }
+
+    /// Width a segment takes in the row.
+    static func width(of segment: SafariBarSegment) -> CGFloat {
+        switch segment {
+        case .nav(let kinds): return kinds.count >= 2 ? navCapsuleWidth : buttonSize
+        case .single: return buttonSize
+        }
+    }
+
+    /// What is left for the pill once the insets, the buttons, and the gaps are taken. The insets never shrink.
+    static func pillWidth(screenWidth: CGFloat, segments: [SafariBarSegment]) -> CGFloat {
+        let inset = sideInset(screenWidth: screenWidth)
+        let buttons = segments.reduce(CGFloat(0)) { $0 + width(of: $1) }
+        let gaps = CGFloat(segments.count) * spacing
+        return max(screenWidth - inset * 2 - buttons - gaps, 0)
+    }
+
+    /// Build 45: neighboring Back and Forward become one capsule; every other button is its own circle.
+    static func segments(_ items: [ToolbarItemKind]) -> [SafariBarSegment] {
+        var result: [SafariBarSegment] = []
+        var hasCapsule = false
+        for kind in items {
+            let isNav = kind == .back || kind == .forward
+            if isNav, case .nav(let kinds)? = result.last {
+                result[result.count - 1] = .nav(kinds + [kind])
+            } else if isNav, !hasCapsule {
+                // Only one capsule per list. A Back or Forward placed apart from the other stays a plain circle.
+                hasCapsule = true
+                result.append(.nav([kind]))
+            } else {
+                result.append(.single(kind))
+            }
+        }
+        return result
+    }
+
+    /// The Back and Forward capsule for the default layout.
+    static func navCapsule(canGoBack: Bool, canGoForward: Bool) -> NavCapsuleState {
+        switch (canGoBack, canGoForward) {
+        case (true, true): return .both
+        case (true, false): return .backOnly
+        case (false, true): return .forwardOnly
+        case (false, false): return .hidden
+        }
+    }
     /// Opacity of a button that cannot be used right now, like Forward with nothing to go forward to.
     static let disabledOpacity: Double = 0.3
     /// Height of the loading line drawn inside the pill. Drawn as an overlay so loading never moves the bar.
@@ -73,5 +135,32 @@ enum SafariBarMetrics {
 
     static func opacity(enabled: Bool) -> Double {
         enabled ? 1 : disabledOpacity
+    }
+}
+
+
+/// Build 45: one control in the Safari style row. Back and Forward side by side share one capsule.
+enum SafariBarSegment: Equatable, Identifiable {
+    case nav([ToolbarItemKind])
+    case single(ToolbarItemKind)
+
+    /// The capsule keeps one identity as it grows or shrinks, so it resizes in the spring instead of swapping.
+    var id: String {
+        switch self {
+        case .nav: return "nav"
+        case .single(let kind): return kind.rawValue
+        }
+    }
+}
+
+enum NavCapsuleState: Equatable {
+    case hidden, backOnly, forwardOnly, both
+
+    var width: CGFloat {
+        switch self {
+        case .hidden: return 0
+        case .backOnly, .forwardOnly: return SafariBarMetrics.buttonSize
+        case .both: return SafariBarMetrics.navCapsuleWidth
+        }
     }
 }
