@@ -185,9 +185,9 @@ public sealed partial class ShellWindow
 
     void OnKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        var control = (args.KeyModifiers & Windows.System.VirtualKeyModifiers.Control) != 0;
-        var shift = (args.KeyModifiers & Windows.System.VirtualKeyModifiers.Shift) != 0;
-        var alt = (args.KeyModifiers & Windows.System.VirtualKeyModifiers.Menu) != 0;
+        var control = IsKeyDown(Windows.System.VirtualKey.Control);
+        var shift = IsKeyDown(Windows.System.VirtualKey.Shift);
+        var alt = IsKeyDown(Windows.System.VirtualKey.Menu);
         if (!control && !alt)
         {
             return;
@@ -233,6 +233,12 @@ public sealed partial class ShellWindow
             Forward();
             args.Handled = true;
         }
+    }
+
+    static bool IsKeyDown(Windows.System.VirtualKey key)
+    {
+        var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(key);
+        return state.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
     }
 
     void Cycle(int delta)

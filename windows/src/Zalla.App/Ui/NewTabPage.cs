@@ -1,3 +1,5 @@
+using Microsoft.UI.Xaml.Shapes;
+
 namespace Zalla;
 
 sealed class NewTabPage : Grid
@@ -25,14 +27,14 @@ sealed class NewTabPage : Grid
         {
             Text = "Zalla",
             FontSize = 76,
-            FontWeight = Windows.UI.Text.FontWeights.ExtraBold,
+            FontWeight = FontWeights.ExtraBold,
             Foreground = Paint.Brush(Paint.White)
         });
         logo.Children.Add(new TextBlock
         {
             Text = ".",
             FontSize = 76,
-            FontWeight = Windows.UI.Text.FontWeights.ExtraBold,
+            FontWeight = FontWeights.ExtraBold,
             Foreground = Paint.Brush("E33B4F")
         });
         _center.Children.Add(logo);
@@ -97,7 +99,7 @@ sealed class NewTabPage : Grid
         {
             Text = name[..1],
             FontSize = 20,
-            FontWeight = Windows.UI.Text.FontWeights.Bold,
+            FontWeight = FontWeights.Bold,
             Foreground = Paint.Brush(Paint.White),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center

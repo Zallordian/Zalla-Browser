@@ -24,6 +24,8 @@ static class Paint
 
     public static SolidColorBrush Brush(Color color) => new(color);
 
+    public static SolidColorBrush Brush(Color color, byte alpha) => new(Color.FromArgb(alpha, color.R, color.G, color.B));
+
     public static SolidColorBrush Brush(string hex, byte alpha = 255) => new(Hex(hex, alpha));
 
     public static Color On(Color color)

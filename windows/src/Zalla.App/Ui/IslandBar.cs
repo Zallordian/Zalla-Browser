@@ -1,5 +1,3 @@
-using Windows.UI.Text;
-
 namespace Zalla;
 
 sealed class IslandBar : Grid

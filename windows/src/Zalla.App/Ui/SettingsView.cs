@@ -47,7 +47,7 @@ sealed class SettingsView : Grid
         Children.Add(card);
 
         var header = new Grid { Margin = new Thickness(0, 8, 0, 8) };
-        header.Children.Add(new TextBlock { Text = Copy.Settings, FontSize = 28, FontWeight = Windows.UI.Text.FontWeights.Bold });
+        header.Children.Add(new TextBlock { Text = Copy.Settings, FontSize = 28, FontWeight = FontWeights.Bold });
         var closeButton = Paint.Flat(new TextBlock { Text = "\u00D7", FontSize = 22 }, 36);
         closeButton.HorizontalAlignment = HorizontalAlignment.Right;
         closeButton.Click += (_, _) => close();
@@ -162,7 +162,7 @@ sealed class SettingsView : Grid
     {
         Text = text,
         FontSize = 18,
-        FontWeight = Windows.UI.Text.FontWeights.SemiBold,
+        FontWeight = FontWeights.SemiBold,
         Margin = new Thickness(0, 16, 0, 4)
     };
 

@@ -1,3 +1,4 @@
+using Microsoft.UI.Xaml.Shapes;
 using Windows.Graphics;
 
 namespace Zalla;
@@ -67,7 +68,7 @@ public sealed partial class ShellWindow : Window
     public ShellWindow()
     {
         Title = "Zalla";
-        _root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zalla");
+        _root = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zalla");
         _spacesRoot = SettingsStore.SpacesRoot(_root);
         Directory.CreateDirectory(_spacesRoot);
         SpaceWipe.ConsumePending(_spacesRoot);
@@ -276,7 +277,7 @@ public sealed partial class ShellWindow : Window
             }
 
             AppWindow.Title = "Zalla";
-            var icon = Path.Combine(AppContext.BaseDirectory, "Assets", "zalla.ico");
+            var icon = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "zalla.ico");
             if (File.Exists(icon))
             {
                 AppWindow.SetIcon(icon);

@@ -1,13 +1,15 @@
+using Microsoft.UI.Xaml.Shapes;
+
 namespace Zalla;
 
 sealed class ShieldCard : Grid
 {
     readonly Border _card = new();
     readonly Ellipse _orb = new() { Width = 46, Height = 46 };
-    readonly TextBlock _title = new() { FontWeight = Windows.UI.Text.FontWeights.Bold, FontSize = 15 };
+    readonly TextBlock _title = new() { FontWeight = FontWeights.Bold, FontSize = 15 };
     readonly TextBlock _tune = new() { Text = Copy.ClickToTune, FontSize = 12, Opacity = 0.7 };
     readonly TextBlock _lines = new() { FontSize = 12, Opacity = 0.88, Margin = new Thickness(0, 12, 0, 0) };
-    readonly TextBlock _count = new() { FontSize = 30, FontWeight = Windows.UI.Text.FontWeights.ExtraBold, Margin = new Thickness(0, 8, 0, 0) };
+    readonly TextBlock _count = new() { FontSize = 30, FontWeight = FontWeights.ExtraBold, Margin = new Thickness(0, 8, 0, 0) };
     readonly TextBlock _countLabel = new() { Text = Copy.BlockedWeek, FontSize = 12, Opacity = 0.65 };
     readonly StackPanel _details = new();
 

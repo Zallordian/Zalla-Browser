@@ -391,7 +391,7 @@ public sealed partial class ShellWindow
 
         var folder = SettingsStore.WebViewDirectory(_root, space);
         Directory.CreateDirectory(folder);
-        var environment = await CoreWebView2Environment.CreateAsync(null!, folder);
+        var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null!, folder, new CoreWebView2EnvironmentOptions());
         _environments[space] = environment;
         return environment;
     }
