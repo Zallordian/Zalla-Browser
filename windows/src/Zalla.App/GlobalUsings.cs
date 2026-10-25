@@ -1,0 +1,14 @@
+global using Microsoft.UI.Dispatching;
+global using Microsoft.UI.Xaml;
+global using Microsoft.UI.Xaml.Automation;
+global using Microsoft.UI.Xaml.Controls;
+global using Microsoft.UI.Xaml.Controls.Primitives;
+global using Microsoft.UI.Xaml.Input;
+global using Microsoft.UI.Xaml.Media;
+global using Microsoft.UI.Xaml.Media.Imaging;
+global using Microsoft.UI.Xaml.Shapes;
+global using Microsoft.UI.Windowing;
+global using Microsoft.Web.WebView2.Core;
+global using Windows.Foundation;
+global using Windows.UI;
+global using Zalla.Core;
