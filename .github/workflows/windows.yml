@@ -1,0 +1,74 @@
+name: Windows
+
+on:
+  push:
+    paths:
+      - "windows/**"
+      - "shared/themes.json"
+      - ".github/workflows/windows.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "shared/themes.json"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Check theme export
+        run: python windows/tools/export_themes.py --check
+
+      - name: Test
+        run: dotnet test windows/tests/Zalla.Core.Tests/Zalla.Core.Tests.csproj -c Release --nologo
+
+      - name: Publish unpackaged app
+        run: >
+          dotnet publish windows/src/Zalla.App/Zalla.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:Platform=x64
+          -p:WindowsAppSDKSelfContained=true
+          -p:WindowsPackageType=None
+          -p:PublishReadyToRun=false
+          -p:PublishTrimmed=false
+          -p:SelfContained=true
+          -o windows/artifacts/publish
+
+      - name: Zip the app
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "windows/artifacts/publish/Zalla.exe")) {
+            throw "Zalla.exe was not published."
+          }
+          New-Item -ItemType Directory -Force -Path "windows/artifacts" | Out-Null
+          tar -a -cf "windows/artifacts/Zalla-Windows-win-x64.zip" -C "windows/artifacts/publish" .
+
+      - name: Upload zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zalla-Windows-win-x64
+          path: windows/artifacts/Zalla-Windows-win-x64.zip
+          if-no-files-found: error
+
+      - name: Pack unsigned MSIX
+        shell: pwsh
+        run: pwsh -File windows/tools/pack-msix.ps1 -PublishDir windows/artifacts/publish -Output windows/artifacts/Zalla-Windows-win-x64.msix
+
+      - name: Upload MSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zalla-Windows-win-x64-msix
+          path: windows/artifacts/Zalla-Windows-win-x64.msix
+          if-no-files-found: error

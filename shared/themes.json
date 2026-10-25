@@ -1,0 +1,1381 @@
+{
+  "version": 1,
+  "note": "Theme colors exported from the iOS app. Both apps can read this file. Windows chooses its own starting theme in the desktop project.",
+  "exportedFrom": [
+    "Zalla/ZallaTheme.swift",
+    "Zalla/NewTabBackground.swift",
+    "Zalla/SeasonalThemes.swift",
+    "Zalla/ThemePacks.swift"
+  ],
+  "themes": [
+    {
+      "id": "zallaRed",
+      "name": "Zalla Red",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "E33B4F",
+      "colors": {
+        "primary": "E33B4F",
+        "bright": "FF5266",
+        "deep": "A91F36",
+        "highlight": "FF6B63",
+        "gradientEnd": "D83B72"
+      },
+      "icon": "Default"
+    },
+    {
+      "id": "orange",
+      "name": "Orange",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "F06A2F",
+      "colors": {
+        "primary": "F06A2F",
+        "bright": "FF8A4A",
+        "deep": "B54716",
+        "highlight": "FF9B6B",
+        "gradientEnd": "F08A3C"
+      },
+      "icon": "Orange"
+    },
+    {
+      "id": "yellow",
+      "name": "Yellow",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "E0A21A",
+      "colors": {
+        "primary": "E0A21A",
+        "bright": "F5C84B",
+        "deep": "A87410",
+        "highlight": "FFD56A",
+        "gradientEnd": "E8B84A"
+      },
+      "icon": "Yellow"
+    },
+    {
+      "id": "green",
+      "name": "Green",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "2FA866",
+      "colors": {
+        "primary": "2FA866",
+        "bright": "4BC98A",
+        "deep": "1E7A4A",
+        "highlight": "6ED9A0",
+        "gradientEnd": "3BBF8A"
+      },
+      "icon": "Green"
+    },
+    {
+      "id": "blue",
+      "name": "Blue",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "2F6FED",
+      "colors": {
+        "primary": "2F6FED",
+        "bright": "5B8FFF",
+        "deep": "1E4BB8",
+        "highlight": "7AA7FF",
+        "gradientEnd": "4B7CF0"
+      },
+      "icon": "Blue"
+    },
+    {
+      "id": "indigo",
+      "name": "Indigo",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "4F5BD5",
+      "colors": {
+        "primary": "4F5BD5",
+        "bright": "6E78E8",
+        "deep": "343CA8",
+        "highlight": "8B93F0",
+        "gradientEnd": "5A4FD0"
+      },
+      "icon": "Indigo"
+    },
+    {
+      "id": "violet",
+      "name": "Violet",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "8B3DDB",
+      "colors": {
+        "primary": "8B3DDB",
+        "bright": "A85CF0",
+        "deep": "5E2499",
+        "highlight": "C07AFF",
+        "gradientEnd": "9B4DE0"
+      },
+      "icon": "Violet"
+    },
+    {
+      "id": "ocean",
+      "name": "Ocean",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "1F8A9E",
+      "colors": {
+        "primary": "1F8A9E",
+        "bright": "2EB7C9",
+        "deep": "0F5C6B",
+        "highlight": "5DD0DC",
+        "gradientEnd": "2A6FBF"
+      },
+      "icon": "Ocean"
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "group": "accent",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "2F7A4A",
+      "colors": {
+        "primary": "2F7A4A",
+        "bright": "4A9B64",
+        "deep": "1B4D30",
+        "highlight": "6BB87A",
+        "gradientEnd": "3A6B3F"
+      },
+      "icon": "Forest"
+    },
+    {
+      "id": "space",
+      "name": "Space",
+      "group": "pack",
+      "requiresUnlock": false,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "6B7CFF",
+      "colors": {
+        "primary": "6B7CFF",
+        "bright": "8B9BFF",
+        "deep": "3A4499",
+        "highlight": "B0A0FF",
+        "gradientEnd": "9B6BFF"
+      },
+      "icon": "Space"
+    },
+    {
+      "id": "jungle",
+      "name": "Jungle",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "8DB63C",
+      "colors": {
+        "primary": "8DB63C",
+        "bright": "A8D354",
+        "deep": "4E6F1E",
+        "highlight": "C5E27A",
+        "gradientEnd": "3F9B4E"
+      },
+      "icon": "Jungle"
+    },
+    {
+      "id": "volcano",
+      "name": "Volcano",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "E8481C",
+      "colors": {
+        "primary": "E8481C",
+        "bright": "FF6A2E",
+        "deep": "9E2410",
+        "highlight": "FFA14A",
+        "gradientEnd": "FF8A1E"
+      },
+      "icon": "Volcano"
+    },
+    {
+      "id": "deepOcean",
+      "name": "Deep Ocean",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "14A3B8",
+      "colors": {
+        "primary": "14A3B8",
+        "bright": "3CD0E0",
+        "deep": "0B5F70",
+        "highlight": "8FEAF0",
+        "gradientEnd": "1E7FC4"
+      },
+      "icon": "DeepOcean"
+    },
+    {
+      "id": "arcade",
+      "name": "Retro Arcade",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "FF4FB0",
+      "colors": {
+        "primary": "FF4FB0",
+        "bright": "FF7AC8",
+        "deep": "A3216F",
+        "highlight": "FFE35A",
+        "gradientEnd": "4F7BFF"
+      },
+      "icon": "RetroArcade"
+    },
+    {
+      "id": "neonCity",
+      "name": "Neon City",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "E83CFF",
+      "colors": {
+        "primary": "E83CFF",
+        "bright": "FF6BFF",
+        "deep": "8A1FA8",
+        "highlight": "5CF2FF",
+        "gradientEnd": "2AD9FF"
+      },
+      "icon": "NeonCity"
+    },
+    {
+      "id": "arctic",
+      "name": "Arctic",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "5AB8E8",
+      "colors": {
+        "primary": "5AB8E8",
+        "bright": "8AD2F5",
+        "deep": "2A7BAF",
+        "highlight": "CBEFFF",
+        "gradientEnd": "7FA8F5"
+      },
+      "icon": "Arctic"
+    },
+    {
+      "id": "cherryBlossom",
+      "name": "Cherry Blossom",
+      "group": "pack",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "F0709C",
+      "colors": {
+        "primary": "F0709C",
+        "bright": "FF92B8",
+        "deep": "B03F68",
+        "highlight": "FFC2D6",
+        "gradientEnd": "E86FB8"
+      },
+      "icon": "CherryBlossom"
+    },
+    {
+      "id": "northwoods",
+      "name": "Northwoods",
+      "group": "pro",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "2E6B4F",
+      "colors": {
+        "primary": "2E6B4F",
+        "bright": "4A8F6C",
+        "deep": "173D2C",
+        "highlight": "F2B84B",
+        "gradientEnd": "D49A3A"
+      },
+      "icon": "Northwoods"
+    },
+    {
+      "id": "lakeSuperior",
+      "name": "Lake Superior",
+      "group": "pro",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "4A6F8F",
+      "colors": {
+        "primary": "4A6F8F",
+        "bright": "6B8FAF",
+        "deep": "2B4560",
+        "highlight": "FF7A2F",
+        "gradientEnd": "7F95A8"
+      },
+      "icon": "LakeSuperior"
+    },
+    {
+      "id": "midnightEmber",
+      "name": "Midnight Ember",
+      "group": "pro",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "C2361F",
+      "colors": {
+        "primary": "C2361F",
+        "bright": "E85A33",
+        "deep": "6E160C",
+        "highlight": "FFB067",
+        "gradientEnd": "F07A24"
+      },
+      "icon": "MidnightEmber"
+    },
+    {
+      "id": "aurora",
+      "name": "Aurora",
+      "group": "pro",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": true,
+      "primaryHex": "3FD9A0",
+      "colors": {
+        "primary": "3FD9A0",
+        "bright": "6FF0BE",
+        "deep": "1E7F66",
+        "highlight": "B48CFF",
+        "gradientEnd": "8A5CF0"
+      },
+      "icon": "Aurora"
+    },
+    {
+      "id": "oledVoid",
+      "name": "OLED Void",
+      "group": "pro",
+      "requiresUnlock": true,
+      "seasonal": false,
+      "usesGradientAccent": false,
+      "primaryHex": "9AA4B5",
+      "colors": {
+        "primary": "9AA4B5",
+        "bright": "C3CAD6",
+        "deep": "5E6675",
+        "highlight": "E6EAF0",
+        "gradientEnd": "9AA4B5"
+      },
+      "icon": "OLEDVoid"
+    },
+    {
+      "id": "newYear",
+      "name": "New Year's",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "D4AF37",
+      "colors": {
+        "primary": "D4AF37",
+        "bright": "F0CF60",
+        "deep": "8F7420",
+        "highlight": "FFF1B0",
+        "gradientEnd": "C0C6D0"
+      },
+      "icon": "NewYear"
+    },
+    {
+      "id": "winter",
+      "name": "Winter",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "6FA8DC",
+      "colors": {
+        "primary": "6FA8DC",
+        "bright": "9CC8EE",
+        "deep": "3C6E9E",
+        "highlight": "E6F3FF",
+        "gradientEnd": "8FA0E8"
+      },
+      "icon": "Winter"
+    },
+    {
+      "id": "valentines",
+      "name": "Valentine's Day",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "E0457B",
+      "colors": {
+        "primary": "E0457B",
+        "bright": "FF6F9C",
+        "deep": "A0234F",
+        "highlight": "FFC1D3",
+        "gradientEnd": "C2185B"
+      },
+      "icon": "Valentines"
+    },
+    {
+      "id": "stPatricks",
+      "name": "Saint Patrick's Day",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "1FA64A",
+      "colors": {
+        "primary": "1FA64A",
+        "bright": "3FCB6B",
+        "deep": "0F6B2E",
+        "highlight": "F2D16B",
+        "gradientEnd": "2E8B57"
+      },
+      "icon": "StPatricks"
+    },
+    {
+      "id": "easter",
+      "name": "Easter",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "B79CF0",
+      "colors": {
+        "primary": "B79CF0",
+        "bright": "CDB8FF",
+        "deep": "7A60B8",
+        "highlight": "FFF0A8",
+        "gradientEnd": "8FD6C8"
+      },
+      "icon": "Easter"
+    },
+    {
+      "id": "spring",
+      "name": "Spring",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "6CC070",
+      "colors": {
+        "primary": "6CC070",
+        "bright": "8FDB8F",
+        "deep": "3E8A45",
+        "highlight": "FFD1E0",
+        "gradientEnd": "E88AB0"
+      },
+      "icon": "Spring"
+    },
+    {
+      "id": "memorialDay",
+      "name": "Memorial Day",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "3A5BA8",
+      "colors": {
+        "primary": "3A5BA8",
+        "bright": "5A7BC8",
+        "deep": "1C2F5C",
+        "highlight": "D23C3C",
+        "gradientEnd": "B33A3A"
+      },
+      "icon": "MemorialDay"
+    },
+    {
+      "id": "summer",
+      "name": "Summer",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "FFB020",
+      "colors": {
+        "primary": "FFB020",
+        "bright": "FFC94D",
+        "deep": "C77A00",
+        "highlight": "FFE38A",
+        "gradientEnd": "FF6A4D"
+      },
+      "icon": "Summer"
+    },
+    {
+      "id": "fourthOfJuly",
+      "name": "Fourth of July",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "D7263D",
+      "colors": {
+        "primary": "D7263D",
+        "bright": "F04A5E",
+        "deep": "8F1626",
+        "highlight": "FFFFFF",
+        "gradientEnd": "2F5DCC"
+      },
+      "icon": "FourthOfJuly"
+    },
+    {
+      "id": "halloween",
+      "name": "Halloween",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "F07A1A",
+      "colors": {
+        "primary": "F07A1A",
+        "bright": "FF9A3D",
+        "deep": "A8480A",
+        "highlight": "B26BFF",
+        "gradientEnd": "8E3FD6"
+      },
+      "icon": "Halloween"
+    },
+    {
+      "id": "harvest",
+      "name": "Fall Harvest",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "C8642A",
+      "colors": {
+        "primary": "C8642A",
+        "bright": "E0853F",
+        "deep": "8A3D17",
+        "highlight": "F2C14E",
+        "gradientEnd": "A6451F"
+      },
+      "icon": "Harvest"
+    },
+    {
+      "id": "christmas",
+      "name": "Christmas",
+      "group": "seasonal",
+      "requiresUnlock": false,
+      "seasonal": true,
+      "usesGradientAccent": true,
+      "primaryHex": "C8102E",
+      "colors": {
+        "primary": "C8102E",
+        "bright": "E8394F",
+        "deep": "7F0A1C",
+        "highlight": "F4D58D",
+        "gradientEnd": "1E7B45"
+      },
+      "icon": "Christmas"
+    }
+  ],
+  "seasonalWindows": [
+    {
+      "id": "newYear",
+      "kind": "fixed",
+      "start": {
+        "month": 12,
+        "day": 26,
+        "yearOffset": -1
+      },
+      "end": {
+        "month": 1,
+        "day": 7,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "winter",
+      "kind": "fixed",
+      "start": {
+        "month": 12,
+        "day": 1,
+        "yearOffset": -1
+      },
+      "end": {
+        "month": 2,
+        "day": 0,
+        "yearOffset": 0,
+        "dayMeaning": "last day of the month"
+      }
+    },
+    {
+      "id": "valentines",
+      "kind": "fixed",
+      "start": {
+        "month": 2,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 2,
+        "day": 15,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "stPatricks",
+      "kind": "fixed",
+      "start": {
+        "month": 3,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 3,
+        "day": 18,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "easter",
+      "kind": "computed",
+      "rule": "westernEaster",
+      "startOffsetDays": -14,
+      "endOffsetDays": 1
+    },
+    {
+      "id": "spring",
+      "kind": "fixed",
+      "start": {
+        "month": 3,
+        "day": 19,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 5,
+        "day": 31,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "memorialDay",
+      "kind": "computed",
+      "rule": "usMemorialDay",
+      "startOffsetDays": -9,
+      "endOffsetDays": 0
+    },
+    {
+      "id": "summer",
+      "kind": "fixed",
+      "start": {
+        "month": 6,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 8,
+        "day": 31,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "fourthOfJuly",
+      "kind": "fixed",
+      "start": {
+        "month": 6,
+        "day": 24,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 7,
+        "day": 7,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "halloween",
+      "kind": "fixed",
+      "start": {
+        "month": 10,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 11,
+        "day": 1,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "harvest",
+      "kind": "fixed",
+      "start": {
+        "month": 10,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 11,
+        "day": 30,
+        "yearOffset": 0
+      }
+    },
+    {
+      "id": "christmas",
+      "kind": "fixed",
+      "start": {
+        "month": 12,
+        "day": 1,
+        "yearOffset": 0
+      },
+      "end": {
+        "month": 12,
+        "day": 26,
+        "yearOffset": 0
+      }
+    }
+  ],
+  "newTabBackgrounds": [
+    {
+      "id": "crimson",
+      "name": "Crimson",
+      "colors": [
+        "E33B4F",
+        "8F1B31"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": null,
+      "decor": "none",
+      "requiresUnlock": false
+    },
+    {
+      "id": "rose",
+      "name": "Rose",
+      "colors": [
+        "FFC2CD",
+        "F27C90"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": null,
+      "decor": "none",
+      "requiresUnlock": false
+    },
+    {
+      "id": "graphite",
+      "name": "Graphite",
+      "colors": [
+        "34343B",
+        "121215"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": null,
+      "decor": "none",
+      "requiresUnlock": false
+    },
+    {
+      "id": "snow",
+      "name": "Snow",
+      "colors": [
+        "FFFFFF",
+        "E9E9F0"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": null,
+      "decor": "none",
+      "requiresUnlock": false
+    },
+    {
+      "id": "sunset",
+      "name": "Sunset",
+      "colors": [
+        "FF9A5A",
+        "E33B4F",
+        "6E1F5C"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "warm",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "ember",
+      "name": "Ember",
+      "colors": [
+        "F06A2F",
+        "A91F36",
+        "35101B"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "warm",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "peach",
+      "name": "Peach",
+      "colors": [
+        "FFE1D0",
+        "FFB3A7"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "warm",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "copper",
+      "name": "Copper",
+      "colors": [
+        "C98555",
+        "5F3421"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "warm",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "ocean",
+      "name": "Ocean",
+      "colors": [
+        "2EB7C9",
+        "1F5FBF",
+        "0B2A55"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "cool",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "glacier",
+      "name": "Glacier",
+      "colors": [
+        "EAF7FF",
+        "B5DBF2"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "cool",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "midnight",
+      "name": "Midnight",
+      "colors": [
+        "262B66",
+        "0A0B1E"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "cool",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "aurora",
+      "name": "Aurora",
+      "colors": [
+        "3DDC97",
+        "2F6FED",
+        "6B3DDB"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "cool",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "colors": [
+        "3B8F5B",
+        "0F2D1B"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "nature",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "meadow",
+      "name": "Meadow",
+      "colors": [
+        "E2F6D0",
+        "9AD08F"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "nature",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "dune",
+      "name": "Dune",
+      "colors": [
+        "F6E8C8",
+        "D8B77F"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "nature",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "stone",
+      "name": "Stone",
+      "colors": [
+        "8E939C",
+        "464A52"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "nature",
+      "decor": "none",
+      "requiresUnlock": true
+    },
+    {
+      "id": "nebula",
+      "name": "Nebula",
+      "colors": [
+        "4B2AA8",
+        "1B1145",
+        "07071A"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "space",
+      "decor": "stars",
+      "requiresUnlock": true
+    },
+    {
+      "id": "deepspace",
+      "name": "Deep Space",
+      "colors": [
+        "10112B",
+        "000000"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "space",
+      "decor": "stars",
+      "requiresUnlock": true
+    },
+    {
+      "id": "moonrise",
+      "name": "Moonrise",
+      "colors": [
+        "8B9BFF",
+        "2A2F73",
+        "0D0E2A"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "space",
+      "decor": "stars",
+      "requiresUnlock": true
+    },
+    {
+      "id": "canopy",
+      "name": "Canopy",
+      "colors": [
+        "3F9B4E",
+        "17472B",
+        "071A0F"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "jungle",
+      "decor": "leaves",
+      "requiresUnlock": true
+    },
+    {
+      "id": "understory",
+      "name": "Understory",
+      "colors": [
+        "8DB63C",
+        "2F5F2A"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "jungle",
+      "decor": "leaves",
+      "requiresUnlock": true
+    },
+    {
+      "id": "monsoon",
+      "name": "Monsoon",
+      "colors": [
+        "1F4D3A",
+        "07160F"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "jungle",
+      "decor": "leaves",
+      "requiresUnlock": true
+    },
+    {
+      "id": "mist",
+      "name": "Mist",
+      "colors": [
+        "E4F0D0",
+        "A5C883"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "jungle",
+      "decor": "leaves",
+      "requiresUnlock": true
+    },
+    {
+      "id": "lava",
+      "name": "Lava",
+      "colors": [
+        "E8481C",
+        "7A1608",
+        "1A0505"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "volcano",
+      "decor": "embers",
+      "requiresUnlock": true
+    },
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "colors": [
+        "3A2626",
+        "0B0707"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "volcano",
+      "decor": "embers",
+      "requiresUnlock": true
+    },
+    {
+      "id": "caldera",
+      "name": "Caldera",
+      "colors": [
+        "FF8A1E",
+        "B2230F",
+        "2B0707"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "volcano",
+      "decor": "embers",
+      "requiresUnlock": true
+    },
+    {
+      "id": "lagoon",
+      "name": "Lagoon",
+      "colors": [
+        "2EC4C9",
+        "0F6F86",
+        "042A3A"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "deepocean",
+      "decor": "bubbles",
+      "requiresUnlock": true
+    },
+    {
+      "id": "abyss",
+      "name": "Abyss",
+      "colors": [
+        "0B4A5E",
+        "010F1A"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "deepocean",
+      "decor": "bubbles",
+      "requiresUnlock": true
+    },
+    {
+      "id": "reef",
+      "name": "Reef",
+      "colors": [
+        "1FB5BD",
+        "0A5C73"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "deepocean",
+      "decor": "bubbles",
+      "requiresUnlock": true
+    },
+    {
+      "id": "cabinet",
+      "name": "Cabinet",
+      "colors": [
+        "FF4FB0",
+        "5B1F8F",
+        "0D0B2E"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "arcade",
+      "decor": "pixels",
+      "requiresUnlock": true
+    },
+    {
+      "id": "synthgrid",
+      "name": "Synthgrid",
+      "colors": [
+        "4F7BFF",
+        "241A66",
+        "0A0820"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "arcade",
+      "decor": "pixels",
+      "requiresUnlock": true
+    },
+    {
+      "id": "pixelsky",
+      "name": "Pixel Sky",
+      "colors": [
+        "1B1450",
+        "07051A"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "arcade",
+      "decor": "pixels",
+      "requiresUnlock": true
+    },
+    {
+      "id": "neonnight",
+      "name": "Neon Night",
+      "colors": [
+        "3A1070",
+        "120628",
+        "05030F"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "neoncity",
+      "decor": "neon",
+      "requiresUnlock": true
+    },
+    {
+      "id": "afterhours",
+      "name": "Afterhours",
+      "colors": [
+        "FF2E93",
+        "4A1070",
+        "0A0614"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "neoncity",
+      "decor": "neon",
+      "requiresUnlock": true
+    },
+    {
+      "id": "skyline",
+      "name": "Skyline",
+      "colors": [
+        "1FA8E0",
+        "0A1F4D",
+        "05040F"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "neoncity",
+      "decor": "neon",
+      "requiresUnlock": true
+    },
+    {
+      "id": "tundra",
+      "name": "Tundra",
+      "colors": [
+        "F2FBFF",
+        "B6DDF2"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "arctic",
+      "decor": "frost",
+      "requiresUnlock": true
+    },
+    {
+      "id": "iceberg",
+      "name": "Iceberg",
+      "colors": [
+        "58BBE0",
+        "1B5E86",
+        "07243D"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "arctic",
+      "decor": "frost",
+      "requiresUnlock": true
+    },
+    {
+      "id": "polar",
+      "name": "Polar Night",
+      "colors": [
+        "12456E",
+        "03111E"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "arctic",
+      "decor": "frost",
+      "requiresUnlock": true
+    },
+    {
+      "id": "sakura",
+      "name": "Sakura",
+      "colors": [
+        "FFE2EB",
+        "F7A8C2"
+      ],
+      "style": "linear",
+      "isDark": false,
+      "pack": "cherryblossom",
+      "decor": "petals",
+      "requiresUnlock": true
+    },
+    {
+      "id": "hanami",
+      "name": "Hanami",
+      "colors": [
+        "F27AA5",
+        "7A2D5C",
+        "2A0F2A"
+      ],
+      "style": "linear",
+      "isDark": true,
+      "pack": "cherryblossom",
+      "decor": "petals",
+      "requiresUnlock": true
+    },
+    {
+      "id": "blossomdusk",
+      "name": "Blossom Dusk",
+      "colors": [
+        "6A2F68",
+        "1C0B26"
+      ],
+      "style": "radial",
+      "isDark": true,
+      "pack": "cherryblossom",
+      "decor": "petals",
+      "requiresUnlock": true
+    }
+  ],
+  "themePacks": [
+    {
+      "id": "space",
+      "name": "Space",
+      "tagline": "Stars, a purple-blue glow, and a rocket that crosses the screen on refresh.",
+      "themeId": "space",
+      "icon": "space",
+      "backgroundPresetId": "nebula",
+      "transition": "space",
+      "symbolName": "sparkles"
+    },
+    {
+      "id": "jungle",
+      "name": "Jungle",
+      "tagline": "Leaves, deep greens, and a leafy curtain that sweeps across on refresh.",
+      "themeId": "jungle",
+      "icon": "jungle",
+      "backgroundPresetId": "canopy",
+      "transition": "jungle",
+      "symbolName": "leaf"
+    },
+    {
+      "id": "volcano",
+      "name": "Volcano",
+      "tagline": "Black rock, ember red, and a wall of lava with flying sparks on refresh.",
+      "themeId": "volcano",
+      "icon": "volcano",
+      "backgroundPresetId": "lava",
+      "transition": "volcano",
+      "symbolName": "flame"
+    },
+    {
+      "id": "deepocean",
+      "name": "Deep Ocean",
+      "tagline": "Deep teal, aqua, bubbles, and a wave that rolls across and pulls back on refresh.",
+      "themeId": "deepOcean",
+      "icon": "deepOcean",
+      "backgroundPresetId": "lagoon",
+      "transition": "ocean",
+      "symbolName": "water.waves"
+    },
+    {
+      "id": "arcade",
+      "name": "Retro Arcade",
+      "tagline": "Pixel stars in pink, blue, and yellow, and a CRT pixel dissolve on refresh.",
+      "themeId": "arcade",
+      "icon": "arcade",
+      "backgroundPresetId": "cabinet",
+      "transition": "arcade",
+      "symbolName": "gamecontroller"
+    },
+    {
+      "id": "neoncity",
+      "name": "Neon City",
+      "tagline": "Magenta and cyan glow, flickering tubes, and a neon wipe with glow streaks on refresh.",
+      "themeId": "neonCity",
+      "icon": "neonCity",
+      "backgroundPresetId": "neonnight",
+      "transition": "neon",
+      "symbolName": "building.2"
+    },
+    {
+      "id": "arctic",
+      "name": "Arctic",
+      "tagline": "Ice blue, snow sparkle, and frost that spreads across the screen on refresh.",
+      "themeId": "arctic",
+      "icon": "arctic",
+      "backgroundPresetId": "iceberg",
+      "transition": "arctic",
+      "symbolName": "snowflake"
+    },
+    {
+      "id": "cherryblossom",
+      "name": "Cherry Blossom",
+      "tagline": "Soft pinks, drifting petals, and a swirl of blossoms that sweeps across on refresh.",
+      "themeId": "cherryBlossom",
+      "icon": "cherryBlossom",
+      "backgroundPresetId": "hanami",
+      "transition": "blossom",
+      "symbolName": "leaf.circle"
+    }
+  ]
+}
