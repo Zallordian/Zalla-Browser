@@ -1,7 +1,8 @@
 namespace Zalla;
 
-sealed class ShieldCard : Border
+sealed class ShieldCard : Grid
 {
+    readonly Border _card = new();
     readonly Ellipse _orb = new() { Width = 46, Height = 46 };
     readonly TextBlock _title = new() { FontWeight = Windows.UI.Text.FontWeights.Bold, FontSize = 15 };
     readonly TextBlock _tune = new() { Text = Copy.ClickToTune, FontSize = 12, Opacity = 0.7 };
@@ -13,11 +14,12 @@ sealed class ShieldCard : Border
     public ShieldCard()
     {
         Width = 210;
-        Padding = new Thickness(16);
-        CornerRadius = new CornerRadius(22);
-        BorderThickness = new Thickness(1);
-        Child = Build();
-        PointerPressed += (_, e) =>
+        _card.Padding = new Thickness(16);
+        _card.CornerRadius = new CornerRadius(22);
+        _card.BorderThickness = new Thickness(1);
+        _card.Child = Build();
+        Children.Add(_card);
+        _card.PointerPressed += (_, e) =>
         {
             OpenSettings?.Invoke();
             e.Handled = true;
@@ -30,8 +32,8 @@ sealed class ShieldCard : Border
     {
         var on = privacy.ShieldOn;
         _title.Text = on ? Copy.ShieldOn : Copy.ShieldOff;
-        Background = Paint.Brush(on ? "0A1E16" : "1A1C20", 170);
-        BorderBrush = Paint.Brush(on ? "6EE7A8" : "FFFFFF", on ? (byte)90 : (byte)40);
+        _card.Background = Paint.Brush(on ? "0A1E16" : "1A1C20", 170);
+        _card.BorderBrush = Paint.Brush(on ? "6EE7A8" : "FFFFFF", on ? (byte)90 : (byte)40);
         _orb.Fill = new RadialGradientBrush
         {
             GradientStops =
