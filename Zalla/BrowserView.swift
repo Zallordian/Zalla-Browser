@@ -547,18 +547,16 @@ private struct TabContent: View {
 
     var body: some View {
         pageContent
-        .alert("Open another app?", isPresented: Binding(
-            get: { tab.externalURL != nil },
-            set: { if !$0 { tab.externalURL = nil } }
+        .alert(tab.externalPrompt?.title ?? "Open this link?", isPresented: Binding(
+            get: { tab.externalPrompt != nil },
+            set: { if !$0 { tab.dismissExternalPrompt() } }
         )) {
-            if let url = tab.externalURL {
-                Button("Open \(url.scheme ?? "link")") {
-                    UIApplication.shared.open(url)
-                    tab.externalURL = nil
-                }
+            let prompt = tab.externalPrompt
+            Button(prompt?.confirmTitle ?? "Open") {
+                tab.openExternalPrompt(prompt)
             }
-            Button("Cancel", role: .cancel) { tab.externalURL = nil }
-        } message: { Text(tab.externalURL?.absoluteString ?? "") }
+            Button("Cancel", role: .cancel) { tab.dismissExternalPrompt() }
+        }
         .alert("Compact toolbar", isPresented: Binding(
             get: { chromeTipMessage == ChromeModeTips.compactMessage },
             set: { if !$0 { chromeTipMessage = nil; hasSeenCompactTip = true } }
@@ -3558,7 +3556,7 @@ private struct SettingsView: View {
     }
     private var versionString: String {
         let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "39"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "50"
         return "\(marketing) (\(build))"
     }
 

@@ -357,6 +357,9 @@ final class BrowserStore: ObservableObject {
         tab.onOpenWindow = { [weak self] opener, configuration in
             self?.openChildTab(from: opener, configuration: configuration)
         }
+        tab.onUserGesture = { [weak self] source, kind in
+            self?.tabs.first { $0.webView === source }?.gestureClock.note(kind)
+        }
         tab.onCloseWindow = { [weak self] tab in
             self?.closeScriptWindow(tab)
         }
@@ -958,7 +961,12 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     @Published var errorMessage: String?
     /// A failed page load, shown as a full-page message instead of a small banner.
     @Published var pageError: FriendlyError?
-    @Published var externalURL: URL?
+    /// Build 50: the question shown before leaving Zalla for another app. Nil while nothing is asking.
+    @Published var externalPrompt: ExternalLinkPrompt?
+    /// Taps the page reported. A popup shares its opener's clock, so a tap and the window it opens agree.
+    var gestureClock = ExternalGestureClock()
+    /// A tap that happened in a popup. Its messages arrive on the tab that opened it, because they share a handler.
+    var onUserGesture: ((WKWebView, ExternalGestureKind) -> Void)?
     @Published var previewImage: UIImage?
     /// Build 44: a picture shown over the page for a moment while going back or switching tabs.
     @Published private(set) var transitionSnapshot: UIImage?
@@ -1069,6 +1077,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             scriptHandlerProxy.delegate = self
             // Build 40: the image hold lives in Zalla's own script world, so page scripts can neither see nor post to it.
             newController.add(scriptHandlerProxy, contentWorld: ImageHold.world, name: ImageHold.messageName)
+            newController.add(scriptHandlerProxy, contentWorld: ExternalLinks.world, name: ExternalLinks.gestureMessageName)
             newController.add(scriptHandlerProxy, name: CookieBannerDismiss.messageName)
             newController.add(scriptHandlerProxy, name: PageColor.messageName)
             if FeatureFlags.videoSaverEnabled {
@@ -1107,6 +1116,13 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     func applyPageScripts(for url: URL?) {
         let controller = webView.configuration.userContentController
         controller.removeAllUserScripts()
+        // Build 50: a real tap in any frame, including an ad frame, notes itself before the page's own script runs.
+        controller.addUserScript(WKUserScript(
+            source: ExternalLinks.gestureScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false,
+            in: ExternalLinks.world
+        ))
         controller.addUserScript(WKUserScript(
             source: ImageHold.script, injectionTime: .atDocumentEnd, forMainFrameOnly: true, in: ImageHold.world
         ))
@@ -1566,6 +1582,10 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     /// Lets go of everything this tab's web view holds so WebKit can free the page and its process (Burn It All).
     /// The tab is not used again afterwards.
     func tearDown() {
+        if externalPrompt != nil {
+            externalPrompt = nil
+            gestureClock.didDismiss()
+        }
         cancelOpenDialogs()
         webView.stopLoading()
         webView.navigationDelegate = nil
@@ -1696,6 +1716,16 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == ExternalLinks.gestureMessageName {
+            // Only Zalla's script world can reach this handler. A page posting the same name is ignored.
+            guard message.world == ExternalLinks.world, let kind = ExternalLinks.gestureKind(from: message.body) else { return }
+            if let source = message.webView, source !== webView {
+                onUserGesture?(source, kind)
+            } else {
+                gestureClock.note(kind)
+            }
+            return
+        }
         if message.name == PageColor.messageName {
             if let info = PageInfo.from(message.body) {
                 pageInfoHost = AppBanner.hostKey(webView.url?.host)
@@ -1946,68 +1976,151 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             isReaderActive = false
             readerOriginalURL = nil
         }
-        let scheme = url.scheme?.lowercased() ?? ""
-        if scheme == "blob" || scheme == "data" {
-            // JS-triggered blob/data downloads become WKDownload via the action path. A blob or data page inside a
-            // frame of the page (not a download link) loads normally.
-            let isMainFrame = navigationAction.targetFrame?.isMainFrame ?? true
-            if isMainFrame || navigationAction.shouldPerformDownload {
-                pendingDownloadURL = url
-                decisionHandler(.download)
-            } else {
-                decisionHandler(.allow)
+        let context = externalContext(for: navigationAction, url: url)
+        resolve(ExternalLinks.decision(for: context), context: context, navigationAction: navigationAction,
+                webView: webView, decisionHandler: decisionHandler)
+    }
+
+    /// Build 50: phone, mail, maps, the App Store, and other apps. A tap counts, including a script that runs
+    /// right after it (Google's Call button) and a link that asks for a new window. A page on its own does not.
+    private func externalContext(for navigationAction: WKNavigationAction, url: URL) -> ExternalLinkContext {
+        ExternalLinkContext(
+            url: url,
+            currentURL: webView.url,
+            activation: ExternalLinks.activation(for: navigationAction.navigationType),
+            gestureFresh: gestureClock.isFresh(),
+            gestureSettled: false,
+            wantsDownload: navigationAction.shouldPerformDownload,
+            isMainFrame: navigationAction.targetFrame?.isMainFrame ?? true,
+            hasTargetFrame: navigationAction.targetFrame != nil,
+            sourceIsMainFrame: navigationAction.sourceFrame.isMainFrame,
+            targetIsMainFrame: navigationAction.targetFrame?.isMainFrame ?? false,
+            method: navigationAction.request.httpMethod ?? "GET",
+            promptAllowed: gestureClock.allowsPrompt()
+        )
+    }
+
+    private func resolve(_ decision: ExternalLinkDecision, context: ExternalLinkContext,
+                         navigationAction: WKNavigationAction, webView: WKWebView,
+                         decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        switch decision {
+        case .wait:
+            // The tap note and this navigation are posted together. Look again once the note has had a chance to land.
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: ExternalLinks.gestureGraceNanoseconds)
+                guard let self else { decisionHandler(.cancel); return }
+                var retry = context
+                retry.gestureFresh = self.gestureClock.isFresh()
+                retry.gestureSettled = true
+                retry.promptAllowed = self.gestureClock.allowsPrompt()
+                self.resolve(ExternalLinks.decision(for: retry), context: retry, navigationAction: navigationAction,
+                             webView: webView, decisionHandler: decisionHandler)
             }
+        case .cancel:
+            decisionHandler(.cancel)
+        case .download:
+            pendingDownloadURL = context.url
+            decisionHandler(.download)
+        case .prompt(let prompt):
+            offerExternal(prompt)
+            decisionHandler(.cancel)
+        case .load(let fallback):
+            decisionHandler(.cancel)
+            load(fallback)
+        case .allow:
+            let scheme = context.url.scheme?.lowercased() ?? ""
+            if scheme == "javascript" || scheme == "applewebdata" || scheme == "blob" || scheme == "data" {
+                decisionHandler(.allow)
+                return
+            }
+            allowWebNavigation(context.url, navigationAction: navigationAction, webView: webView, decisionHandler: decisionHandler)
+        }
+    }
+
+    /// http, https, and about. Same-page anchors jump. Tracking tags and HTTPS-Only Mode still apply to real loads.
+    private func allowWebNavigation(_ url: URL, navigationAction: WKNavigationAction, webView: WKWebView,
+                                    decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let scheme = url.scheme?.lowercased() ?? ""
+        if ExternalLinks.isSameDocument(
+            from: webView.url, to: url, method: navigationAction.request.httpMethod ?? "GET",
+            hasTargetFrame: navigationAction.targetFrame != nil
+        ) {
+            decisionHandler(.allow)
             return
         }
-        if ["http", "https", "about"].contains(scheme) {
-            if PrivacyShield.stripLinks(), scheme != "about",
-               navigationAction.targetFrame?.isMainFrame == true,
-               navigationAction.navigationType == .linkActivated || navigationAction.navigationType == .other,
-               (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET",
-               lastStrippedSource != url,
-               stripCount < 3,
-               let cleanURL = TrackingParameters.cleaned(url) {
-                // Load the same page without tracking tags. If a site sends the tags straight back,
-                // the second time is let through so it cannot loop.
-                lastStrippedSource = url
-                stripCount += 1
-                if !isPrivate { PrivacyReport.record(.linkCleaned, host: cleanURL.host) }
-                decisionHandler(.cancel)
-                webView.load(URLRequest(url: cleanURL))
-                return
-            }
-            if scheme == "http", let original = pendingHTTPSUpgrade,
-               navigationAction.navigationType == .other,
-               isHTTPSOnlyCandidate(navigationAction),
-               original.host?.lowercased() == url.host?.lowercased() {
-                // The https page sent us back to http for the same site, so it has no working secure version.
-                decisionHandler(.cancel)
-                showHTTPSFallback(for: original)
-                return
-            }
-            if scheme == "http", isHTTPSOnlyCandidate(navigationAction),
-               let secureURL = HTTPSOnly.upgradedURL(for: url, exceptions: HTTPSOnlySession.exceptions) {
-                decisionHandler(.cancel)
-                pendingHTTPSUpgrade = url
-                webView.load(URLRequest(url: secureURL))
-                return
-            }
-            if navigationAction.targetFrame == nil, onOpenWindow == nil {
-                decisionHandler(.cancel)
-                webView.load(navigationAction.request)
-            } else {
-                if navigationAction.targetFrame?.isMainFrame == true {
-                    applyContentBlocking(for: url)
-                    applyPageScripts(for: url)
-                }
-                // New-window actions are allowed so WebKit asks createWebViewWith for a child tab.
-                decisionHandler(.allow)
-            }
-        } else {
-            if navigationAction.navigationType == .linkActivated,
-               ["mailto", "tel", "sms"].contains(scheme) { externalURL = url }
+        if PrivacyShield.stripLinks(), scheme != "about",
+           navigationAction.targetFrame?.isMainFrame == true,
+           navigationAction.navigationType == .linkActivated || navigationAction.navigationType == .other,
+           (navigationAction.request.httpMethod ?? "GET").uppercased() == "GET",
+           lastStrippedSource != url,
+           stripCount < 3,
+           let cleanURL = TrackingParameters.cleaned(url) {
+            // Load the same page without tracking tags. If a site sends the tags straight back,
+            // the second time is let through so it cannot loop.
+            lastStrippedSource = url
+            stripCount += 1
+            if !isPrivate { PrivacyReport.record(.linkCleaned, host: cleanURL.host) }
             decisionHandler(.cancel)
+            webView.load(URLRequest(url: cleanURL))
+            return
         }
+        if scheme == "http", let original = pendingHTTPSUpgrade,
+           navigationAction.navigationType == .other,
+           isHTTPSOnlyCandidate(navigationAction),
+           original.host?.lowercased() == url.host?.lowercased() {
+            // The https page sent us back to http for the same site, so it has no working secure version.
+            decisionHandler(.cancel)
+            showHTTPSFallback(for: original)
+            return
+        }
+        if scheme == "http", isHTTPSOnlyCandidate(navigationAction),
+           let secureURL = HTTPSOnly.upgradedURL(for: url, exceptions: HTTPSOnlySession.exceptions) {
+            decisionHandler(.cancel)
+            pendingHTTPSUpgrade = url
+            webView.load(URLRequest(url: secureURL))
+            return
+        }
+        if navigationAction.targetFrame == nil, onOpenWindow == nil {
+            decisionHandler(.cancel)
+            webView.load(navigationAction.request)
+        } else {
+            if navigationAction.targetFrame?.isMainFrame == true {
+                applyContentBlocking(for: url)
+                applyPageScripts(for: url)
+            }
+            // New-window actions are allowed so WebKit asks createWebViewWith for a child tab.
+            decisionHandler(.allow)
+        }
+    }
+
+    /// Shows the prompt once. A second attempt from the same tap, or one that arrives with no tap, is dropped.
+    private func offerExternal(_ prompt: ExternalLinkPrompt) {
+        guard gestureClock.allowsPrompt(), gestureClock.isFresh() else { return }
+        gestureClock.didShow()
+        externalPrompt = prompt
+    }
+
+    /// The person chose Open or Call. `prompt` is passed in because the dialog may already have cleared the
+    /// published one by the time the button runs. Hands the address to iOS.
+    func openExternalPrompt(_ prompt: ExternalLinkPrompt?) {
+        guard let prompt else { return }
+        if externalPrompt != nil {
+            externalPrompt = nil
+            gestureClock.didDismiss()
+        }
+        UIApplication.shared.open(prompt.url, options: [:]) { [weak self] accepted in
+            guard !accepted else { return }
+            Task { @MainActor in
+                self?.showToast("Couldn't open that app.")
+            }
+        }
+    }
+
+    /// Cancel, or the dialog went away. Further prompts wait for a new click.
+    func dismissExternalPrompt() {
+        guard externalPrompt != nil else { return }
+        externalPrompt = nil
+        gestureClock.didDismiss()
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
@@ -2072,12 +2185,62 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
+        // window.open and target=_blank. App links stay in this tab's prompt and do not open a blank one.
+        guard let url = navigationAction.request.url else { return nil }
+        var context = externalContext(for: navigationAction, url: url)
+        context.hasTargetFrame = false
+        context.isMainFrame = true
+        switch ExternalLinks.decision(for: context) {
+        case .allow:
+            return openNewWindow(url, request: navigationAction.request, configuration: configuration, webView: webView)
+        case .download:
+            // A file asked for from window.open. The child tab turns it into a download, same as a normal link.
+            return openNewWindow(url, request: navigationAction.request, configuration: configuration, webView: webView)
+        case .prompt(let prompt):
+            offerExternal(prompt)
+            return nil
+        case .load(let fallback):
+            load(fallback)
+            return nil
+        case .wait:
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: ExternalLinks.gestureGraceNanoseconds)
+                guard let self else { return }
+                var retry = context
+                retry.gestureFresh = self.gestureClock.isFresh()
+                retry.gestureSettled = true
+                retry.promptAllowed = self.gestureClock.allowsPrompt()
+                switch ExternalLinks.decision(for: retry) {
+                case .prompt(let prompt):
+                    self.offerExternal(prompt)
+                case .load(let fallback):
+                    self.load(fallback)
+                case .allow:
+                    let scheme = url.scheme?.lowercased() ?? ""
+                    if ["http", "https", "about"].contains(scheme) {
+                        self.webView.load(URLRequest(url: url))
+                    }
+                default:
+                    break
+                }
+            }
+            return nil
+        case .cancel:
+            return nil
+        }
+    }
+
+    /// A real page or about:blank gets a child tab. Anything else is not a new window.
+    private func openNewWindow(_ url: URL, request: URLRequest, configuration: WKWebViewConfiguration,
+                               webView: WKWebView) -> WKWebView? {
+        let scheme = url.scheme?.lowercased() ?? ""
+        guard ["http", "https", "about", "blob", "data"].contains(scheme) else { return nil }
         if let child = onOpenWindow?(self, configuration) {
+            child.gestureClock = gestureClock
             return child.webView
         }
-        // No tab host: fall back to opening the link in this tab.
-        if let url = navigationAction.request.url, ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            webView.load(navigationAction.request)
+        if ["http", "https"].contains(scheme) {
+            webView.load(request)
         }
         return nil
     }
