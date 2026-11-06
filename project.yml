@@ -8,7 +8,7 @@ settings:
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "50"
+    CURRENT_PROJECT_VERSION: "51"
 targets:
   Zalla:
     type: application
@@ -79,8 +79,9 @@ targets:
         NSMicrophoneUsageDescription: Zalla uses the microphone only when a website you are visiting asks for it and you allow it.
         NSLocationWhenInUseUsageDescription: Sites you choose can ask for your location, for things like weather and nearby businesses. Zalla asks you first, and your location goes only to the site you allow.
         NSLocalNetworkUsageDescription: Zalla connects to devices on your local network only when you open their address.
-        UIBackgroundModes:
-          - audio
+        # No background mode. Listen to page speaks only while Zalla is open. Apple rejected a background
+        # audio declaration (guideline 2.5.4, build 49). Do not add one back unless playback continues
+        # after leaving the app, and a device recording is ready for review.
         CFBundleIcons:
           CFBundlePrimaryIcon:
             CFBundleIconFiles:
@@ -261,7 +262,11 @@ targets:
   ZallaTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [ZallaTests]
+    sources:
+      - ZallaTests
+      # So the background-mode test can read the file XcodeGen turns into Info.plist.
+      - path: project.yml
+        buildPhase: resources
     dependencies:
       - target: Zalla
     settings:

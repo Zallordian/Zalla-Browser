@@ -2,6 +2,9 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 51: No Background Audio
+- Removed the unused background audio declaration. Listen to page still reads a page aloud while Zalla is open, and it stops when you leave. Apple rejected build 49 for declaring background audio without a feature that keeps playing.
+
 ## Build 50: Phone Links Open
 - Tapping Call on a Google business now asks, then opens the Phone app. Google starts that call from a script, so Zalla used to drop it. A normal link, like the one on Brave Search, already worked
 - Phone, Messages, Mail, FaceTime, and Maps do the same, whether you tap the link, the page runs a script right after the tap, the link opens in a new tab, or the page calls window.open
