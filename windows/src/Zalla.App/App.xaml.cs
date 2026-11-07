@@ -19,14 +19,25 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            AppLog.Write(ex);
+            var details = AppLog.Describe(ex);
+            AppLog.WriteText(details);
+            var note = details.Contains("WebView2", StringComparison.OrdinalIgnoreCase)
+                ? Environment.NewLine + Environment.NewLine + Copy.WebViewMissing
+                : "";
             var fallback = new Window { Title = "Zalla" };
-            fallback.Content = new TextBlock
+            var body = new TextBlock
             {
-                Text = "Zalla could not open. " + ex.Message,
-                Margin = new Thickness(24),
+                Text = Copy.OpenFailed + Environment.NewLine + Environment.NewLine + details + note + Environment.NewLine + Environment.NewLine + Copy.LogHint,
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 16
+                FontSize = 14,
+                Foreground = Paint.Brush(Paint.White),
+                IsTextSelectionEnabled = true
+            };
+            fallback.Content = new ScrollViewer
+            {
+                Background = Paint.Brush("111111"),
+                Padding = new Thickness(24),
+                Content = body
             };
             fallback.Activate();
             _window = fallback;

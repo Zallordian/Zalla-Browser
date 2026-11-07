@@ -29,6 +29,8 @@ static class Copy
     public const string NoTheme = "No theme named that.";
     public const string NeedAnother = "Open another card to sit side by side.";
     public const string WebViewMissing = "This PC needs the Microsoft Edge WebView2 Runtime before pages can load. Windows 11 usually has it already.";
+    public const string OpenFailed = "Zalla could not open.";
+    public const string LogHint = "The same details are in %LOCALAPPDATA%\\Zalla\\zalla.log.";
     public const string GhostNote = "Ghost forgets this Space when you leave it.";
     public const string CloseSplit = "Close split";
     public const string DropToSplit = "Drop to sit side by side";

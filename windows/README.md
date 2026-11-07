@@ -5,13 +5,15 @@ Phase 1 of the desktop browser. The iOS app is unchanged. Theme colors live in `
 ## Download and run
 
 1. Open the Windows workflow run on GitHub Actions for the pull request.
-2. Download the artifact named `Zalla-Windows-win-x64`.
-3. Unzip it.
+2. Download the artifact named `Zalla-Windows-win-x64`. That download is one zip of the app files. `Zalla.exe` is at the top of the zip.
+3. Unzip it once.
 4. Double click `Zalla.exe`.
 
-Windows 11 already includes the Microsoft Edge WebView2 Runtime, which is what loads pages. On Windows 10 (version 1809 or later), install Microsoft's Evergreen WebView2 Runtime if Zalla says it is missing.
+Windows 11 already includes the Microsoft Edge WebView2 Runtime, which is what loads pages. On Windows 10 (version 1809 or later), install Microsoft's Evergreen WebView2 Runtime if Zalla says it is missing. Zalla carries its own Windows App SDK runtime next to the exe.
 
-The other artifact, `Zalla-Windows-win-x64-msix`, is an unsigned package. Windows will not install it until it is signed. Use the zip.
+The other artifact, `Zalla-Windows-win-x64-msix`, is an unsigned package. Windows will not install it until it is signed. Use the app zip.
+
+If the window opens but only shows an error, the text includes the real exception. The same text is in `%LOCALAPPDATA%\Zalla\zalla.log`.
 
 Settings and Spaces are stored in `%LOCALAPPDATA%\Zalla`. Ghost keeps its pages in its own folder and deletes that folder when you leave the Space or close the app. If a file is still locked, Zalla tries the delete again next launch.
 
