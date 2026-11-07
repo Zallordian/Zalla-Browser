@@ -11,3 +11,7 @@ __pycache__/
 *.mbox
 *~
 *.swp
+windows/**/bin/
+windows/**/obj/
+windows/artifacts/
+.dotnet/
