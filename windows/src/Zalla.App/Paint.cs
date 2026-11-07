@@ -58,17 +58,17 @@ static class Paint
         var clear = Brush(White, 0);
         var hover = Brush(White, 28);
         var pressed = Brush(White, 48);
-        button.Resources["ButtonBackground"] = clear;
-        button.Resources["ButtonBackgroundPointerOver"] = hover;
-        button.Resources["ButtonBackgroundPressed"] = pressed;
-        button.Resources["ButtonBackgroundDisabled"] = clear;
-        button.Resources["ButtonBorderBrush"] = clear;
-        button.Resources["ButtonBorderBrushPointerOver"] = clear;
-        button.Resources["ButtonBorderBrushPressed"] = clear;
-        button.Resources["ButtonBorderBrushDisabled"] = clear;
-        button.Resources["ButtonForeground"] = Brush(White);
-        button.Resources["ButtonForegroundPointerOver"] = Brush(White);
-        button.Resources["ButtonForegroundPressed"] = Brush(White);
+        TryTheme(button, "ButtonBackground", clear);
+        TryTheme(button, "ButtonBackgroundPointerOver", hover);
+        TryTheme(button, "ButtonBackgroundPressed", pressed);
+        TryTheme(button, "ButtonBackgroundDisabled", clear);
+        TryTheme(button, "ButtonBorderBrush", clear);
+        TryTheme(button, "ButtonBorderBrushPointerOver", clear);
+        TryTheme(button, "ButtonBorderBrushPressed", clear);
+        TryTheme(button, "ButtonBorderBrushDisabled", clear);
+        TryTheme(button, "ButtonForeground", Brush(White));
+        TryTheme(button, "ButtonForegroundPointerOver", Brush(White));
+        TryTheme(button, "ButtonForegroundPressed", Brush(White));
         return button;
     }
 
@@ -76,19 +76,70 @@ static class Paint
     {
         button.Background = fill;
         button.Foreground = foreground;
-        button.Resources["ButtonBackground"] = fill;
-        button.Resources["ButtonBackgroundPointerOver"] = fill;
-        button.Resources["ButtonBackgroundPressed"] = fill;
-        button.Resources["ButtonBackgroundDisabled"] = fill;
-        button.Resources["ButtonForeground"] = foreground;
-        button.Resources["ButtonForegroundPointerOver"] = foreground;
-        button.Resources["ButtonForegroundPressed"] = foreground;
-        button.Resources["ButtonForegroundDisabled"] = foreground;
+        TryTheme(button, "ButtonBackground", fill);
+        TryTheme(button, "ButtonBackgroundPointerOver", fill);
+        TryTheme(button, "ButtonBackgroundPressed", fill);
+        TryTheme(button, "ButtonBackgroundDisabled", fill);
+        TryTheme(button, "ButtonForeground", foreground);
+        TryTheme(button, "ButtonForegroundPointerOver", foreground);
+        TryTheme(button, "ButtonForegroundPressed", foreground);
+        TryTheme(button, "ButtonForegroundDisabled", foreground);
         var clear = Brush(White, 0);
-        button.Resources["ButtonBorderBrush"] = clear;
-        button.Resources["ButtonBorderBrushPointerOver"] = clear;
-        button.Resources["ButtonBorderBrushPressed"] = clear;
-        button.Resources["ButtonBorderBrushDisabled"] = clear;
+        TryTheme(button, "ButtonBorderBrush", clear);
+        TryTheme(button, "ButtonBorderBrushPointerOver", clear);
+        TryTheme(button, "ButtonBorderBrushPressed", clear);
+        TryTheme(button, "ButtonBorderBrushDisabled", clear);
+    }
+
+    public static void TryTheme(FrameworkElement element, string key, Brush? brush)
+    {
+        if (element is null || string.IsNullOrWhiteSpace(key) || brush is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var copy = CopyBrush(brush);
+            var resources = element.Resources;
+            if (resources.ContainsKey(key))
+            {
+                resources.Remove(key);
+            }
+
+            resources.Add(key, copy);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
+    }
+
+    static Brush CopyBrush(Brush brush)
+    {
+        if (brush is SolidColorBrush solid)
+        {
+            return new SolidColorBrush(solid.Color);
+        }
+
+        if (brush is LinearGradientBrush linear)
+        {
+            var copy = new LinearGradientBrush
+            {
+                StartPoint = linear.StartPoint,
+                EndPoint = linear.EndPoint,
+                MappingMode = linear.MappingMode,
+                SpreadMethod = linear.SpreadMethod
+            };
+            foreach (var stop in linear.GradientStops)
+            {
+                copy.GradientStops.Add(new GradientStop { Color = stop.Color, Offset = stop.Offset });
+            }
+
+            return copy;
+        }
+
+        return brush;
     }
 
     public static async Task<BitmapImage?> PngAsync(byte[]? png)
