@@ -367,25 +367,20 @@ public sealed partial class ShellWindow : Window
         _strip.Visibility = classic ? Visibility.Visible : Visibility.Collapsed;
         _classicIsland.Visibility = classic ? Visibility.Visible : Visibility.Collapsed;
         _island.UsePill(!classic);
-        (_island.Parent as Panel)?.Children.Remove(_island);
-        (_spaces.Parent as Panel)?.Children.Remove(_spaces);
         if (classic)
         {
-            _classicIsland.Children.Clear();
-            _classicIsland.Children.Add(_island);
+            MoveElement(_island, _classicIsland);
             _island.Width = double.NaN;
             _island.HorizontalAlignment = HorizontalAlignment.Stretch;
-            _strip.SpacesHost.Children.Clear();
-            _strip.SpacesHost.Children.Add(_spaces);
+            MoveElement(_spaces, _strip.SpacesHost);
             _deck.Visibility = Visibility.Collapsed;
             _hint.Visibility = Visibility.Collapsed;
             SetChromeOpacity(1);
         }
         else
         {
-            _overlay.Children.Add(_island);
-            _deck.SpacesHost.Children.Clear();
-            _deck.SpacesHost.Children.Add(_spaces);
+            MoveElement(_island, _overlay);
+            MoveElement(_spaces, _deck.SpacesHost);
             _hint.Visibility = _settings.Island.HasMoved ? Visibility.Collapsed : Visibility.Visible;
             PositionIsland();
         }

@@ -60,9 +60,9 @@ public sealed partial class ShellWindow
         _saying++;
         tab.Page = new NewTabPage(saying, url => _ = NavigateAsync(tab, url));
         tab.Page.SetBrand(Paint.Hex(BrandHex));
-        tab.Host.Children.Add(tab.Page);
-        _stack.Children.Add(tab.Host);
+        MoveElement(tab.Page, tab.Host);
         _tabs.Add(tab);
+        MoveElement(tab.Host, _stack);
         if (select)
         {
             Select(tab.Id);
@@ -241,16 +241,71 @@ public sealed partial class ShellWindow
         }
     }
 
-    static void Place(BrowserTab tab, Panel parent)
+    void Place(BrowserTab tab, Panel parent) => MoveElement(tab.Host, parent);
+
+    void MoveElement(UIElement element, Panel target)
     {
-        if (!ReferenceEquals(tab.Host.Parent, parent))
+        var plan = ElementPlacement.Decide(
+            target.Children.Contains(element),
+            ReferenceEquals(element.Parent, target),
+            ListedInOtherPanel(element, target));
+        if (!plan.Add)
         {
-            (tab.Host.Parent as Panel)?.Children.Remove(tab.Host);
-            parent.Children.Add(tab.Host);
+            return;
+        }
+
+        if (plan.DetachFromOther || element.Parent is Panel)
+        {
+            Detach(element, target);
+        }
+
+        if (!target.Children.Contains(element))
+        {
+            target.Children.Add(element);
         }
     }
 
-    static void Destroy(BrowserTab tab)
+    void Detach(UIElement element, Panel target)
+    {
+        if (element.Parent is Panel reported && !ReferenceEquals(reported, target) && reported.Children.Contains(element))
+        {
+            reported.Children.Remove(element);
+        }
+
+        foreach (var panel in HostPanels())
+        {
+            if (!ReferenceEquals(panel, target) && panel.Children.Contains(element))
+            {
+                panel.Children.Remove(element);
+            }
+        }
+    }
+
+    bool ListedInOtherPanel(UIElement element, Panel target)
+    {
+        foreach (var panel in HostPanels())
+        {
+            if (!ReferenceEquals(panel, target) && panel.Children.Contains(element))
+            {
+                return true;
+            }
+        }
+
+        return element.Parent is Panel parent && !ReferenceEquals(parent, target) && parent.Children.Contains(element);
+    }
+
+    IEnumerable<Panel> HostPanels()
+    {
+        yield return _stack;
+        yield return _splitLeft;
+        yield return _splitRight;
+        yield return _overlay;
+        yield return _classicIsland;
+        yield return _deck.SpacesHost;
+        yield return _strip.SpacesHost;
+    }
+
+    void Destroy(BrowserTab tab)
     {
         try
         {
@@ -261,7 +316,12 @@ public sealed partial class ShellWindow
             // The control can already be gone during shutdown.
         }
 
-        (tab.Host.Parent as Panel)?.Children.Remove(tab.Host);
+        Detach(tab.Host, _stack);
+        if (_stack.Children.Contains(tab.Host))
+        {
+            _stack.Children.Remove(tab.Host);
+        }
+
         tab.Web = null;
         tab.Ready = false;
     }
@@ -364,11 +424,7 @@ public sealed partial class ShellWindow
             HorizontalAlignment = HorizontalAlignment.Stretch,
             VerticalAlignment = VerticalAlignment.Stretch
         };
-        if (!ReferenceEquals(tab.Web.Parent, tab.Host))
-        {
-            (tab.Web.Parent as Panel)?.Children.Remove(tab.Web);
-            tab.Host.Children.Add(tab.Web);
-        }
+        MoveElement(tab.Web, tab.Host);
 
         var environment = await EnvironmentForAsync(_space);
         await tab.Web.EnsureCoreWebView2Async(environment);
