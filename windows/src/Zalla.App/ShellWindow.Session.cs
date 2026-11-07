@@ -403,6 +403,7 @@ public sealed partial class ShellWindow
             tab.Web?.CoreWebView2.Navigate(url);
             _island.LeaveCommand();
             _island.SetAddress(url);
+            tab.Web?.Focus(FocusState.Programmatic);
             SaveCurrentSpace();
         }
         catch (Exception ex)
@@ -425,9 +426,15 @@ public sealed partial class ShellWindow
             VerticalAlignment = VerticalAlignment.Stretch
         };
         MoveElement(tab.Web, tab.Host);
+        ShowWeb(tab);
+        if (tab.Host.Visibility == Visibility.Visible)
+        {
+            await WaitForViewportAsync(tab.Web);
+        }
 
         var environment = await EnvironmentForAsync(_space);
         await tab.Web.EnsureCoreWebView2Async(environment);
+        tab.Web.UpdateLayout();
         tab.Web.DefaultBackgroundColor = Scenery.For(CurrentTheme()).Edge;
         var core = tab.Web.CoreWebView2;
         core.Settings.IsPasswordAutosaveEnabled = false;
@@ -436,6 +443,34 @@ public sealed partial class ShellWindow
         WireCore(tab, core);
         tab.Ready = true;
         ShowWeb(tab);
+    }
+
+    static async Task WaitForViewportAsync(FrameworkElement element)
+    {
+        bool Ready() => PageViewport.Ready(element.XamlRoot != null, element.ActualWidth, element.ActualHeight);
+        if (Ready())
+        {
+            return;
+        }
+
+        var ready = new TaskCompletionSource<bool>();
+        void Consider()
+        {
+            if (Ready())
+            {
+                ready.TrySetResult(true);
+            }
+        }
+
+        RoutedEventHandler onLoaded = (_, _) => Consider();
+        SizeChangedEventHandler onSize = (_, _) => Consider();
+        element.Loaded += onLoaded;
+        element.SizeChanged += onSize;
+        element.UpdateLayout();
+        Consider();
+        await Task.WhenAny(ready.Task, Task.Delay(400));
+        element.Loaded -= onLoaded;
+        element.SizeChanged -= onSize;
     }
 
     async Task<CoreWebView2Environment> EnvironmentForAsync(SpaceKind space)

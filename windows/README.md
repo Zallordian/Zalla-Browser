@@ -9,9 +9,13 @@ Phase 1 of the desktop browser. The iOS app is unchanged. Theme colors live in `
 3. Unzip it once.
 4. Double click `Zalla.exe`.
 
-Windows 11 already includes the Microsoft Edge WebView2 Runtime, which is what loads pages. On Windows 10 (version 1809 or later), install Microsoft's Evergreen WebView2 Runtime if Zalla says it is missing. Zalla carries its own Windows App SDK runtime next to the exe.
+Copy the unzipped folder onto another Windows PC and run `Zalla.exe`. There is no installer. The folder already contains the Windows App SDK runtime.
 
-The other artifact, `Zalla-Windows-win-x64-msix`, is an unsigned package. Windows will not install it until it is signed. Use the app zip.
+You need 64-bit Windows 10 version 1809 or Windows 11, and the Microsoft Edge WebView2 Runtime. Windows 11 usually has that runtime. Windows 10, and some managed work PCs, do not. A company policy can block an unsigned program or the WebView2 Runtime. Zalla does not bypass that. If pages cannot load, install Microsoft's Evergreen WebView2 Runtime only when you are allowed to.
+
+The square caption button maximizes inside the taskbar. F11 is full screen and covers the taskbar. F11 again, or the restore caption button, leaves full screen.
+
+The other artifact, `Zalla-Windows-win-x64-msix`, is unsigned. Windows will not install it until it is signed. Use the app zip.
 
 If the window opens but only shows an error, the text includes the real exception. The same text is in `%LOCALAPPDATA%\Zalla\zalla.log`.
 

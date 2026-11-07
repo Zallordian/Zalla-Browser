@@ -6,10 +6,7 @@ static class Copy
     public const string CommandPlaceholder = "Type a command";
     public const string IslandHint = "Drag it anywhere, or dock it on an edge";
     public const string NewCard = "New card    Ctrl T";
-    public const string ShieldOn = "Shield on";
-    public const string ShieldOff = "Shield off";
     public const string ClickToTune = "Click to tune";
-    public const string BlockedWeek = "blocked this week";
     public const string Trackers = "Trackers";
     public const string Ads = "Ads";
     public const string CookieBanners = "Cookie banners";
@@ -25,6 +22,8 @@ static class Copy
     public const string Minimize = "Minimize";
     public const string Maximize = "Maximize";
     public const string Restore = "Restore";
+    public const string LeaveFullScreen = "Leave full screen";
+    public const string PreviewSaved = "Preview. Saved for later. Zalla does not do this yet.";
     public const string WebOnly = "Zalla only opens web pages.";
     public const string NoTheme = "No theme named that.";
     public const string NeedAnother = "Open another card to sit side by side.";
@@ -37,7 +36,7 @@ static class Copy
     public const string LayoutIsland = "Command Island";
     public const string LayoutClassic = "Classic tab strip";
     public const string LayoutHelp = "Command Island keeps the page full screen. Classic puts a tab strip on top.";
-    public const string PrivacyNote = "Link cleaning, HTTPS-Only, referrer trimming, and Burn It All work now. Tracker lists, ad lists, cookie banner hiding, fingerprint changes, and encrypted DNS are saved and on. They take effect when those pieces land.";
+    public const string PrivacyNote = "HTTPS-Only, link cleaning, referrer trimming, and Burn It All work now. Tracker lists, ad lists, cookie banner hiding, fingerprint changes, encrypted DNS, and proxy routing are preview. The switches are saved, and they are not active yet.";
     public const string ProxyTitle = "Use my own proxy";
     public const string ProxyDetail = "Sends page traffic through a proxy you provide. Zalla does not ship a proxy, and it does not hide your IP on its own. Leave this off until you have an address. Routing through it comes in a later update.";
     public const string About = "Zalla for Windows. Pages load with Microsoft Edge WebView2, which is already on most Windows 11 PCs.";

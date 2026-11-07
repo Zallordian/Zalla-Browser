@@ -24,8 +24,8 @@ public sealed partial class ShellWindow : Window
     readonly ShieldCard _shield = new();
     readonly SpacesBar _spaces = new();
     readonly TextBlock _hint = new();
-    readonly Grid _dragStrip = new() { Height = 32, VerticalAlignment = VerticalAlignment.Top };
-    readonly StackPanel _windowButtons = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 10, 14, 0) };
+    readonly Grid _dragStrip = new() { Height = 40, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 150, 0) };
+    readonly StackPanel _windowButtons = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
     readonly Grid _fire = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     readonly Border _toast = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 120), Padding = new Thickness(16, 8, 16, 8), CornerRadius = new CornerRadius(14), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     readonly TextBlock _toastText = new() { FontSize = 14 };
@@ -33,6 +33,10 @@ public sealed partial class ShellWindow : Window
     readonly Border _dropHint = new() { Width = 360, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Stretch, Margin = new Thickness(24), CornerRadius = new CornerRadius(20), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
     readonly Button _maxButton;
     readonly Button _cardsButton;
+    bool _workMaximized;
+    bool _fullScreen;
+    bool _movingFrame;
+    RectInt32 _restoreBounds;
     Grid _rootGrid = null!;
 
     AppSettings _settings = new();
@@ -80,7 +84,7 @@ public sealed partial class ShellWindow : Window
             _space = SpaceKind.Personal;
         }
 
-        _maxButton = WindowButton(Paint.Hex("FFFFFF", 70), Copy.Maximize, ToggleMaximize);
+        _maxButton = CaptionButton("\uE922", Copy.Maximize, ToggleMaximize, close: false);
         _cardsButton = Paint.Flat(new TextBlock { Text = "Cards", FontSize = 12, Margin = new Thickness(8, 0, 8, 0) }, 0);
         _cardsButton.Padding = new Thickness(10, 6, 10, 6);
         _cardsButton.Background = Paint.Brush(Paint.Black, 120);
@@ -156,9 +160,9 @@ public sealed partial class ShellWindow : Window
             e.Handled = true;
         };
         _rootGrid.Children.Add(_dragStrip);
-        _windowButtons.Children.Add(WindowButton(Paint.Hex("FFFFFF", 70), Copy.Minimize, Minimize));
+        _windowButtons.Children.Add(CaptionButton("\uE921", Copy.Minimize, Minimize, close: false));
         _windowButtons.Children.Add(_maxButton);
-        _windowButtons.Children.Add(WindowButton(Paint.Hex("E33B4F"), Copy.Close, Close));
+        _windowButtons.Children.Add(CaptionButton("\uE8BB", Copy.Close, Close, close: true));
         _rootGrid.Children.Add(_windowButtons);
         _rootGrid.Children.Add(_cardsButton);
 
@@ -277,6 +281,7 @@ public sealed partial class ShellWindow : Window
             }
 
             AppWindow.Title = "Zalla";
+            AppWindow.Changed += OnAppWindowChanged;
             var icon = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "zalla.ico");
             if (File.Exists(icon))
             {
@@ -407,7 +412,7 @@ public sealed partial class ShellWindow : Window
         var shieldWidth = _shield.ActualWidth > 1 ? _shield.ActualWidth : _shield.Width;
         Canvas.SetLeft(_shield, Math.Max(12, width - shieldWidth - 36));
         Canvas.SetTop(_shield, 72);
-        _shield.Update(_spaceState.Privacy, _spaceState.BlockedThisWeek, width < 1100);
+        _shield.Update(_spaceState.Privacy, width < 1100);
         UpdateInsets();
         if (height < 10)
         {
@@ -555,7 +560,7 @@ public sealed partial class ShellWindow : Window
             () =>
             {
                 SaveCurrentSpace();
-                _shield.Update(_spaceState.Privacy, _spaceState.BlockedThisWeek, _rootGrid.ActualWidth < 1100);
+                _shield.Update(_spaceState.Privacy, _rootGrid.ActualWidth < 1100);
             },
             CloseSettings));
         _settingsLayer.Visibility = Visibility.Visible;
@@ -615,20 +620,118 @@ public sealed partial class ShellWindow : Window
         _shield.IsHitTestVisible = hit;
     }
 
-    static Button WindowButton(Color color, string name, Action action)
+    static Button CaptionButton(string glyph, string name, Action action, bool close)
     {
-        var button = Paint.Flat(new Ellipse
+        var icon = new TextBlock
         {
-            Width = 12,
-            Height = 12,
-            Fill = Paint.Brush(color),
+            Text = glyph,
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 12,
+            Foreground = Paint.Brush(Paint.White),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
-        }, 28);
+        };
+        var button = new Button
+        {
+            Content = icon,
+            Width = 46,
+            Height = 40,
+            Padding = new Thickness(0),
+            Margin = new Thickness(0),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(0),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        var clear = Paint.Brush(Paint.White, 0);
+        var hover = close ? Paint.Brush("C42B1C") : Paint.Brush(Paint.White, 36);
+        var pressed = close ? Paint.Brush("8E1C12") : Paint.Brush(Paint.White, 56);
+        button.Resources["ButtonBackground"] = clear;
+        button.Resources["ButtonBackgroundPointerOver"] = hover;
+        button.Resources["ButtonBackgroundPressed"] = pressed;
+        button.Resources["ButtonBackgroundDisabled"] = clear;
+        button.Resources["ButtonForeground"] = Paint.Brush(Paint.White);
+        button.Resources["ButtonForegroundPointerOver"] = Paint.Brush(Paint.White);
+        button.Resources["ButtonForegroundPressed"] = Paint.Brush(Paint.White);
+        var none = Paint.Brush(Paint.White, 0);
+        button.Resources["ButtonBorderBrush"] = none;
+        button.Resources["ButtonBorderBrushPointerOver"] = none;
+        button.Resources["ButtonBorderBrushPressed"] = none;
+        button.Resources["ButtonBorderBrushDisabled"] = none;
         button.Click += (_, _) => action();
         AutomationProperties.SetName(button, name);
         ToolTipService.SetToolTip(button, name);
         return button;
+    }
+
+    void SetCaptionGlyph(string glyph, string name)
+    {
+        if (_maxButton.Content is TextBlock icon)
+        {
+            icon.Text = glyph;
+        }
+
+        AutomationProperties.SetName(_maxButton, name);
+        ToolTipService.SetToolTip(_maxButton, name);
+    }
+
+    void SyncCaption()
+    {
+        if (_fullScreen)
+        {
+            SetCaptionGlyph("\uE923", Copy.LeaveFullScreen);
+        }
+        else if (_workMaximized)
+        {
+            SetCaptionGlyph("\uE923", Copy.Restore);
+        }
+        else
+        {
+            SetCaptionGlyph("\uE922", Copy.Maximize);
+        }
+    }
+
+    ScreenRect CurrentRect()
+    {
+        var position = AppWindow.Position;
+        var size = AppWindow.Size;
+        return new ScreenRect(position.X, position.Y, size.Width, size.Height);
+    }
+
+    ScreenRect CurrentWork()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest);
+        var work = area.WorkArea;
+        return new ScreenRect(work.X, work.Y, work.Width, work.Height);
+    }
+
+    ScreenRect CurrentMonitor()
+    {
+        var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest);
+        var bounds = area.OuterBounds;
+        return new ScreenRect(bounds.X, bounds.Y, bounds.Width, bounds.Height);
+    }
+
+    void MoveFrame(ScreenRect rect)
+    {
+        _movingFrame = true;
+        try
+        {
+            AppWindow.MoveAndResize(new RectInt32(rect.X, rect.Y, rect.Width, rect.Height));
+        }
+        finally
+        {
+            DispatcherQueue.TryEnqueue(() => _movingFrame = false);
+        }
+    }
+
+    void RememberRestored()
+    {
+        if (!_workMaximized && !_fullScreen)
+        {
+            var current = CurrentRect();
+            _restoreBounds = new RectInt32(current.X, current.Y, current.Width, current.Height);
+        }
     }
 
     void Minimize()
@@ -641,20 +744,105 @@ public sealed partial class ShellWindow : Window
 
     void ToggleMaximize()
     {
-        if (AppWindow.Presenter is not OverlappedPresenter presenter)
+        if (_fullScreen || _workMaximized)
+        {
+            RestoreWindow();
+        }
+        else
+        {
+            MaximizeWindow();
+        }
+    }
+
+    void ToggleFullScreen()
+    {
+        if (_fullScreen)
+        {
+            RestoreWindow();
+        }
+        else
+        {
+            EnterFullScreen();
+        }
+    }
+
+    void MaximizeWindow()
+    {
+        try
+        {
+            RememberRestored();
+            _fullScreen = false;
+            _workMaximized = true;
+            MoveFrame(WindowFrame.Maximize(CurrentWork()));
+            SyncCaption();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
+    }
+
+    void EnterFullScreen()
+    {
+        try
+        {
+            RememberRestored();
+            _workMaximized = false;
+            _fullScreen = true;
+            MoveFrame(WindowFrame.FullScreen(CurrentMonitor()));
+            SyncCaption();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
+    }
+
+    void RestoreWindow()
+    {
+        try
+        {
+            _workMaximized = false;
+            _fullScreen = false;
+            if (_restoreBounds.Width > 200 && _restoreBounds.Height > 160)
+            {
+                AppWindow.MoveAndResize(_restoreBounds);
+            }
+
+            SyncCaption();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
+    }
+
+    void OnAppWindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
+    {
+        if (_movingFrame || (!_workMaximized && !_fullScreen))
         {
             return;
         }
 
-        if (presenter.State == OverlappedPresenterState.Maximized)
+        if (!args.DidSizeChange && !args.DidPositionChange)
         {
-            presenter.Restore();
-            ToolTipService.SetToolTip(_maxButton, Copy.Maximize);
+            return;
         }
-        else
+
+        try
         {
-            presenter.Maximize();
-            ToolTipService.SetToolTip(_maxButton, Copy.Restore);
+            var target = _fullScreen ? WindowFrame.FullScreen(CurrentMonitor()) : WindowFrame.Maximize(CurrentWork());
+            var now = CurrentRect();
+            if (Math.Abs(now.Width - target.Width) > 8 || Math.Abs(now.Height - target.Height) > 8)
+            {
+                _workMaximized = false;
+                _fullScreen = false;
+                SyncCaption();
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
         }
     }
 }

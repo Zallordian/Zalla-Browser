@@ -99,16 +99,16 @@ sealed class SettingsView : Grid
 
         stack.Children.Add(Heading(Copy.Privacy));
         stack.Children.Add(Body(Copy.PrivacyNote));
-        Toggle(stack, "Block trackers", "Stops known tracking and analytics requests.", privacy.BlockTrackers, value => { privacy.BlockTrackers = value; privacyChanged(); });
-        Toggle(stack, "Block common ads", "Stops requests to known ad networks.", privacy.BlockCommonAds, value => { privacy.BlockCommonAds = value; privacyChanged(); });
-        Toggle(stack, "Full ad blocking", "Adds detailed rules for ads that the common list misses.", privacy.FullAdBlocking, value => { privacy.FullAdBlocking = value; privacyChanged(); });
-        Toggle(stack, "Hide ad spaces", "Hides leftover ad boxes on the page.", privacy.HideAdSpaces, value => { privacy.HideAdSpaces = value; privacyChanged(); });
-        Toggle(stack, "Cookie banners", "Hides cookie notices and other popups.", privacy.CookieBanners, value => { privacy.CookieBanners = value; privacyChanged(); });
+        Toggle(stack, "Block trackers", Copy.PreviewSaved, privacy.BlockTrackers, value => { privacy.BlockTrackers = value; privacyChanged(); });
+        Toggle(stack, "Block common ads", Copy.PreviewSaved, privacy.BlockCommonAds, value => { privacy.BlockCommonAds = value; privacyChanged(); });
+        Toggle(stack, "Full ad blocking", Copy.PreviewSaved, privacy.FullAdBlocking, value => { privacy.FullAdBlocking = value; privacyChanged(); });
+        Toggle(stack, "Hide ad spaces", Copy.PreviewSaved, privacy.HideAdSpaces, value => { privacy.HideAdSpaces = value; privacyChanged(); });
+        Toggle(stack, "Cookie banners", Copy.PreviewSaved, privacy.CookieBanners, value => { privacy.CookieBanners = value; privacyChanged(); });
         Toggle(stack, Copy.HttpsOnly, "Opens pages over HTTPS. If a page has no secure version, Zalla tries it once over HTTP.", privacy.HttpsOnly, value => { privacy.HttpsOnly = value; privacyChanged(); });
         Toggle(stack, "Clean tracking from links", "Removes tracking tags such as utm_source and fbclid from addresses you open.", privacy.CleanLinks, value => { privacy.CleanLinks = value; privacyChanged(); });
         Toggle(stack, "Trim referrer", "Sites you open next are told the last site's name, not the exact page you were on.", privacy.TrimReferrer, value => { privacy.TrimReferrer = value; privacyChanged(); });
-        Toggle(stack, "Fingerprinting protection", "Makes it harder for a page to single out this PC. It can affect some games and web apps.", privacy.Fingerprinting, value => { privacy.Fingerprinting = value; privacyChanged(); });
-        Toggle(stack, "Encrypted DNS", "Looks up site names over an encrypted connection when Zalla can do that lookup itself.", privacy.EncryptedDns, value => { privacy.EncryptedDns = value; privacyChanged(); });
+        Toggle(stack, "Fingerprinting protection", Copy.PreviewSaved, privacy.Fingerprinting, value => { privacy.Fingerprinting = value; privacyChanged(); });
+        Toggle(stack, "Encrypted DNS", Copy.PreviewSaved, privacy.EncryptedDns, value => { privacy.EncryptedDns = value; privacyChanged(); });
         Toggle(stack, Copy.ProxyTitle, Copy.ProxyDetail, privacy.OwnProxy, value => { privacy.OwnProxy = value; privacyChanged(); });
         var proxy = new TextBox
         {

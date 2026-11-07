@@ -4,9 +4,13 @@ namespace Zalla;
 
 public sealed partial class ShellWindow
 {
+    const int WmKeyDown = 0x0100;
     const int WmHotkey = 0x0312;
+    const int WmSysCommand = 0x0112;
+    const int VkF11 = 0x7A;
     const int WmNcLButtonDown = 0x00A1;
     const int HtCaption = 2;
+    const int ScMaximize = 0xF030;
     const uint ModAlt = 0x0001;
     const uint ModControl = 0x0002;
     const uint ModShift = 0x0004;
@@ -185,6 +189,13 @@ public sealed partial class ShellWindow
 
     void OnKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        if (args.Key == Windows.System.VirtualKey.F11)
+        {
+            ToggleFullScreen();
+            args.Handled = true;
+            return;
+        }
+
         var control = IsKeyDown(Windows.System.VirtualKey.Control);
         var shift = IsKeyDown(Windows.System.VirtualKey.Shift);
         var alt = IsKeyDown(Windows.System.VirtualKey.Menu);
@@ -425,6 +436,18 @@ public sealed partial class ShellWindow
         {
             var hotkey = wParam.ToInt32();
             DispatcherQueue.TryEnqueue(() => DispatchHotkey(hotkey));
+            return IntPtr.Zero;
+        }
+
+        if (msg == WmKeyDown && wParam.ToInt32() == VkF11)
+        {
+            DispatcherQueue.TryEnqueue(ToggleFullScreen);
+            return IntPtr.Zero;
+        }
+
+        if (msg == WmSysCommand && ((int)wParam.ToInt64() & 0xFFF0) == ScMaximize)
+        {
+            DispatcherQueue.TryEnqueue(ToggleMaximize);
             return IntPtr.Zero;
         }
 
