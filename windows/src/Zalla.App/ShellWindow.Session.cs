@@ -243,7 +243,7 @@ public sealed partial class ShellWindow
 
     void Place(BrowserTab tab, Panel parent) => MoveElement(tab.Host, parent);
 
-    void MoveElement(UIElement element, Panel target)
+    void MoveElement(FrameworkElement element, Panel target)
     {
         var plan = ElementPlacement.Decide(
             target.Children.Contains(element),
@@ -265,7 +265,7 @@ public sealed partial class ShellWindow
         }
     }
 
-    void Detach(UIElement element, Panel target)
+    void Detach(FrameworkElement element, Panel target)
     {
         if (element.Parent is Panel reported && !ReferenceEquals(reported, target) && reported.Children.Contains(element))
         {
@@ -281,7 +281,7 @@ public sealed partial class ShellWindow
         }
     }
 
-    bool ListedInOtherPanel(UIElement element, Panel target)
+    bool ListedInOtherPanel(FrameworkElement element, Panel target)
     {
         foreach (var panel in HostPanels())
         {
