@@ -11,6 +11,10 @@ Phase 1 of the desktop browser. The iOS app is unchanged. Theme colors live in `
 
 Copy the unzipped folder onto another Windows PC and run `Zalla.exe`. There is no installer. The folder already contains the Windows App SDK runtime.
 
+Pages are drawn by Microsoft Edge WebView2. That engine is Chromium, the same family Chrome uses. Zalla is not Chrome and it does not include Chrome's toolbar, the Chrome Web Store, or the Edge Add-ons store. An unpacked extension can be loaded from a folder you already have. Zalla will not download extensions. Many Chrome-only features will not run. Replacing WebView2 with a full Chrome shell would be a different app and is not this build.
+
+The default layout is a browser bar above the page: tabs, back, forward, reload or stop, the address field, bookmarks, history, and downloads. Floating cards remain in Settings if you want that experiment.
+
 You need 64-bit Windows 10 version 1809 or Windows 11, and the Microsoft Edge WebView2 Runtime. Windows 11 usually has that runtime. Windows 10, and some managed work PCs, do not. A company policy can block an unsigned program or the WebView2 Runtime. Zalla does not bypass that. If pages cannot load, install Microsoft's Evergreen WebView2 Runtime only when you are allowed to.
 
 Drag the dark strip at the top to move the window. The caption buttons stay visible. The square one maximizes inside the taskbar. F11 is full screen and covers the taskbar. F11 again, or the restore button, leaves full screen.

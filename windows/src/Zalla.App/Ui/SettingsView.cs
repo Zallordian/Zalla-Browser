@@ -125,6 +125,8 @@ sealed class SettingsView : Grid
 
         stack.Children.Add(Heading(Copy.AboutTitle));
         stack.Children.Add(Body(Copy.About));
+        stack.Children.Add(Body(Copy.EngineNote));
+        stack.Children.Add(Body(Copy.ExtensionNote));
     }
 
     static void AddThemeGroup(StackPanel stack, ThemeCatalog catalog, string themeId, string group, string title, Action<string> themeChanged)

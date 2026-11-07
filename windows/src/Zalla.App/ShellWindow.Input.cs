@@ -437,10 +437,33 @@ public sealed partial class ShellWindow
             return IntPtr.Zero;
         }
 
-        if (msg == WmKeyDown && wParam.ToInt32() == VkF11)
+        if (msg == WmKeyDown)
         {
-            DispatcherQueue.TryEnqueue(ToggleFullScreen);
-            return IntPtr.Zero;
+            var key = wParam.ToInt32();
+            var ctrl = (GetKeyState(0x11) & 0x8000) != 0;
+            if (key == VkF11)
+            {
+                DispatcherQueue.TryEnqueue(ToggleFullScreen);
+                return IntPtr.Zero;
+            }
+
+            if (key == 0x74 || (ctrl && key == 0x52))
+            {
+                DispatcherQueue.TryEnqueue(ReloadOrStop);
+                return IntPtr.Zero;
+            }
+
+            if (ctrl && key == 0x44)
+            {
+                DispatcherQueue.TryEnqueue(ToggleBookmark);
+                return IntPtr.Zero;
+            }
+
+            if (ctrl && key == 0x48)
+            {
+                DispatcherQueue.TryEnqueue(ShowHistory);
+                return IntPtr.Zero;
+            }
         }
 
         if (msg == WmSysCommand && ((int)wParam.ToInt64() & 0xFFF0) == ScMaximize)
@@ -460,6 +483,9 @@ public sealed partial class ShellWindow
 
     [DllImport("user32.dll")]
     static extern bool GetCursorPos(out PointNative point);
+
+    [DllImport("user32.dll")]
+    static extern short GetKeyState(int key);
 
     [DllImport("comctl32.dll")]
     static extern bool SetWindowSubclass(IntPtr hwnd, SubclassProc callback, nuint id, nuint data);

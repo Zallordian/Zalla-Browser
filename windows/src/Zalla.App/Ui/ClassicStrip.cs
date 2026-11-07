@@ -7,8 +7,9 @@ sealed class ClassicStrip : Grid
 
     public ClassicStrip()
     {
-        Height = 44;
-        Padding = new Thickness(12, 8, 130, 0);
+        Height = 52;
+        Background = Paint.Brush("070B12");
+        Padding = new Thickness(12, 8, 148, 0);
         ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         SpacesHost = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
@@ -43,9 +44,9 @@ sealed class ClassicStrip : Grid
         {
             var tab = new Grid
             {
-                MinWidth = 88,
-                MaxWidth = 190,
-                Height = 32
+                MinWidth = 140,
+                MaxWidth = 240,
+                Height = 36
             };
             var chrome = new Border
             {
@@ -74,7 +75,7 @@ sealed class ClassicStrip : Grid
             var title = new TextBlock
             {
                 Text = card.Title,
-                FontSize = 13,
+                FontSize = 15,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextTrimming = TextTrimming.CharacterEllipsis
             };

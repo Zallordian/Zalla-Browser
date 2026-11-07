@@ -489,7 +489,8 @@ public sealed partial class ShellWindow
 
         var folder = SettingsStore.WebViewDirectory(_root, space);
         Directory.CreateDirectory(folder);
-        var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null!, folder, new CoreWebView2EnvironmentOptions());
+        var options = new CoreWebView2EnvironmentOptions { AreBrowserExtensionsEnabled = true };
+        var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null!, folder, options);
         _environments[space] = environment;
         return environment;
     }
@@ -526,6 +527,16 @@ public sealed partial class ShellWindow
         };
         core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
         core.WebResourceRequested += (_, args) => TrimReferrer(args);
+        core.DownloadStarting += (_, args) => TrackDownload(args);
+    }
+
+    void TrackDownload(CoreWebView2DownloadStartingEventArgs args)
+    {
+        var path = args.ResultFilePath;
+        var name = string.IsNullOrWhiteSpace(path) ? "Download" : System.IO.Path.GetFileName(path);
+        var note = new DownloadNote { Name = name, State = args.DownloadOperation.State.ToString() };
+        _downloads.Insert(0, note);
+        args.DownloadOperation.StateChanged += (_, _) => note.State = args.DownloadOperation.State.ToString();
     }
 
     void OnStarting(BrowserTab tab, CoreWebView2NavigationStartingEventArgs args)
@@ -554,6 +565,12 @@ public sealed partial class ShellWindow
                 tab.Web?.CoreWebView2.Navigate(https);
             }
         }
+
+        if (tab.Id == Primary.Id)
+        {
+            _loading = true;
+            _island.SetLoading(true);
+        }
     }
 
     void OnCompleted(BrowserTab tab, CoreWebView2NavigationCompletedEventArgs args)
@@ -568,8 +585,16 @@ public sealed partial class ShellWindow
         }
 
         tab.PendingHttp = null;
+        if (tab.Id == Primary.Id)
+        {
+            _loading = false;
+            _island.SetLoading(false);
+        }
+
         if (args.IsSuccess)
         {
+            BrowserLibrary.Remember(_spaceState.History, tab.Url, tab.Title);
+            SaveCurrentSpace();
             _ = CaptureSoon(tab);
         }
 

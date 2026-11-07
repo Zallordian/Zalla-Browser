@@ -28,7 +28,9 @@ public static class SettingsStore
 
     public static AppSettings LoadApp(string root)
     {
-        return Read(SettingsPath(root), new AppSettings());
+        var settings = Read(SettingsPath(root), new AppSettings());
+        settings.Bookmarks ??= new List<Bookmark>();
+        return settings;
     }
 
     public static void SaveApp(string root, AppSettings settings)
@@ -46,6 +48,7 @@ public static class SettingsStore
         }
 
         state.Privacy ??= PrivacySettings.CreateDefaults();
+        state.History ??= new List<HistoryEntry>();
         if (string.IsNullOrWhiteSpace(state.ThemeId))
         {
             state.ThemeId = ThemeCatalog.WindowsStartThemeId;

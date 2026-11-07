@@ -5,6 +5,10 @@ sealed class IslandBar : Grid
     readonly Border _shell = new();
     readonly Button _back;
     readonly Button _forward;
+    readonly Button _reload;
+    readonly TextBlock _reloadLabel;
+    readonly Button _bookmark;
+    readonly TextBlock _bookmarkLabel;
     readonly TextBox _input = new();
     readonly Button _burn;
     string _address = "";
@@ -23,56 +27,74 @@ sealed class IslandBar : Grid
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _shell.Child = row;
 
-        var z = LetterButton("Z");
-        z.Click += (_, _) => { };
-        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.Auto };
+        var z = TextButton(Copy.Menu, () => { });
+        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.Bottom };
         menu.Items.Add(Item(Copy.NewTab, () => NewTab?.Invoke()));
+        menu.Items.Add(Item(Copy.Bookmarks, () => Bookmarks?.Invoke()));
+        menu.Items.Add(Item(Copy.History, () => History?.Invoke()));
+        menu.Items.Add(Item(Copy.Downloads, () => Downloads?.Invoke()));
+        menu.Items.Add(Item(Copy.Extensions, () => Extensions?.Invoke()));
+        menu.Items.Add(Item(Copy.Cards, () => Deck?.Invoke()));
         menu.Items.Add(Item(Copy.Settings, () => Settings?.Invoke()));
         menu.Items.Add(Item(Copy.BurnTooltip, () => Burn?.Invoke()));
         z.Flyout = menu;
         AutomationProperties.SetName(z, Copy.Menu);
         row.Children.Add(z);
 
-        _back = GlyphButton("\u2190", Copy.Back);
+        _back = TextButton(Copy.Back, () => Back?.Invoke());
         _back.Margin = new Thickness(8, 0, 0, 0);
-        _back.Click += (_, _) => Back?.Invoke();
         Grid.SetColumn(_back, 1);
         row.Children.Add(_back);
 
-        _forward = GlyphButton("\u2192", Copy.Forward);
-        _forward.Margin = new Thickness(2, 0, 8, 0);
-        _forward.Click += (_, _) => Forward?.Invoke();
+        _forward = TextButton(Copy.Forward, () => Forward?.Invoke());
+        _forward.Margin = new Thickness(6, 0, 0, 0);
         Grid.SetColumn(_forward, 2);
         row.Children.Add(_forward);
+
+        _reloadLabel = new TextBlock { Text = Copy.Reload, FontSize = 15, Foreground = Paint.Brush(Paint.White) };
+        _reload = TextButton(Copy.Reload, () => ReloadOrStop?.Invoke());
+        _reload.Content = _reloadLabel;
+        _reload.Margin = new Thickness(6, 0, 8, 0);
+        Grid.SetColumn(_reload, 3);
+        row.Children.Add(_reload);
 
         _input.PlaceholderText = Copy.SearchPlaceholder;
         _input.BorderThickness = new Thickness(0);
         _input.Background = Paint.Brush(Paint.Black, 90);
         _input.Foreground = Paint.Brush(Paint.White);
-        _input.CornerRadius = new CornerRadius(23);
-        _input.Height = 46;
-        _input.Padding = new Thickness(16, 8, 16, 8);
-        _input.FontSize = 15;
+        _input.CornerRadius = new CornerRadius(8);
+        _input.Height = 44;
+        _input.MinWidth = 240;
+        _input.Padding = new Thickness(14, 8, 14, 8);
+        _input.FontSize = 16;
         _input.VerticalAlignment = VerticalAlignment.Center;
         _input.RequestedTheme = ElementTheme.Dark;
         _input.KeyDown += OnKey;
-        Grid.SetColumn(_input, 3);
+        Grid.SetColumn(_input, 4);
         row.Children.Add(_input);
 
-        _burn = LetterButton("\uD83D\uDD25");
+        _bookmarkLabel = new TextBlock { Text = Copy.Bookmark, FontSize = 15, Foreground = Paint.Brush(Paint.White) };
+        _bookmark = TextButton(Copy.Bookmark, () => Bookmark?.Invoke());
+        _bookmark.Content = _bookmarkLabel;
+        _bookmark.Margin = new Thickness(8, 0, 0, 0);
+        Grid.SetColumn(_bookmark, 5);
+        row.Children.Add(_bookmark);
+
+        _burn = TextButton(Copy.BurnTooltip, () => Burn?.Invoke());
         if (_burn.Content is TextBlock flame)
         {
             flame.FontFamily = new FontFamily("Segoe UI Emoji");
         }
-        _burn.Margin = new Thickness(10, 0, 0, 0);
-        _burn.Click += (_, _) => Burn?.Invoke();
+        _burn.Margin = new Thickness(8, 0, 0, 0);
         AutomationProperties.SetName(_burn, Copy.BurnTooltip);
         ToolTipService.SetToolTip(_burn, Copy.BurnTooltip);
-        Grid.SetColumn(_burn, 4);
+        Grid.SetColumn(_burn, 6);
         row.Children.Add(_burn);
 
         SetHistory(false, false);
@@ -84,16 +106,38 @@ sealed class IslandBar : Grid
 
     public event Action? Back;
     public event Action? Forward;
+    public event Action? ReloadOrStop;
+    public event Action? Bookmark;
     public event Action? Burn;
     public event Action? NewTab;
     public event Action? Settings;
+    public event Action? Bookmarks;
+    public event Action? History;
+    public event Action? Downloads;
+    public event Action? Extensions;
+    public event Action? Deck;
     public event Action<string, bool>? Submit;
 
     public void UsePill(bool pill)
     {
-        _shell.CornerRadius = new CornerRadius(pill ? 35 : 16);
-        Height = pill ? 70 : 56;
-        Margin = pill ? new Thickness(0) : new Thickness(8, 0, 8, 8);
+        _shell.CornerRadius = new CornerRadius(pill ? 20 : 0);
+        Height = 64;
+        Margin = new Thickness(0);
+        _shell.Padding = new Thickness(pill ? 12 : 8, 0, 12, 0);
+    }
+
+    public void SetLoading(bool loading)
+    {
+        _reloadLabel.Text = loading ? Copy.Stop : Copy.Reload;
+        AutomationProperties.SetName(_reload, _reloadLabel.Text);
+        ToolTipService.SetToolTip(_reload, _reloadLabel.Text);
+    }
+
+    public void SetBookmarked(bool marked)
+    {
+        _bookmarkLabel.Text = marked ? Copy.Bookmarked : Copy.Bookmark;
+        AutomationProperties.SetName(_bookmark, _bookmarkLabel.Text);
+        ToolTipService.SetToolTip(_bookmark, _bookmarkLabel.Text);
     }
 
     public void SetAddress(string url)
@@ -199,18 +243,34 @@ sealed class IslandBar : Grid
         return button;
     }
 
-    static Button GlyphButton(string glyph, string name)
+    static Button TextButton(string name, Action action)
     {
         var label = new TextBlock
         {
-            Text = glyph,
-            FontSize = 18,
-            Opacity = 0.85,
+            Text = name,
+            FontSize = 15,
+            Foreground = Paint.Brush(Paint.White),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        var button = Paint.Flat(label, 40);
-        button.Foreground = Paint.Brush(Paint.White);
+        var button = new Button
+        {
+            Content = label,
+            Height = 40,
+            MinWidth = 72,
+            Padding = new Thickness(12, 0, 12, 0),
+            Margin = new Thickness(0),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1)
+        };
+        var rest = Paint.Brush("101820", 230);
+        var hover = Paint.Brush("243044");
+        Paint.FillButton(button, rest, Paint.Brush(Paint.White));
+        button.Resources["ButtonBackgroundPointerOver"] = hover;
+        button.Resources["ButtonBackgroundPressed"] = Paint.Brush("0A1018");
+        button.Resources["ButtonBorderBrush"] = Paint.Brush(Paint.White, 80);
+        button.Resources["ButtonBorderBrushPointerOver"] = Paint.Brush(Paint.White, 160);
+        button.Click += (_, _) => action();
         AutomationProperties.SetName(button, name);
         ToolTipService.SetToolTip(button, name);
         return button;

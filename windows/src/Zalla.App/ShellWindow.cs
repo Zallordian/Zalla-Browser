@@ -17,6 +17,15 @@ public sealed partial class ShellWindow : Window
     readonly Grid _splitLeft = new();
     readonly Grid _splitRight = new();
     readonly Grid _classicIsland = new() { Visibility = Visibility.Collapsed };
+    readonly ScrollViewer _bookmarks = new()
+    {
+        Height = 44,
+        Visibility = Visibility.Collapsed,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+    };
+    readonly StackPanel _bookmarkItems = new() { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(12, 4, 12, 8) };
+    readonly List<DownloadNote> _downloads = new();
     readonly Canvas _overlay = new();
     readonly DeckView _deck = new();
     readonly ClassicStrip _strip = new() { Visibility = Visibility.Collapsed };
@@ -51,6 +60,7 @@ public sealed partial class ShellWindow : Window
     bool _booted;
     bool _closing;
     bool _busy;
+    bool _loading;
     bool _settingsOpen;
     bool _draggingIsland;
     bool _draggingCard;
@@ -80,6 +90,10 @@ public sealed partial class ShellWindow : Window
         _launch.Mark("wipe-deferred");
         _catalog = ThemeCatalog.LoadEmbedded();
         _settings = SettingsStore.LoadApp(_root);
+        if (ChromeMigration.Apply(_settings))
+        {
+            SettingsStore.SaveApp(_root, _settings);
+        }
         _space = _settings.LastSpace;
         if (!SpaceNames.TryParse(_space.ToString(), out _))
         {
@@ -129,6 +143,12 @@ public sealed partial class ShellWindow : Window
         pageHost.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         pageHost.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         pageHost.Children.Add(_strip);
+        _classicIsland.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _classicIsland.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        _bookmarks.Content = _bookmarkItems;
+        _bookmarks.Background = Paint.Brush("070B12");
+        Grid.SetRow(_bookmarks, 1);
+        _classicIsland.Children.Add(_bookmarks);
         Grid.SetRow(_classicIsland, 1);
         pageHost.Children.Add(_classicIsland);
         Grid.SetRow(_page, 2);
@@ -240,6 +260,19 @@ public sealed partial class ShellWindow : Window
         _island.Back += Back;
         _island.Forward += Forward;
         _island.Burn += () => _ = BurnAsync();
+        _island.ReloadOrStop += ReloadOrStop;
+        _island.Bookmark += ToggleBookmark;
+        _island.Bookmarks += ShowBookmarks;
+        _island.History += ShowHistory;
+        _island.Downloads += ShowDownloads;
+        _island.Extensions += ShowExtensions;
+        _island.Deck += () =>
+        {
+            _settings.Layout = _settings.Layout == ChromeLayout.Island ? ChromeLayout.Classic : ChromeLayout.Island;
+            ApplyLayout();
+            SettingsStore.SaveApp(_root, _settings);
+            RefreshChrome();
+        };
         _island.NewTab += NewTabFromChrome;
         _island.Settings += OpenSettings;
         _island.Submit += OnSubmit;
@@ -367,9 +400,12 @@ public sealed partial class ShellWindow : Window
         };
         var brand = Paint.Hex(BrandHex);
         _island.ApplyBrand(brand);
-        var fill = theme.Id == "lakeSuperior"
-            ? Color.FromArgb(184, 14, 30, 52)
-            : Color.FromArgb(190, wash.Mid.R, wash.Mid.G, wash.Mid.B);
+        var fill = _settings.Layout == ChromeLayout.Classic
+            ? Color.FromArgb(255, 10, 16, 26)
+            : theme.Id == "lakeSuperior"
+                ? Color.FromArgb(184, 14, 30, 52)
+                : Color.FromArgb(190, wash.Mid.R, wash.Mid.G, wash.Mid.B);
+        _strip.Background = Paint.Brush("070B12");
         _island.ApplyChrome(fill, Paint.Hex(theme.Colors.Highlight), brand);
         foreach (var tab in _tabs)
         {
@@ -393,6 +429,7 @@ public sealed partial class ShellWindow : Window
         if (classic)
         {
             MoveElement(_island, _classicIsland);
+            Grid.SetRow(_island, 0);
             _island.Width = double.NaN;
             _island.HorizontalAlignment = HorizontalAlignment.Stretch;
             MoveElement(_spaces, _strip.SpacesHost);
@@ -534,9 +571,152 @@ public sealed partial class ShellWindow : Window
             var core = primary.Web?.CoreWebView2;
             _island.SetHistory(core?.CanGoBack == true, core?.CanGoForward == true);
             _island.SetAddress(primary.Url);
+            _island.SetBookmarked(BrowserLibrary.IsBookmarked(_settings.Bookmarks, primary.Url));
+            RefreshBookmarks();
         }
 
         PlaceChrome();
+    }
+
+    void ReloadOrStop()
+    {
+        var core = PrimaryOrNull()?.Web?.CoreWebView2;
+        if (core == null)
+        {
+            return;
+        }
+
+        if (_loading)
+        {
+            core.Stop();
+            _loading = false;
+            _island.SetLoading(false);
+        }
+        else
+        {
+            core.Reload();
+        }
+    }
+
+    void ToggleBookmark()
+    {
+        var tab = PrimaryOrNull();
+        if (tab == null || !BrowserLibrary.IsPage(tab.Url))
+        {
+            Toast("Open a page before you bookmark it.");
+            return;
+        }
+
+        var added = BrowserLibrary.ToggleBookmark(_settings.Bookmarks, tab.Url, tab.Title);
+        SettingsStore.SaveApp(_root, _settings);
+        _island.SetBookmarked(added);
+        RefreshBookmarks();
+        Toast(added ? "Bookmark saved." : "Bookmark removed.");
+    }
+
+    void RefreshBookmarks()
+    {
+        _bookmarkItems.Children.Clear();
+        if (_settings.Layout != ChromeLayout.Classic || _settings.Bookmarks.Count == 0)
+        {
+            _bookmarks.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        _bookmarks.Visibility = Visibility.Visible;
+        foreach (var mark in _settings.Bookmarks)
+        {
+            var label = string.IsNullOrWhiteSpace(mark.Title) ? mark.Url : mark.Title;
+            var button = new Button
+            {
+                Content = label,
+                Height = 32,
+                MaxWidth = 220,
+                Padding = new Thickness(12, 0, 12, 0),
+                FontSize = 14
+            };
+            Paint.FillButton(button, Paint.Brush(Paint.White, 24), Paint.Brush(Paint.White));
+            var url = mark.Url;
+            button.Click += (_, _) => OpenAddress(url);
+            AutomationProperties.SetName(button, label);
+            _bookmarkItems.Children.Add(button);
+        }
+    }
+
+    void OpenAddress(string url)
+    {
+        var tab = PrimaryOrNull();
+        if (tab != null)
+        {
+            _ = NavigateAsync(tab, url);
+        }
+
+        CloseSettings();
+    }
+
+    void ShowBookmarks()
+    {
+        ShowLibrary(Copy.Bookmarks, "Saved on this PC. They stay when you switch Spaces.", _settings.Bookmarks.Select(mark => (Label: string.IsNullOrWhiteSpace(mark.Title) ? mark.Url : mark.Title, Url: mark.Url)).ToList(), "No bookmarks yet. Use Bookmark or Ctrl D on a page.", null, null);
+    }
+
+    void ShowHistory()
+    {
+        ShowLibrary(Copy.History, "Recent pages in this Space. Ghost does not keep them.", _spaceState.History.Select(item => (Label: item.Title + "  " + item.Url, Url: (string?)item.Url)).ToList(), "No pages yet.", null, null);
+    }
+
+    void ShowDownloads()
+    {
+        ShowLibrary(Copy.Downloads, "Files this window has started saving. The usual save prompt still appears.", _downloads.Select(item => (Label: item.Name + "  " + item.State, Url: (string?)null)).ToList(), "No downloads yet.", null, null);
+    }
+
+    void ShowExtensions()
+    {
+        ShowLibrary(Copy.Extensions, Copy.ExtensionNote, [], "No extension is loaded from here until you pick a folder.", LoadUnpackedExtension, Copy.LoadExtension);
+    }
+
+    async void LoadUnpackedExtension()
+    {
+        var core = PrimaryOrNull()?.Web?.CoreWebView2;
+        if (core == null)
+        {
+            Toast("Open a page first, then choose the extension folder.");
+            return;
+        }
+
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, _hwnd != 0 ? _hwnd : WinRT.Interop.WindowNative.GetWindowHandle(this));
+            picker.FileTypeFilter.Add("*");
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder == null)
+            {
+                return;
+            }
+
+            if (!BrowserLibrary.IsUnpackedExtension(folder.Path))
+            {
+                Toast("That folder needs a manifest.json file. Zalla will not download an extension for you.");
+                return;
+            }
+
+            await core.Profile.AddBrowserExtensionAsync(folder.Path);
+            Toast("That unpacked extension is loaded for this Space. Chrome Web Store installs are not available.");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+            Toast("Zalla could not load that extension. Many Chrome-only features will not run here.");
+        }
+    }
+
+    void ShowLibrary(string title, string note, IReadOnlyList<(string Label, string? Url)> rows, string empty, Action? extra, string? extraLabel)
+    {
+        _settingsOpen = true;
+        SetChromeOpacity(1);
+        _settingsLayer.Children.Clear();
+        _settingsLayer.Children.Add(new LibraryPanel(title, note, rows, empty, OpenAddress, extra, extraLabel, CloseSettings));
+        _settingsLayer.Visibility = Visibility.Visible;
     }
 
     void OpenSettings()

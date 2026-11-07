@@ -81,6 +81,8 @@ public sealed class SpaceState
 
     public PrivacySettings Privacy { get; set; } = PrivacySettings.CreateDefaults();
 
+    public List<HistoryEntry> History { get; set; } = new();
+
     public int BlockedThisWeek { get; set; }
 
     public static SpaceState CreateNew()
@@ -94,7 +96,9 @@ public sealed class SpaceState
 
 public sealed class AppSettings
 {
-    public ChromeLayout Layout { get; set; } = ChromeLayout.Island;
+    public ChromeLayout Layout { get; set; } = ChromeLayout.Classic;
+
+    public int ChromeRevision { get; set; }
 
     public string SearchEngineId { get; set; } = SearchEngine.Brave.Id;
 
@@ -103,4 +107,6 @@ public sealed class AppSettings
     public SpaceKind LastSpace { get; set; } = SpaceKind.Personal;
 
     public IslandPlacement Island { get; set; } = new();
+
+    public List<Bookmark> Bookmarks { get; set; } = new();
 }
