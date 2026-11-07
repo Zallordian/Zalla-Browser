@@ -61,14 +61,6 @@ sealed class NewTabPage : Grid
         }
 
         _center.Children.Add(shortcuts);
-
-        PointerPressed += (_, e) =>
-        {
-            if (!HitTestHelper.IsInteractive(e.OriginalSource as DependencyObject))
-            {
-                WindowDrag.Requested?.Invoke();
-            }
-        };
     }
 
     public void SetSideInset(double left, double right)
@@ -149,9 +141,4 @@ static class HitTestHelper
 
         return false;
     }
-}
-
-static class WindowDrag
-{
-    public static Action? Requested { get; set; }
 }

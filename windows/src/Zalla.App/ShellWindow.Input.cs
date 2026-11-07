@@ -8,8 +8,6 @@ public sealed partial class ShellWindow
     const int WmHotkey = 0x0312;
     const int WmSysCommand = 0x0112;
     const int VkF11 = 0x7A;
-    const int WmNcLButtonDown = 0x00A1;
-    const int HtCaption = 2;
     const int ScMaximize = 0xF030;
     const uint ModAlt = 0x0001;
     const uint ModControl = 0x0002;
@@ -88,7 +86,10 @@ public sealed partial class ShellWindow
     {
         _island.PointerPressed += (_, e) =>
         {
-            if (_settings.Layout == ChromeLayout.Classic || HitTestHelper.IsInteractive(e.OriginalSource as DependencyObject))
+            var surface = _settings.Layout == ChromeLayout.Classic || HitTestHelper.IsInteractive(e.OriginalSource as DependencyObject)
+                ? DragSurface.Control
+                : DragSurface.IslandChrome;
+            if (!DragPolicy.MoveIsland(surface, e.GetCurrentPoint(_island).Properties.IsLeftButtonPressed))
             {
                 return;
             }
@@ -108,6 +109,12 @@ public sealed partial class ShellWindow
                 return;
             }
 
+            if (!DragPolicy.KeepDragging(e.GetCurrentPoint(_island).Properties.IsLeftButtonPressed))
+            {
+                EndIslandDrag();
+                return;
+            }
+
             var pos = e.GetCurrentPoint(_overlay).Position;
             Canvas.SetLeft(_island, _islandStart.X + pos.X - _dragStart.X);
             Canvas.SetTop(_island, _islandStart.Y + pos.Y - _dragStart.Y);
@@ -116,19 +123,22 @@ public sealed partial class ShellWindow
             _hint.Visibility = Visibility.Collapsed;
             e.Handled = true;
         };
-        _island.PointerReleased += (_, e) =>
-        {
-            if (!_draggingIsland)
-            {
-                return;
-            }
+        _island.PointerReleased += (_, _) => EndIslandDrag();
+        _island.PointerCaptureLost += (_, _) => EndIslandDrag();
+        _island.PointerCanceled += (_, _) => EndIslandDrag();
+    }
 
-            _draggingIsland = false;
-            _island.ReleasePointerCaptures();
-            SnapIsland();
-            SettingsStore.SaveApp(_root, _settings);
-            e.Handled = true;
-        };
+    void EndIslandDrag()
+    {
+        if (!_draggingIsland)
+        {
+            return;
+        }
+
+        _draggingIsland = false;
+        _island.ReleasePointerCaptures();
+        SnapIsland();
+        SettingsStore.SaveApp(_root, _settings);
     }
 
     void SnapIsland()
@@ -329,18 +339,6 @@ public sealed partial class ShellWindow
         return tab != null && tab.Url.Length > 0;
     }
 
-    void BeginWindowDrag()
-    {
-        var hwnd = _hwnd != 0 ? _hwnd : WinRT.Interop.WindowNative.GetWindowHandle(this);
-        if (hwnd == 0)
-        {
-            return;
-        }
-
-        ReleaseCapture();
-        SendMessage(hwnd, WmNcLButtonDown, (IntPtr)HtCaption, IntPtr.Zero);
-    }
-
     void InstallHotkeys()
     {
         if (_hotkeysOn)
@@ -459,12 +457,6 @@ public sealed partial class ShellWindow
 
     [DllImport("user32.dll")]
     static extern bool UnregisterHotKey(IntPtr hwnd, int id);
-
-    [DllImport("user32.dll")]
-    static extern IntPtr SendMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    static extern bool ReleaseCapture();
 
     [DllImport("user32.dll")]
     static extern bool GetCursorPos(out PointNative point);

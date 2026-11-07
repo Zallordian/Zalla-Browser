@@ -24,7 +24,7 @@ public sealed partial class ShellWindow : Window
     readonly ShieldCard _shield = new();
     readonly SpacesBar _spaces = new();
     readonly TextBlock _hint = new();
-    readonly Grid _dragStrip = new() { Height = 40, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 150, 0) };
+    readonly Grid _dragStrip = new() { Height = 40, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 148, 0) };
     readonly StackPanel _windowButtons = new() { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top };
     readonly Grid _fire = new() { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
     readonly Border _toast = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 120), Padding = new Thickness(16, 8, 16, 8), CornerRadius = new CornerRadius(14), Visibility = Visibility.Collapsed, IsHitTestVisible = false };
@@ -68,6 +68,8 @@ public sealed partial class ShellWindow : Window
     DispatcherQueueTimer? _previewTimer;
     IntPtr _hwnd;
     SubclassProc? _subclass;
+    readonly LaunchClock _launch = new();
+    bool _loggedPage;
 
     public ShellWindow()
     {
@@ -75,7 +77,7 @@ public sealed partial class ShellWindow : Window
         _root = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Zalla");
         _spacesRoot = SettingsStore.SpacesRoot(_root);
         Directory.CreateDirectory(_spacesRoot);
-        SpaceWipe.ConsumePending(_spacesRoot);
+        _launch.Mark("wipe-deferred");
         _catalog = ThemeCatalog.LoadEmbedded();
         _settings = SettingsStore.LoadApp(_root);
         _space = _settings.LastSpace;
@@ -84,7 +86,7 @@ public sealed partial class ShellWindow : Window
             _space = SpaceKind.Personal;
         }
 
-        _maxButton = CaptionButton("\uE922", Copy.Maximize, ToggleMaximize, close: false);
+        _maxButton = CaptionButtons.Create(CaptionKind.Maximize, ToggleMaximize);
         _cardsButton = Paint.Flat(new TextBlock { Text = "Cards", FontSize = 12, Margin = new Thickness(8, 0, 8, 0) }, 0);
         _cardsButton.Padding = new Thickness(10, 6, 10, 6);
         _cardsButton.Background = Paint.Brush(Paint.Black, 120);
@@ -100,12 +102,13 @@ public sealed partial class ShellWindow : Window
         };
 
         Content = BuildRoot();
+        _launch.Mark("tree");
         Wire();
         LoadSpaceIntoTabs();
         ApplyTheme();
         ApplyLayout();
         ConfigureFrame();
-        StartTimers();
+        _launch.Mark("ready");
         Activated += OnActivated;
         AppWindow.Closing += OnClosing;
     }
@@ -153,16 +156,11 @@ public sealed partial class ShellWindow : Window
         _overlay.Children.Add(_hint);
         _rootGrid.Children.Add(_overlay);
 
-        _dragStrip.Background = Paint.Brush(Paint.White, 1);
-        _dragStrip.PointerPressed += (_, e) =>
-        {
-            BeginWindowDrag();
-            e.Handled = true;
-        };
+        _dragStrip.Background = Paint.Brush("070B12", 150);
         _rootGrid.Children.Add(_dragStrip);
-        _windowButtons.Children.Add(CaptionButton("\uE921", Copy.Minimize, Minimize, close: false));
+        _windowButtons.Children.Add(CaptionButtons.Create(CaptionKind.Minimize, Minimize));
         _windowButtons.Children.Add(_maxButton);
-        _windowButtons.Children.Add(CaptionButton("\uE8BB", Copy.Close, Close, close: true));
+        _windowButtons.Children.Add(CaptionButtons.Create(CaptionKind.Close, Close));
         _rootGrid.Children.Add(_windowButtons);
         _rootGrid.Children.Add(_cardsButton);
 
@@ -238,7 +236,6 @@ public sealed partial class ShellWindow : Window
 
     void Wire()
     {
-        WindowDrag.Requested = BeginWindowDrag;
         _deck.SpacesHost.Children.Add(_spaces);
         _island.Back += Back;
         _island.Forward += Forward;
@@ -282,6 +279,7 @@ public sealed partial class ShellWindow : Window
 
             AppWindow.Title = "Zalla";
             AppWindow.Changed += OnAppWindowChanged;
+            SetTitleBar(_dragStrip);
             var icon = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "zalla.ico");
             if (File.Exists(icon))
             {
@@ -317,6 +315,26 @@ public sealed partial class ShellWindow : Window
         }
 
         InstallHotkeys();
+        StartTimers();
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, StartAfterFirstFrame);
+    }
+
+    void StartAfterFirstFrame()
+    {
+        _launch.Mark("first-frame");
+        AppLog.WriteText("launch " + _launch.Line());
+        var spaces = _spacesRoot;
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                SpaceWipe.ConsumePending(spaces);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write(ex);
+            }
+        });
         var tab = PrimaryOrNull();
         if (tab != null && tab.Url.Length > 0 && tab.Web?.CoreWebView2 == null)
         {
@@ -620,74 +638,19 @@ public sealed partial class ShellWindow : Window
         _shield.IsHitTestVisible = hit;
     }
 
-    static Button CaptionButton(string glyph, string name, Action action, bool close)
-    {
-        var icon = new TextBlock
-        {
-            Text = glyph,
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 12,
-            Foreground = Paint.Brush(Paint.White),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var button = new Button
-        {
-            Content = icon,
-            Width = 46,
-            Height = 40,
-            Padding = new Thickness(0),
-            Margin = new Thickness(0),
-            BorderThickness = new Thickness(0),
-            CornerRadius = new CornerRadius(0),
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Top
-        };
-        var clear = Paint.Brush(Paint.White, 0);
-        var hover = close ? Paint.Brush("C42B1C") : Paint.Brush(Paint.White, 36);
-        var pressed = close ? Paint.Brush("8E1C12") : Paint.Brush(Paint.White, 56);
-        button.Resources["ButtonBackground"] = clear;
-        button.Resources["ButtonBackgroundPointerOver"] = hover;
-        button.Resources["ButtonBackgroundPressed"] = pressed;
-        button.Resources["ButtonBackgroundDisabled"] = clear;
-        button.Resources["ButtonForeground"] = Paint.Brush(Paint.White);
-        button.Resources["ButtonForegroundPointerOver"] = Paint.Brush(Paint.White);
-        button.Resources["ButtonForegroundPressed"] = Paint.Brush(Paint.White);
-        var none = Paint.Brush(Paint.White, 0);
-        button.Resources["ButtonBorderBrush"] = none;
-        button.Resources["ButtonBorderBrushPointerOver"] = none;
-        button.Resources["ButtonBorderBrushPressed"] = none;
-        button.Resources["ButtonBorderBrushDisabled"] = none;
-        button.Click += (_, _) => action();
-        AutomationProperties.SetName(button, name);
-        ToolTipService.SetToolTip(button, name);
-        return button;
-    }
-
-    void SetCaptionGlyph(string glyph, string name)
-    {
-        if (_maxButton.Content is TextBlock icon)
-        {
-            icon.Text = glyph;
-        }
-
-        AutomationProperties.SetName(_maxButton, name);
-        ToolTipService.SetToolTip(_maxButton, name);
-    }
-
     void SyncCaption()
     {
         if (_fullScreen)
         {
-            SetCaptionGlyph("\uE923", Copy.LeaveFullScreen);
+            CaptionButtons.Show(_maxButton, CaptionKind.Restore, Copy.LeaveFullScreen);
         }
         else if (_workMaximized)
         {
-            SetCaptionGlyph("\uE923", Copy.Restore);
+            CaptionButtons.Show(_maxButton, CaptionKind.Restore, Copy.Restore);
         }
         else
         {
-            SetCaptionGlyph("\uE922", Copy.Maximize);
+            CaptionButtons.Show(_maxButton, CaptionKind.Maximize, Copy.Maximize);
         }
     }
 

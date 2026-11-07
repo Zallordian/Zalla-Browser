@@ -13,7 +13,9 @@ Copy the unzipped folder onto another Windows PC and run `Zalla.exe`. There is n
 
 You need 64-bit Windows 10 version 1809 or Windows 11, and the Microsoft Edge WebView2 Runtime. Windows 11 usually has that runtime. Windows 10, and some managed work PCs, do not. A company policy can block an unsigned program or the WebView2 Runtime. Zalla does not bypass that. If pages cannot load, install Microsoft's Evergreen WebView2 Runtime only when you are allowed to.
 
-The square caption button maximizes inside the taskbar. F11 is full screen and covers the taskbar. F11 again, or the restore caption button, leaves full screen.
+Drag the dark strip at the top to move the window. The caption buttons stay visible. The square one maximizes inside the taskbar. F11 is full screen and covers the taskbar. F11 again, or the restore button, leaves full screen.
+
+The first window is shown before a saved page is opened. Opening that page still starts WebView2, which is the slow part on a cold start. A line in `%LOCALAPPDATA%\Zalla\zalla.log` records the phase names. That is a trace, not a promise of a particular startup time.
 
 The other artifact, `Zalla-Windows-win-x64-msix`, is unsigned. Windows will not install it until it is signed. Use the app zip.
 

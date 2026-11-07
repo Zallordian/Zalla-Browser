@@ -404,6 +404,13 @@ public sealed partial class ShellWindow
             _island.LeaveCommand();
             _island.SetAddress(url);
             tab.Web?.Focus(FocusState.Programmatic);
+            if (!_loggedPage)
+            {
+                _loggedPage = true;
+                _launch.Mark("page-ready");
+                AppLog.WriteText("launch " + _launch.Line());
+            }
+
             SaveCurrentSpace();
         }
         catch (Exception ex)
