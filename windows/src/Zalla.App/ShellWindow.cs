@@ -293,10 +293,10 @@ public sealed partial class ShellWindow : Window
         _island.ZoomReset += () => ChangeZoom(0);
         _island.ZoomQuery += () =>
         {
-            var web = PrimaryOrNull()?.Web;
-            if (web?.CoreWebView2 != null)
+            var tab = PrimaryOrNull();
+            if (tab != null)
             {
-                _island.SetZoom(PageZoom.Label(web.ZoomFactor));
+                _island.SetZoom(PageZoom.Label(tab.Zoom));
             }
         };
         _find.TextChanged += QueueFind;
@@ -792,15 +792,34 @@ public sealed partial class ShellWindow : Window
 
     void ChangeZoom(int direction)
     {
-        var web = PrimaryOrNull()?.Web;
-        if (web?.CoreWebView2 == null)
+        var tab = PrimaryOrNull();
+        if (tab?.Web?.CoreWebView2 == null)
         {
             return;
         }
 
-        var next = direction > 0 ? PageZoom.In(web.ZoomFactor) : direction < 0 ? PageZoom.Out(web.ZoomFactor) : PageZoom.Reset();
-        web.ZoomFactor = next;
-        _island.SetZoom(PageZoom.Label(next));
+        tab.Zoom = direction > 0 ? PageZoom.In(tab.Zoom) : direction < 0 ? PageZoom.Out(tab.Zoom) : PageZoom.Reset();
+        _island.SetZoom(PageZoom.Label(tab.Zoom));
+        _ = ApplyPageZoomAsync(tab);
+    }
+
+    async Task ApplyPageZoomAsync(BrowserTab tab)
+    {
+        var core = tab.Web?.CoreWebView2;
+        if (core == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var value = tab.Zoom.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await core.ExecuteScriptAsync("document.documentElement.style.zoom = '" + value + "'");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
     }
 
     void ShowDownloads()

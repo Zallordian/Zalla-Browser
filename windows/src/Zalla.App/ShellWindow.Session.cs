@@ -451,7 +451,7 @@ public sealed partial class ShellWindow
         core.Settings.IsGeneralAutofillEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = true;
         core.Settings.AreDevToolsEnabled = false;
-        core.Settings.IsZoomControlEnabled = true;
+        core.Settings.IsZoomControlEnabled = false;
         WireCore(tab, core);
         tab.Ready = true;
         ShowWeb(tab);
@@ -678,6 +678,11 @@ public sealed partial class ShellWindow
         {
             BrowserLibrary.Remember(_spaceState.History, tab.Url, tab.Title);
             SaveCurrentSpace();
+            if (Math.Abs(tab.Zoom - 1) > 0.001)
+            {
+                _ = ApplyPageZoomAsync(tab);
+            }
+
             _ = CaptureSoon(tab);
         }
 
@@ -958,6 +963,7 @@ sealed class BrowserTab
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "New Tab";
     public string Url { get; set; } = "";
+    public double Zoom { get; set; } = 1;
     public string ColorHex { get; set; } = "E33B4F";
     public byte[]? Preview { get; set; }
     public Grid Host { get; } = new();
