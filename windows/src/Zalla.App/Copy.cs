@@ -1,0 +1,92 @@
+namespace Zalla;
+
+static class Copy
+{
+    public const string SearchPlaceholder = "Search or type an address";
+    public const string CommandPlaceholder = "Type a command";
+    public const string IslandHint = "Drag it anywhere, or dock it on an edge";
+    public const string NewCard = "New card    Ctrl T";
+    public const string ClickToTune = "Click to tune";
+    public const string Trackers = "Trackers";
+    public const string Ads = "Ads";
+    public const string CookieBanners = "Cookie banners";
+    public const string HttpsOnly = "HTTPS-Only";
+    public const string Fingerprinting = "Fingerprinting";
+    public const string BurnTooltip = "Burn It All";
+    public const string Back = "Back";
+    public const string Forward = "Forward";
+    public const string Menu = "Menu";
+    public const string MenuTip = "Menu";
+    public const string BackTip = "Back (Alt+Left)";
+    public const string ForwardTip = "Forward (Alt+Right)";
+    public const string ReloadTip = "Reload (Ctrl+R)";
+    public const string BookmarkTip = "Bookmark this page (Ctrl+D)";
+    public const string BookmarkedTip = "Remove bookmark (Ctrl+D)";
+    public const string ShieldTip = "Shield preview";
+    public const string PrivacySettings = "Privacy settings";
+    public const string WorkingNow = "Working now";
+    public const string PreviewHeading = "Preview";
+    public const string NewTab = "New tab";
+    public const string Settings = "Settings";
+    public const string Close = "Close";
+    public const string Minimize = "Minimize";
+    public const string Maximize = "Maximize";
+    public const string Restore = "Restore";
+    public const string LeaveFullScreen = "Leave full screen";
+    public const string PreviewSaved = "Preview. Saved for later. Zalla does not do this yet.";
+    public const string WebOnly = "Zalla only opens web pages.";
+    public const string NoTheme = "No theme named that.";
+    public const string NeedAnother = "Open another card to sit side by side.";
+    public const string WebViewMissing = "This PC needs the Microsoft Edge WebView2 Runtime before pages can load. Windows 11 usually has it already.";
+    public const string OpenFailed = "Zalla could not open.";
+    public const string LogHint = "The same details are in %LOCALAPPDATA%\\Zalla\\zalla.log.";
+    public const string GhostNote = "Ghost forgets this Space when you leave it.";
+    public const string CloseSplit = "Close split";
+    public const string DropToSplit = "Drop to sit side by side";
+    public const string LayoutIsland = "Floating cards";
+    public const string LayoutClassic = "Browser bar";
+    public const string LayoutHelp = "Browser bar puts tabs, back, forward, reload, and the address field above the page. Floating cards is the experimental layout and covers the page.";
+    public const string Reload = "Reload";
+    public const string Stop = "Stop";
+    public const string Bookmark = "Bookmark";
+    public const string Bookmarked = "Bookmarked";
+    public const string Bookmarks = "Bookmarks";
+    public const string History = "History";
+    public const string Downloads = "Downloads";
+    public const string Extensions = "Extensions";
+    public const string Cards = "Card deck";
+    public const string ExtensionNote = "Pages use Microsoft Edge WebView2. The engine is Chromium, the same family Chrome uses. Zalla is not Chrome. The Chrome Web Store and the Edge Add-ons store cannot install here. You can load an unpacked extension from a folder that already has a manifest.json file. Zalla will not download one for you. Many Chrome-only features will not work.";
+    public const string LoadExtension = "Load unpacked extension";
+    public const string EngineNote = "Pages are drawn by Microsoft Edge WebView2, which uses the Chromium engine. Zalla does not include the Chrome browser itself.";
+    public const string PrivacyNote = "HTTPS-Only, link cleaning, referrer trimming, and Burn It All work now. Tracker lists, ad lists, cookie banner hiding, fingerprint changes, encrypted DNS, and proxy routing are preview. The switches are saved, and they are not active yet.";
+    public const string ProxyTitle = "Use my own proxy";
+    public const string ProxyDetail = "Sends page traffic through a proxy you provide. Zalla does not ship a proxy, and it does not hide your IP on its own. Leave this off until you have an address. Routing through it comes in a later update.";
+    public const string About = "Zalla for Windows. Pages load with Microsoft Edge WebView2, which is already on most Windows 11 PCs.";
+    public const string Spaces = "SPACES";
+    public const string Appearance = "Appearance";
+    public const string Privacy = "Privacy";
+    public const string Search = "Search";
+    public const string AboutTitle = "About";
+    public const string BurnFailed = "Zalla could not clear everything. Close the app and open it again.";
+    public const string Colors = "Colors";
+    public const string Themes = "Themes";
+    public const string Pro = "Pro";
+    public const string Seasons = "Seasons";
+    public const string CustomSearch = "Custom search address, with %s where the words go";
+
+    public static readonly string[] Sayings =
+    [
+        "Where to next?",
+        "Browse quietly.",
+        "Private by default.",
+        "Start somewhere.",
+        "Ready when you are.",
+        "Look something up."
+    ];
+
+    public static string ThemeOn(string name) => name + " is on.";
+
+    public static string Cleared(string space) => space + " is cleared.";
+
+    public static string DeckCount(int count) => count == 1 ? "DECK  ·  1 TAB" : $"DECK  ·  {count} TABS";
+}
