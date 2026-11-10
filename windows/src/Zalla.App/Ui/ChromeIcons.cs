@@ -50,7 +50,7 @@ static class ChromeIcons
         figure.Segments.Add(new LineSegment { Point = new Point(8, 11) });
         figure.Segments.Add(new LineSegment { Point = new Point(4, 14) });
         geometry.Figures.Add(figure);
-        var path = new Path
+        var path = new Microsoft.UI.Xaml.Shapes.Path
         {
             Data = geometry,
             Stroke = Paint.Brush(Paint.White),
@@ -143,7 +143,7 @@ static class ChromeIcons
         return Icon(Stroke(geometry));
     }
 
-    static Path Stroke(Geometry geometry) => new()
+    static Microsoft.UI.Xaml.Shapes.Path Stroke(Geometry geometry) => new()
     {
         Data = geometry,
         Stroke = Paint.Brush(Paint.White),
