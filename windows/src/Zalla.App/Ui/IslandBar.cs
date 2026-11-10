@@ -6,96 +6,79 @@ sealed class IslandBar : Grid
     readonly Button _back;
     readonly Button _forward;
     readonly Button _reload;
-    readonly TextBlock _reloadLabel;
     readonly Button _bookmark;
-    readonly TextBlock _bookmarkLabel;
+    readonly Button _shield;
     readonly TextBox _input = new();
-    readonly Button _burn;
+    readonly TextBlock _shieldTitle = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Paint.Brush(Paint.White) };
+    readonly TextBlock _shieldLines = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap, Foreground = Paint.Brush(Paint.White) };
+    readonly TextBlock _shieldDetail = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap, Opacity = 0.84, Margin = new Thickness(0, 8, 0, 0), Foreground = Paint.Brush(Paint.White) };
     string _address = "";
+    string _shieldKey = "";
 
     public IslandBar()
     {
-        Height = 70;
+        Height = 52;
         VerticalAlignment = VerticalAlignment.Center;
-        _shell.BorderThickness = new Thickness(1);
-        _shell.BorderBrush = Paint.Brush(Paint.White, 40);
-        _shell.CornerRadius = new CornerRadius(35);
-        _shell.Padding = new Thickness(12, 0, 12, 0);
+        _shell.BorderThickness = new Thickness(0, 0, 0, 1);
+        _shell.BorderBrush = Paint.Brush(Paint.White, 28);
+        _shell.Padding = new Thickness(8, 0, 8, 0);
         Children.Add(_shell);
 
         var row = new Grid { VerticalAlignment = VerticalAlignment.Center };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         _shell.Child = row;
 
-        var z = TextButton(Copy.Menu, () => { });
-        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.Bottom };
-        menu.Items.Add(Item(Copy.NewTab, () => NewTab?.Invoke()));
-        menu.Items.Add(Item(Copy.Bookmarks, () => Bookmarks?.Invoke()));
-        menu.Items.Add(Item(Copy.History, () => History?.Invoke()));
-        menu.Items.Add(Item(Copy.Downloads, () => Downloads?.Invoke()));
-        menu.Items.Add(Item(Copy.Extensions, () => Extensions?.Invoke()));
-        menu.Items.Add(Item(Copy.Cards, () => Deck?.Invoke()));
-        menu.Items.Add(Item(Copy.Settings, () => Settings?.Invoke()));
-        menu.Items.Add(Item(Copy.BurnTooltip, () => Burn?.Invoke()));
-        z.Flyout = menu;
-        AutomationProperties.SetName(z, Copy.Menu);
-        row.Children.Add(z);
-
-        _back = TextButton(Copy.Back, () => Back?.Invoke());
-        _back.Margin = new Thickness(8, 0, 0, 0);
-        Grid.SetColumn(_back, 1);
+        _back = IconButton(ChromeIcons.Back(), Copy.Back, Copy.BackTip, () => Back?.Invoke());
+        Grid.SetColumn(_back, 0);
         row.Children.Add(_back);
 
-        _forward = TextButton(Copy.Forward, () => Forward?.Invoke());
-        _forward.Margin = new Thickness(6, 0, 0, 0);
-        Grid.SetColumn(_forward, 2);
+        _forward = IconButton(ChromeIcons.Forward(), Copy.Forward, Copy.ForwardTip, () => Forward?.Invoke());
+        _forward.Margin = new Thickness(2, 0, 0, 0);
+        Grid.SetColumn(_forward, 1);
         row.Children.Add(_forward);
 
-        _reloadLabel = new TextBlock { Text = Copy.Reload, FontSize = 15, Foreground = Paint.Brush(Paint.White) };
-        _reload = TextButton(Copy.Reload, () => ReloadOrStop?.Invoke());
-        _reload.Content = _reloadLabel;
-        _reload.Margin = new Thickness(6, 0, 8, 0);
-        Grid.SetColumn(_reload, 3);
+        _reload = IconButton(ChromeIcons.Reload(), Copy.Reload, Copy.ReloadTip, () => ReloadOrStop?.Invoke());
+        _reload.Margin = new Thickness(2, 0, 8, 0);
+        Grid.SetColumn(_reload, 2);
         row.Children.Add(_reload);
 
         _input.PlaceholderText = Copy.SearchPlaceholder;
         _input.BorderThickness = new Thickness(0);
-        _input.Background = Paint.Brush(Paint.Black, 90);
+        _input.Background = Paint.Brush("1A2330");
         _input.Foreground = Paint.Brush(Paint.White);
-        _input.CornerRadius = new CornerRadius(8);
-        _input.Height = 44;
-        _input.MinWidth = 240;
-        _input.Padding = new Thickness(14, 8, 14, 8);
-        _input.FontSize = 16;
+        _input.CornerRadius = new CornerRadius(18);
+        _input.Height = 36;
+        _input.MinWidth = 220;
+        _input.Padding = new Thickness(16, 6, 16, 6);
+        _input.FontSize = 15;
         _input.VerticalAlignment = VerticalAlignment.Center;
         _input.RequestedTheme = ElementTheme.Dark;
         _input.KeyDown += OnKey;
-        Grid.SetColumn(_input, 4);
+        Grid.SetColumn(_input, 3);
         row.Children.Add(_input);
 
-        _bookmarkLabel = new TextBlock { Text = Copy.Bookmark, FontSize = 15, Foreground = Paint.Brush(Paint.White) };
-        _bookmark = TextButton(Copy.Bookmark, () => Bookmark?.Invoke());
-        _bookmark.Content = _bookmarkLabel;
+        _bookmark = IconButton(ChromeIcons.Bookmark(false), Copy.Bookmark, Copy.BookmarkTip, () => Bookmark?.Invoke());
         _bookmark.Margin = new Thickness(8, 0, 0, 0);
-        Grid.SetColumn(_bookmark, 5);
+        Grid.SetColumn(_bookmark, 4);
         row.Children.Add(_bookmark);
 
-        _burn = TextButton(Copy.BurnTooltip, () => Burn?.Invoke());
-        if (_burn.Content is TextBlock flame)
-        {
-            flame.FontFamily = new FontFamily("Segoe UI Emoji");
-        }
-        _burn.Margin = new Thickness(8, 0, 0, 0);
-        AutomationProperties.SetName(_burn, Copy.BurnTooltip);
-        ToolTipService.SetToolTip(_burn, Copy.BurnTooltip);
-        Grid.SetColumn(_burn, 6);
-        row.Children.Add(_burn);
+        _shield = IconButton(ChromeIcons.Shield(), Copy.ShieldTip, Copy.ShieldTip, () => { });
+        _shield.Margin = new Thickness(2, 0, 0, 0);
+        _shield.Flyout = BuildShield();
+        Grid.SetColumn(_shield, 5);
+        row.Children.Add(_shield);
+
+        var menuButton = IconButton(ChromeIcons.Menu(), Copy.Menu, Copy.MenuTip, () => { });
+        menuButton.Margin = new Thickness(2, 0, 0, 0);
+        menuButton.Flyout = BuildMenu();
+        Grid.SetColumn(menuButton, 6);
+        row.Children.Add(menuButton);
 
         SetHistory(false, false);
     }
@@ -120,24 +103,43 @@ sealed class IslandBar : Grid
 
     public void UsePill(bool pill)
     {
-        _shell.CornerRadius = new CornerRadius(pill ? 20 : 0);
-        Height = 64;
+        _shell.CornerRadius = new CornerRadius(pill ? 18 : 0);
+        _shell.BorderThickness = new Thickness(pill ? 1 : 0, pill ? 1 : 0, pill ? 1 : 0, 1);
+        Height = pill ? 64 : 52;
         Margin = new Thickness(0);
-        _shell.Padding = new Thickness(pill ? 12 : 8, 0, 12, 0);
+        _shell.Padding = new Thickness(pill ? 12 : 8, 0, 8, 0);
+        _shield.Visibility = pill ? Visibility.Collapsed : Visibility.Visible;
     }
 
     public void SetLoading(bool loading)
     {
-        _reloadLabel.Text = loading ? Copy.Stop : Copy.Reload;
-        AutomationProperties.SetName(_reload, _reloadLabel.Text);
-        ToolTipService.SetToolTip(_reload, _reloadLabel.Text);
+        _reload.Content = loading ? ChromeIcons.Stop() : ChromeIcons.Reload();
+        var name = loading ? Copy.Stop : Copy.Reload;
+        AutomationProperties.SetName(_reload, name);
+        ToolTipService.SetToolTip(_reload, loading ? Copy.Stop : Copy.ReloadTip);
     }
 
     public void SetBookmarked(bool marked)
     {
-        _bookmarkLabel.Text = marked ? Copy.Bookmarked : Copy.Bookmark;
-        AutomationProperties.SetName(_bookmark, _bookmarkLabel.Text);
-        ToolTipService.SetToolTip(_bookmark, _bookmarkLabel.Text);
+        _bookmark.Content = ChromeIcons.Bookmark(marked);
+        var name = marked ? Copy.Bookmarked : Copy.Bookmark;
+        AutomationProperties.SetName(_bookmark, name);
+        ToolTipService.SetToolTip(_bookmark, marked ? Copy.BookmarkedTip : Copy.BookmarkTip);
+    }
+
+    public void SetShield(string title, string detail, IReadOnlyList<string> lines)
+    {
+        var body = string.Join('\n', lines);
+        var key = title + "\n" + detail + "\n" + body;
+        if (key == _shieldKey)
+        {
+            return;
+        }
+
+        _shieldKey = key;
+        _shieldTitle.Text = title;
+        _shieldDetail.Text = detail;
+        _shieldLines.Text = body;
     }
 
     public void SetAddress(string url)
@@ -153,8 +155,8 @@ sealed class IslandBar : Grid
 
     public void SetHistory(bool canBack, bool canForward)
     {
-        _back.Opacity = canBack ? 1 : 0.35;
-        _forward.Opacity = canForward ? 1 : 0.35;
+        _back.Opacity = canBack ? 1 : 0.38;
+        _forward.Opacity = canForward ? 1 : 0.38;
         _back.IsEnabled = canBack;
         _forward.IsEnabled = canForward;
     }
@@ -185,24 +187,92 @@ sealed class IslandBar : Grid
 
     public void ApplyChrome(Color fill, Color burnTop, Color burnBottom)
     {
+        _ = burnTop;
+        _ = burnBottom;
         _shell.Background = Paint.Brush(fill);
-        Paint.FillButton(_burn, new LinearGradientBrush
-        {
-            StartPoint = new Point(0.5, 0),
-            EndPoint = new Point(0.5, 1),
-            GradientStops =
-            {
-                new GradientStop { Color = burnTop, Offset = 0 },
-                new GradientStop { Color = burnBottom, Offset = 1 }
-            }
-        }, Paint.Brush(Paint.White));
     }
 
-    public void ApplyBrand(Color brand)
+    public void ApplyBrand(Color brand) => _ = brand;
+
+    Flyout BuildShield()
     {
-        if (_shell.Child is Grid row && row.Children[0] is Button z)
+        var stack = new StackPanel { Width = 280, Spacing = 4, RequestedTheme = ElementTheme.Dark };
+        stack.Children.Add(_shieldTitle);
+        stack.Children.Add(_shieldLines);
+        stack.Children.Add(_shieldDetail);
+        var open = new Button
         {
-            Paint.FillButton(z, Paint.Brush(brand), Paint.Brush(Paint.White));
+            Content = Copy.PrivacySettings,
+            Height = 36,
+            Margin = new Thickness(0, 12, 0, 0),
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        Paint.FillButton(open, Paint.Brush(Paint.White, 24), Paint.Brush(Paint.White));
+        open.Click += (_, _) => Settings?.Invoke();
+        AutomationProperties.SetName(open, Copy.PrivacySettings);
+        stack.Children.Add(open);
+        return new Flyout
+        {
+            Placement = FlyoutPlacementMode.BottomEdgeAlignedRight,
+            Content = stack
+        };
+    }
+
+    MenuFlyout BuildMenu()
+    {
+        var menu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
+        foreach (var command in BrowserChrome.Menu)
+        {
+            if (command.SeparatorBefore)
+            {
+                menu.Items.Add(new MenuFlyoutSeparator());
+            }
+
+            menu.Items.Add(Item(command));
+        }
+
+        return menu;
+    }
+
+    MenuFlyoutItem Item(ChromeCommand command)
+    {
+        var item = new MenuFlyoutItem
+        {
+            Text = command.Label,
+            KeyboardAcceleratorTextOverride = command.Shortcut
+        };
+        item.Click += (_, _) => Run(command.Action);
+        return item;
+    }
+
+    void Run(string action)
+    {
+        switch (action)
+        {
+            case "new-tab":
+                NewTab?.Invoke();
+                break;
+            case "bookmarks":
+                Bookmarks?.Invoke();
+                break;
+            case "history":
+                History?.Invoke();
+                break;
+            case "downloads":
+                Downloads?.Invoke();
+                break;
+            case "extensions":
+                Extensions?.Invoke();
+                break;
+            case "settings":
+                Settings?.Invoke();
+                break;
+            case "deck":
+                Deck?.Invoke();
+                break;
+            case "burn":
+                Burn?.Invoke();
+                break;
         }
     }
 
@@ -220,71 +290,31 @@ sealed class IslandBar : Grid
         }
     }
 
-    static MenuFlyoutItem Item(string text, Action action)
+    static Button IconButton(FrameworkElement icon, string name, string tip, Action action)
     {
-        var item = new MenuFlyoutItem { Text = text };
-        item.Click += (_, _) => action();
-        return item;
-    }
-
-    static Button LetterButton(string text)
-    {
-        var label = new TextBlock
-        {
-            Text = text,
-            FontSize = 20,
-            FontWeight = FontWeights.Bold,
-            Foreground = Paint.Brush(Paint.White),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var button = Paint.Flat(label, 46);
-        button.Foreground = Paint.Brush(Paint.White);
-        return button;
-    }
-
-    static Button TextButton(string name, Action action)
-    {
-        var label = new TextBlock
-        {
-            Text = name,
-            FontSize = 15,
-            Foreground = Paint.Brush(Paint.White),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
         var button = new Button
         {
-            Content = label,
-            Height = 40,
-            MinWidth = 72,
-            Padding = new Thickness(12, 0, 12, 0),
-            Margin = new Thickness(0),
+            Content = icon,
+            Width = 36,
+            Height = 36,
+            MinWidth = 36,
+            Padding = new Thickness(0),
             CornerRadius = new CornerRadius(8),
-            BorderThickness = new Thickness(1)
+            BorderThickness = new Thickness(0),
+            Background = Paint.Brush(Paint.White, 0),
+            VerticalAlignment = VerticalAlignment.Center
         };
-        var rest = Paint.Brush("101820", 230);
-        var hover = Paint.Brush("243044");
-        var pressed = Paint.Brush("0A1018");
-        var ink = Paint.Brush(Paint.White);
-        var edge = Paint.Brush(Paint.White, 80);
-        button.Background = rest;
-        button.Foreground = ink;
-        button.BorderBrush = edge;
-        Paint.TryTheme(button, "ButtonBackground", rest);
-        Paint.TryTheme(button, "ButtonBackgroundPointerOver", hover);
-        Paint.TryTheme(button, "ButtonBackgroundPressed", pressed);
-        Paint.TryTheme(button, "ButtonBackgroundDisabled", rest);
-        Paint.TryTheme(button, "ButtonForeground", ink);
-        Paint.TryTheme(button, "ButtonForegroundPointerOver", ink);
-        Paint.TryTheme(button, "ButtonForegroundPressed", ink);
-        Paint.TryTheme(button, "ButtonBorderBrush", edge);
-        Paint.TryTheme(button, "ButtonBorderBrushPointerOver", Paint.Brush(Paint.White, 160));
-        Paint.TryTheme(button, "ButtonBorderBrushPressed", edge);
-        Paint.TryTheme(button, "ButtonBorderBrushDisabled", Paint.Brush(Paint.White, 40));
+        var clear = Paint.Brush(Paint.White, 0);
+        Paint.TryTheme(button, "ButtonBackground", clear);
+        Paint.TryTheme(button, "ButtonBackgroundPointerOver", Paint.Brush(Paint.White, 28));
+        Paint.TryTheme(button, "ButtonBackgroundPressed", Paint.Brush(Paint.White, 48));
+        Paint.TryTheme(button, "ButtonBackgroundDisabled", clear);
+        Paint.TryTheme(button, "ButtonBorderBrush", clear);
+        Paint.TryTheme(button, "ButtonBorderBrushPointerOver", clear);
+        Paint.TryTheme(button, "ButtonBorderBrushPressed", clear);
         button.Click += (_, _) => action();
         AutomationProperties.SetName(button, name);
-        ToolTipService.SetToolTip(button, name);
+        ToolTipService.SetToolTip(button, tip);
         return button;
     }
 }

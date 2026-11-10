@@ -629,6 +629,11 @@ public sealed partial class ShellWindow
 
     async Task CaptureSoon(BrowserTab tab)
     {
+        if (_settings.Layout != ChromeLayout.Island)
+        {
+            return;
+        }
+
         await Task.Delay(450);
         await CaptureAsync(tab);
     }

@@ -281,7 +281,7 @@ public sealed partial class ShellWindow
     void StartTimers()
     {
         _cursorTimer = DispatcherQueue.CreateTimer();
-        _cursorTimer.Interval = TimeSpan.FromMilliseconds(90);
+        _cursorTimer.Interval = TimeSpan.FromMilliseconds(200);
         _cursorTimer.IsRepeating = true;
         _cursorTimer.Tick += (_, _) => OnCursor();
         _cursorTimer.Start();
@@ -291,6 +291,11 @@ public sealed partial class ShellWindow
         _previewTimer.IsRepeating = true;
         _previewTimer.Tick += (_, _) =>
         {
+            if (_settings.Layout != ChromeLayout.Island)
+            {
+                return;
+            }
+
             var tab = PrimaryOrNull();
             if (tab != null)
             {
@@ -302,6 +307,17 @@ public sealed partial class ShellWindow
 
     void OnCursor()
     {
+        if (_toastUntil > 0 && Environment.TickCount64 > _toastUntil)
+        {
+            _toast.Visibility = Visibility.Collapsed;
+            _toastUntil = 0;
+        }
+
+        if (_settings.Layout != ChromeLayout.Island)
+        {
+            return;
+        }
+
         if (GetCursorPos(out var point))
         {
             if (Math.Abs(point.X - _lastCursorX) + Math.Abs(point.Y - _lastCursorY) > 2)
@@ -311,12 +327,6 @@ public sealed partial class ShellWindow
 
             _lastCursorX = point.X;
             _lastCursorY = point.Y;
-        }
-
-        if (_toastUntil > 0 && Environment.TickCount64 > _toastUntil)
-        {
-            _toast.Visibility = Visibility.Collapsed;
-            _toastUntil = 0;
         }
 
         var fade = ShouldFade() && Environment.TickCount64 - _lastMove > 2200;

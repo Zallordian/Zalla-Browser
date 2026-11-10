@@ -72,6 +72,8 @@ public sealed partial class ShellWindow : Window
     Point _islandStart;
     long _lastMove = Environment.TickCount64;
     long _toastUntil;
+    double _chromeOpacity = -1;
+    string _bookmarkKey = "";
     int _lastCursorX;
     int _lastCursorY;
     DispatcherQueueTimer? _cursorTimer;
@@ -433,6 +435,7 @@ public sealed partial class ShellWindow : Window
             _island.Width = double.NaN;
             _island.HorizontalAlignment = HorizontalAlignment.Stretch;
             MoveElement(_spaces, _strip.SpacesHost);
+            _spaces.ShowNote(false);
             _deck.Visibility = Visibility.Collapsed;
             _hint.Visibility = Visibility.Collapsed;
             SetChromeOpacity(1);
@@ -441,6 +444,7 @@ public sealed partial class ShellWindow : Window
         {
             MoveElement(_island, _overlay);
             MoveElement(_spaces, _deck.SpacesHost);
+            _spaces.ShowNote(true);
             _hint.Visibility = _settings.Island.HasMoved ? Visibility.Collapsed : Visibility.Visible;
             PositionIsland();
         }
@@ -464,10 +468,20 @@ public sealed partial class ShellWindow : Window
             _cardsButton.Visibility = Visibility.Collapsed;
         }
 
-        var shieldWidth = _shield.ActualWidth > 1 ? _shield.ActualWidth : _shield.Width;
-        Canvas.SetLeft(_shield, Math.Max(12, width - shieldWidth - 36));
-        Canvas.SetTop(_shield, 72);
-        _shield.Update(_spaceState.Privacy, width < 1100);
+        if (BrowserChrome.FloatsShield(_settings.Layout))
+        {
+            _shield.Visibility = Visibility.Visible;
+            var shieldWidth = _shield.ActualWidth > 1 ? _shield.ActualWidth : _shield.Width;
+            Canvas.SetLeft(_shield, Math.Max(12, width - shieldWidth - 36));
+            Canvas.SetTop(_shield, 72);
+            _shield.Update(_spaceState.Privacy, width < 1100);
+        }
+        else
+        {
+            _shield.Visibility = Visibility.Collapsed;
+            PublishShield();
+        }
+
         UpdateInsets();
         if (height < 10)
         {
@@ -487,7 +501,7 @@ public sealed partial class ShellWindow : Window
         var islandWidth = Math.Min(820, Math.Max(420, width - 80));
         _island.Width = islandWidth;
         var iw = islandWidth;
-        var ih = 70.0;
+        var ih = 64.0;
         double x;
         double y;
         switch (_settings.Island.Dock)
@@ -562,7 +576,11 @@ public sealed partial class ShellWindow : Window
             Side = _splitMode && tab.Id == _rightId
         }).ToList();
         var accent = Paint.Hex(BrandHex);
-        _deck.Bind(cards, accent);
+        if (_settings.Layout == ChromeLayout.Island)
+        {
+            _deck.Bind(cards, accent);
+        }
+
         _strip.Bind(cards, accent);
         _spaces.SetActive(_space, accent);
         var primary = PrimaryOrNull();
@@ -614,10 +632,26 @@ public sealed partial class ShellWindow : Window
         Toast(added ? "Bookmark saved." : "Bookmark removed.");
     }
 
+    void PublishShield()
+    {
+        var lines = ShieldPresentation.Lines(_spaceState.Privacy.HttpsOnly)
+            .Select(line => ShieldPresentation.Format(line.Name, line.State))
+            .ToList();
+        _island.SetShield(ShieldPresentation.Title, ShieldPresentation.Detail(_spaceState.Privacy.HttpsOnly, _spaceState.Privacy.CleanLinks), lines);
+    }
+
     void RefreshBookmarks()
     {
+        var show = _settings.Layout == ChromeLayout.Classic && _settings.Bookmarks.Count > 0;
+        var key = show ? string.Join("\n", _settings.Bookmarks.Select(mark => mark.Url + "\t" + mark.Title)) : "";
+        if (key == _bookmarkKey)
+        {
+            return;
+        }
+
+        _bookmarkKey = key;
         _bookmarkItems.Children.Clear();
-        if (_settings.Layout != ChromeLayout.Classic || _settings.Bookmarks.Count == 0)
+        if (!show)
         {
             _bookmarks.Visibility = Visibility.Collapsed;
             return;
@@ -758,7 +792,11 @@ public sealed partial class ShellWindow : Window
             () =>
             {
                 SaveCurrentSpace();
-                _shield.Update(_spaceState.Privacy, _rootGrid.ActualWidth < 1100);
+                PublishShield();
+                if (BrowserChrome.FloatsShield(_settings.Layout))
+                {
+                    _shield.Update(_spaceState.Privacy, _rootGrid.ActualWidth < 1100);
+                }
             },
             CloseSettings));
         _settingsLayer.Visibility = Visibility.Visible;
@@ -808,6 +846,12 @@ public sealed partial class ShellWindow : Window
             opacity = 1;
         }
 
+        if (Math.Abs(_chromeOpacity - opacity) < 0.01)
+        {
+            return;
+        }
+
+        _chromeOpacity = opacity;
         _island.Opacity = opacity;
         _deck.Opacity = opacity;
         _shield.Opacity = opacity;

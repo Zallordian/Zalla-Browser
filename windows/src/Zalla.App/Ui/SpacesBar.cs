@@ -6,12 +6,16 @@ sealed class SpacesBar : StackPanel
     readonly Button _work;
     readonly Button _ghost;
     readonly TextBlock _note = new();
+    SpaceKind _shown;
+    Color _accent;
+    bool _painted;
+    bool _showNote = true;
 
     public SpacesBar()
     {
         Orientation = Orientation.Vertical;
         Spacing = 8;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
         _personal = Pill(SpaceKind.Personal);
         _work = Pill(SpaceKind.Work);
         _ghost = Pill(SpaceKind.Ghost);
@@ -27,16 +31,31 @@ sealed class SpacesBar : StackPanel
         _note.Margin = new Thickness(2, 0, 0, 0);
         _note.Visibility = Visibility.Collapsed;
         Children.Add(_note);
+        ToolTipService.SetToolTip(_ghost, Copy.GhostNote);
     }
 
     public event Action<SpaceKind>? Selected;
 
+    public void ShowNote(bool show)
+    {
+        _showNote = show;
+        _note.Visibility = show && _shown == SpaceKind.Ghost ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     public void SetActive(SpaceKind space, Color accent)
     {
+        if (_painted && _shown == space && _accent.Equals(accent))
+        {
+            return;
+        }
+
+        _painted = true;
+        _shown = space;
+        _accent = accent;
         PaintPill(_personal, space == SpaceKind.Personal, accent);
         PaintPill(_work, space == SpaceKind.Work, accent);
         PaintPill(_ghost, space == SpaceKind.Ghost, accent);
-        _note.Visibility = space == SpaceKind.Ghost ? Visibility.Visible : Visibility.Collapsed;
+        _note.Visibility = _showNote && space == SpaceKind.Ghost ? Visibility.Visible : Visibility.Collapsed;
     }
 
     Button Pill(SpaceKind space)
@@ -45,9 +64,9 @@ sealed class SpacesBar : StackPanel
         {
             Content = SpaceNames.Label(space),
             CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(12, 6, 12, 6),
+            Padding = new Thickness(10, 4, 10, 4),
             BorderThickness = new Thickness(0),
-            FontSize = 12
+            FontSize = 13
         };
         button.Click += (_, _) => Selected?.Invoke(space);
         return button;

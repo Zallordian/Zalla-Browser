@@ -2,7 +2,7 @@ namespace Zalla;
 
 static class Copy
 {
-    public const string SearchPlaceholder = "Search, type a site, or press / for commands";
+    public const string SearchPlaceholder = "Search or type an address";
     public const string CommandPlaceholder = "Type a command";
     public const string IslandHint = "Drag it anywhere, or dock it on an edge";
     public const string NewCard = "New card    Ctrl T";
@@ -15,7 +15,17 @@ static class Copy
     public const string BurnTooltip = "Burn It All";
     public const string Back = "Back";
     public const string Forward = "Forward";
-    public const string Menu = "Zalla menu";
+    public const string Menu = "Menu";
+    public const string MenuTip = "Menu";
+    public const string BackTip = "Back (Alt+Left)";
+    public const string ForwardTip = "Forward (Alt+Right)";
+    public const string ReloadTip = "Reload (Ctrl+R)";
+    public const string BookmarkTip = "Bookmark this page (Ctrl+D)";
+    public const string BookmarkedTip = "Remove bookmark (Ctrl+D)";
+    public const string ShieldTip = "Shield preview";
+    public const string PrivacySettings = "Privacy settings";
+    public const string WorkingNow = "Working now";
+    public const string PreviewHeading = "Preview";
     public const string NewTab = "New tab";
     public const string Settings = "Settings";
     public const string Close = "Close";
