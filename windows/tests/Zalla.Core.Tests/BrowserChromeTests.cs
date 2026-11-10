@@ -16,7 +16,9 @@ public class BrowserChromeTests
     {
         var labels = BrowserChrome.Menu.Select(item => item.Label).ToList();
         Assert.Equal("New tab", labels[0]);
-        Assert.Equal(["Bookmarks", "History", "Downloads"], labels.Skip(1).Take(3));
+        Assert.Contains(BrowserChrome.Menu, item => item.Action == "find");
+        Assert.Contains(BrowserChrome.Menu, item => item.Action == "zoom-in");
+        Assert.Equal(["Bookmarks", "History", "Downloads"], labels.Skip(2).Take(3));
         var burn = BrowserChrome.Menu[^1];
         Assert.Equal("burn", burn.Action);
         Assert.True(burn.SeparatorBefore);

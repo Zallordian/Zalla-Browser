@@ -4,7 +4,17 @@ sealed class DownloadNote
 {
     public string Name { get; set; } = "Download";
 
+    public string Path { get; set; } = "";
+
     public string State { get; set; } = "";
+
+    public long Received { get; set; }
+
+    public long Total { get; set; }
+
+    public bool Active { get; set; }
+
+    public bool Finished { get; set; }
 }
 
 sealed class LibraryPanel : Grid

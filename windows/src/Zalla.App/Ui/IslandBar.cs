@@ -12,8 +12,36 @@ sealed class IslandBar : Grid
     readonly TextBlock _shieldTitle = new() { FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = Paint.Brush(Paint.White) };
     readonly TextBlock _shieldLines = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap, Foreground = Paint.Brush(Paint.White) };
     readonly TextBlock _shieldDetail = new() { FontSize = 13, TextWrapping = TextWrapping.Wrap, Opacity = 0.84, Margin = new Thickness(0, 8, 0, 0), Foreground = Paint.Brush(Paint.White) };
+    readonly Popup _suggest = new() { IsLightDismissEnabled = true };
+    readonly Border _suggestCard = new()
+    {
+        Background = Paint.Brush("101820", 250),
+        BorderBrush = Paint.Brush(Paint.White, 40),
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(12),
+        Padding = new Thickness(6),
+        RequestedTheme = ElementTheme.Dark
+    };
+    readonly StackPanel _suggestList = new() { Spacing = 2 };
+    readonly Border _menuBadge = new()
+    {
+        Width = 16,
+        Height = 16,
+        CornerRadius = new CornerRadius(8),
+        Background = Paint.Brush("E33B4F"),
+        HorizontalAlignment = HorizontalAlignment.Right,
+        VerticalAlignment = VerticalAlignment.Top,
+        Visibility = Visibility.Collapsed,
+        IsHitTestVisible = false
+    };
+    readonly TextBlock _menuBadgeText = new() { FontSize = 9, Foreground = Paint.Brush(Paint.White), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     string _address = "";
     string _shieldKey = "";
+    string _zoom = "100%";
+    int _downloadCount;
+    int _suggestIndex = -1;
+    bool _quiet;
+    IReadOnlyList<AddressSuggestion> _suggestItems = [];
 
     public IslandBar()
     {
@@ -59,9 +87,19 @@ sealed class IslandBar : Grid
         _input.FontSize = 15;
         _input.VerticalAlignment = VerticalAlignment.Center;
         _input.RequestedTheme = ElementTheme.Dark;
+        _input.TextChanged += (_, _) =>
+        {
+            if (!_quiet)
+            {
+                QueryEdited?.Invoke(_input.Text);
+            }
+        };
         _input.KeyDown += OnKey;
         Grid.SetColumn(_input, 3);
         row.Children.Add(_input);
+        _suggestCard.Child = _suggestList;
+        _suggest.Child = _suggestCard;
+        Children.Add(_suggest);
 
         _bookmark = IconButton(ChromeIcons.Bookmark(false), Copy.Bookmark, Copy.BookmarkTip, () => Bookmark?.Invoke());
         _bookmark.Margin = new Thickness(8, 0, 0, 0);
@@ -74,7 +112,14 @@ sealed class IslandBar : Grid
         Grid.SetColumn(_shield, 5);
         row.Children.Add(_shield);
 
-        var menuButton = IconButton(ChromeIcons.Menu(), Copy.Menu, Copy.MenuTip, () => { });
+        _menuBadge.Child = _menuBadgeText;
+        var menuFace = new Grid { Width = 22, Height = 22 };
+        var menuIcon = ChromeIcons.Menu();
+        menuIcon.HorizontalAlignment = HorizontalAlignment.Center;
+        menuIcon.VerticalAlignment = VerticalAlignment.Center;
+        menuFace.Children.Add(menuIcon);
+        menuFace.Children.Add(_menuBadge);
+        var menuButton = IconButton(menuFace, Copy.Menu, Copy.MenuTip, () => { });
         menuButton.Margin = new Thickness(2, 0, 0, 0);
         menuButton.Flyout = BuildMenu();
         Grid.SetColumn(menuButton, 6);
@@ -99,6 +144,13 @@ sealed class IslandBar : Grid
     public event Action? Downloads;
     public event Action? Extensions;
     public event Action? Deck;
+    public event Action? Find;
+    public event Action? ZoomIn;
+    public event Action? ZoomOut;
+    public event Action? ZoomReset;
+    public event Action? ZoomQuery;
+    public event Action<string>? QueryEdited;
+    public event Action<AddressSuggestion>? SuggestionChosen;
     public event Action<string, bool>? Submit;
 
     public void UsePill(bool pill)
@@ -150,7 +202,71 @@ sealed class IslandBar : Grid
             return;
         }
 
-        _input.Text = url;
+        Quiet(() => _input.Text = url);
+        HideSuggestions();
+    }
+
+    public void SetZoom(string label) => _zoom = string.IsNullOrWhiteSpace(label) ? "100%" : label;
+
+    public void SetDownloadCount(int active)
+    {
+        _downloadCount = Math.Max(0, active);
+        _menuBadge.Visibility = _downloadCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+        _menuBadgeText.Text = _downloadCount > 9 ? "9+" : _downloadCount.ToString();
+    }
+
+    public void ShowSuggestions(IReadOnlyList<AddressSuggestion> items)
+    {
+        _suggestItems = items;
+        _suggestIndex = -1;
+        _suggestList.Children.Clear();
+        if (items.Count == 0)
+        {
+            _suggest.IsOpen = false;
+            return;
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            var index = i;
+            var item = items[i];
+            var button = new Button
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Height = 48,
+                Padding = new Thickness(10, 4, 10, 4),
+                Background = Paint.Brush(Paint.White, 0),
+                BorderThickness = new Thickness(0)
+            };
+            var lines = new StackPanel();
+            lines.Children.Add(new TextBlock
+            {
+                Text = KindLabel(item.Kind) + "  " + item.Title,
+                FontSize = 14,
+                Foreground = Paint.Brush(Paint.White),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            lines.Children.Add(new TextBlock
+            {
+                Text = item.Url,
+                FontSize = 12,
+                Opacity = 0.7,
+                Foreground = Paint.Brush(Paint.White),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            button.Content = lines;
+            button.Click += (_, _) => Choose(index);
+            AutomationProperties.SetName(button, item.Title);
+            _suggestList.Children.Add(button);
+        }
+
+        var origin = _input.TransformToVisual(this).TransformPoint(new Point(0, _input.ActualHeight + 6));
+        _suggest.HorizontalOffset = origin.X;
+        _suggest.VerticalOffset = origin.Y;
+        _suggestCard.Width = Math.Max(360, _input.ActualWidth);
+        _suggest.IsOpen = true;
+        PaintSuggestions();
     }
 
     public void SetHistory(bool canBack, bool canForward)
@@ -165,14 +281,7 @@ sealed class IslandBar : Grid
     {
         CommandMode = command;
         _input.PlaceholderText = command ? Copy.CommandPlaceholder : Copy.SearchPlaceholder;
-        if (command)
-        {
-            _input.Text = "";
-        }
-        else
-        {
-            _input.Text = _address;
-        }
+        Quiet(() => _input.Text = command ? "" : _address);
 
         _input.Focus(FocusState.Programmatic);
         _input.SelectAll();
@@ -182,7 +291,8 @@ sealed class IslandBar : Grid
     {
         CommandMode = false;
         _input.PlaceholderText = Copy.SearchPlaceholder;
-        _input.Text = _address;
+        Quiet(() => _input.Text = _address);
+        HideSuggestions();
     }
 
     public void ApplyChrome(Color fill, Color burnTop, Color burnBottom)
@@ -221,24 +331,38 @@ sealed class IslandBar : Grid
     MenuFlyout BuildMenu()
     {
         var menu = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedRight };
-        foreach (var command in BrowserChrome.Menu)
+        menu.Opening += (_, _) =>
         {
-            if (command.SeparatorBefore)
+            ZoomQuery?.Invoke();
+            menu.Items.Clear();
+            foreach (var command in BrowserChrome.Menu)
             {
-                menu.Items.Add(new MenuFlyoutSeparator());
+                if (command.SeparatorBefore)
+                {
+                    menu.Items.Add(new MenuFlyoutSeparator());
+                }
+
+                menu.Items.Add(Item(command));
             }
-
-            menu.Items.Add(Item(command));
-        }
-
+        };
         return menu;
     }
 
     MenuFlyoutItem Item(ChromeCommand command)
     {
+        var label = command.Label;
+        if (command.Action == "zoom-reset")
+        {
+            label = "Actual size (" + _zoom + ")";
+        }
+        else if (command.Action == "downloads" && _downloadCount > 0)
+        {
+            label = "Downloads (" + _downloadCount + ")";
+        }
+
         var item = new MenuFlyoutItem
         {
-            Text = command.Label,
+            Text = label,
             KeyboardAcceleratorTextOverride = command.Shortcut
         };
         item.Click += (_, _) => Run(command.Action);
@@ -261,6 +385,18 @@ sealed class IslandBar : Grid
             case "downloads":
                 Downloads?.Invoke();
                 break;
+            case "find":
+                Find?.Invoke();
+                break;
+            case "zoom-in":
+                ZoomIn?.Invoke();
+                break;
+            case "zoom-out":
+                ZoomOut?.Invoke();
+                break;
+            case "zoom-reset":
+                ZoomReset?.Invoke();
+                break;
             case "extensions":
                 Extensions?.Invoke();
                 break;
@@ -278,17 +414,93 @@ sealed class IslandBar : Grid
 
     void OnKey(object sender, KeyRoutedEventArgs e)
     {
+        if (_suggest.IsOpen && e.Key == Windows.System.VirtualKey.Down)
+        {
+            MoveSuggest(1);
+            e.Handled = true;
+            return;
+        }
+
+        if (_suggest.IsOpen && e.Key == Windows.System.VirtualKey.Up)
+        {
+            MoveSuggest(-1);
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Windows.System.VirtualKey.Enter)
         {
-            Submit?.Invoke(_input.Text, CommandMode);
+            if (_suggest.IsOpen && _suggestIndex >= 0 && _suggestIndex < _suggestItems.Count)
+            {
+                Choose(_suggestIndex);
+            }
+            else
+            {
+                HideSuggestions();
+                Submit?.Invoke(_input.Text, CommandMode);
+            }
+
             e.Handled = true;
         }
         else if (e.Key == Windows.System.VirtualKey.Escape)
         {
-            LeaveCommand();
+            if (_suggest.IsOpen)
+            {
+                HideSuggestions();
+            }
+            else
+            {
+                LeaveCommand();
+            }
+
             e.Handled = true;
         }
     }
+
+    void MoveSuggest(int delta)
+    {
+        _suggestIndex = AddressSuggestions.Move(_suggestIndex, _suggestItems.Count, delta);
+        PaintSuggestions();
+    }
+
+    void PaintSuggestions()
+    {
+        for (var i = 0; i < _suggestList.Children.Count; i++)
+        {
+            if (_suggestList.Children[i] is Button button)
+            {
+                button.Background = Paint.Brush(Paint.White, i == _suggestIndex ? (byte)36 : (byte)0);
+            }
+        }
+    }
+
+    void Choose(int index)
+    {
+        if (index < 0 || index >= _suggestItems.Count)
+        {
+            return;
+        }
+
+        var item = _suggestItems[index];
+        HideSuggestions();
+        SuggestionChosen?.Invoke(item);
+    }
+
+    void HideSuggestions() => _suggest.IsOpen = false;
+
+    void Quiet(Action write)
+    {
+        _quiet = true;
+        write();
+        _quiet = false;
+    }
+
+    static string KindLabel(SuggestionKind kind) => kind switch
+    {
+        SuggestionKind.Bookmark => "Bookmark",
+        SuggestionKind.History => "History",
+        _ => "Address"
+    };
 
     static Button IconButton(FrameworkElement icon, string name, string tip, Action action)
     {

@@ -51,6 +51,7 @@ sealed class ClassicStrip : Grid
     public event Action<string>? Selected;
     public event Action<string>? Closed;
     public event Action? NewTab;
+    public event Action<string, FrameworkElement>? TabMenu;
 
     public void Bind(IReadOnlyList<DeckCard> cards, Color accent)
     {
@@ -117,6 +118,11 @@ sealed class ClassicStrip : Grid
                 {
                     Selected?.Invoke(id);
                 }
+            };
+            chrome.RightTapped += (_, e) =>
+            {
+                e.Handled = true;
+                TabMenu?.Invoke(id, chrome);
             };
             _tabs.Children.Add(chrome);
         }

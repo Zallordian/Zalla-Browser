@@ -26,6 +26,12 @@ public sealed partial class ShellWindow : Window
     };
     readonly StackPanel _bookmarkItems = new() { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(12, 4, 12, 8) };
     readonly List<DownloadNote> _downloads = new();
+    readonly List<ClosedPage> _closed = new();
+    readonly FindBar _find = new();
+    readonly HashSet<IntPtr> _webKeys = new();
+    DownloadList? _downloadList;
+    DispatcherQueueTimer? _findTimer;
+    long _downloadPaint;
     readonly Canvas _overlay = new();
     readonly DeckView _deck = new();
     readonly ClassicStrip _strip = new() { Visibility = Visibility.Collapsed };
@@ -162,6 +168,7 @@ public sealed partial class ShellWindow : Window
         _dropHint.BorderThickness = new Thickness(1);
         _dropHint.Child = new TextBlock { Text = Copy.DropToSplit, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 16 };
         _page.Children.Add(_dropHint);
+        _page.Children.Add(_find);
         pageHost.Children.Add(_page);
         _rootGrid.Children.Add(pageHost);
 
@@ -278,6 +285,25 @@ public sealed partial class ShellWindow : Window
         _island.NewTab += NewTabFromChrome;
         _island.Settings += OpenSettings;
         _island.Submit += OnSubmit;
+        _island.QueryEdited += ShowAddressSuggestions;
+        _island.SuggestionChosen += chosen => OpenAddress(chosen.Url);
+        _island.Find += ShowFind;
+        _island.ZoomIn += () => ChangeZoom(1);
+        _island.ZoomOut += () => ChangeZoom(-1);
+        _island.ZoomReset += () => ChangeZoom(0);
+        _island.ZoomQuery += () =>
+        {
+            var web = PrimaryOrNull()?.Web;
+            if (web?.CoreWebView2 != null)
+            {
+                _island.SetZoom(PageZoom.Label(web.ZoomFactor));
+            }
+        };
+        _find.TextChanged += QueueFind;
+        _find.Next += () => ApplyFind(false);
+        _find.Previous += () => ApplyFind(true);
+        _find.Dismiss += HideFind;
+        _strip.TabMenu += ShowTabMenu;
         _deck.Selected += id => Select(id);
         _deck.Closed += CloseTab;
         _deck.Split += StartSplit;
@@ -698,9 +724,241 @@ public sealed partial class ShellWindow : Window
         ShowLibrary(Copy.History, "Recent pages in this Space. Ghost does not keep them.", _spaceState.History.Select(item => (Label: item.Title + "  " + item.Url, Url: (string?)item.Url)).ToList(), "No pages yet.", null, null);
     }
 
+    void ShowAddressSuggestions(string text)
+    {
+        _island.ShowSuggestions(AddressSuggestions.Match(text, _settings.Bookmarks, _spaceState.History, SearchEngine.Find(_settings.SearchEngineId), _settings.CustomSearchTemplate));
+    }
+
+    void ShowFind()
+    {
+        _find.Visibility = Visibility.Visible;
+        _find.FocusBox();
+    }
+
+    void QueueFind(string text)
+    {
+        _findTimer?.Stop();
+        _findTimer = DispatcherQueue.CreateTimer();
+        _findTimer.Interval = TimeSpan.FromMilliseconds(160);
+        _findTimer.IsRepeating = false;
+        _findTimer.Tick += (_, _) => ApplyFind(false);
+        _findTimer.Start();
+        _ = text;
+    }
+
+    async void ApplyFind(bool backwards)
+    {
+        var core = PrimaryOrNull()?.Web?.CoreWebView2;
+        var term = _find.Term.Trim();
+        if (core == null || term.Length == 0)
+        {
+            _find.SetStatus("");
+            return;
+        }
+
+        try
+        {
+            await core.ExecuteScriptAsync(PageFind.JumpScript(term, backwards));
+            var raw = await core.ExecuteScriptAsync(PageFind.CountScript(term));
+            var count = 0;
+            int.TryParse(raw?.Trim().Trim('"'), out count);
+            _find.SetStatus(count == 0 ? "No matches" : count == 1 ? "1 match" : count + " matches");
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+            _find.SetStatus("");
+        }
+    }
+
+    async void HideFind()
+    {
+        _find.Visibility = Visibility.Collapsed;
+        var core = PrimaryOrNull()?.Web?.CoreWebView2;
+        if (core == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await core.ExecuteScriptAsync(PageFind.ClearScript());
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+        }
+    }
+
+    void ChangeZoom(int direction)
+    {
+        var web = PrimaryOrNull()?.Web;
+        if (web?.CoreWebView2 == null)
+        {
+            return;
+        }
+
+        var next = direction > 0 ? PageZoom.In(web.ZoomFactor) : direction < 0 ? PageZoom.Out(web.ZoomFactor) : PageZoom.Reset();
+        web.ZoomFactor = next;
+        _island.SetZoom(PageZoom.Label(next));
+    }
+
     void ShowDownloads()
     {
-        ShowLibrary(Copy.Downloads, "Files this window has started saving. The usual save prompt still appears.", _downloads.Select(item => (Label: item.Name + "  " + item.State, Url: (string?)null)).ToList(), "No downloads yet.", null, null);
+        _settingsOpen = true;
+        SetChromeOpacity(1);
+        _downloadList = new DownloadList(OpenDownload, RevealDownload, CloseSettings);
+        _downloadList.Update(_downloads);
+        _settingsLayer.Children.Clear();
+        _settingsLayer.Children.Add(_downloadList);
+        _settingsLayer.Visibility = Visibility.Visible;
+    }
+
+    void RefreshDownloads()
+    {
+        var active = _downloads.Count(item => item.Active);
+        _island.SetDownloadCount(active);
+        _downloadList?.Update(_downloads);
+    }
+
+    void OpenDownload(string path)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+            Toast("Zalla could not open that file.");
+        }
+    }
+
+    void RevealDownload(string path)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = "/select,\"" + path + "\"",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write(ex);
+            Toast("Zalla could not show that folder.");
+        }
+    }
+
+    void ShowTabMenu(string id, FrameworkElement anchor)
+    {
+        var tab = Find(id);
+        if (tab == null)
+        {
+            return;
+        }
+
+        var commands = ContextMenus.Tab(_tabs.Count > 1, BrowserLibrary.IsPage(tab.Url));
+        var flyout = BuildCommandMenu(commands, action => RunTabCommand(id, action));
+        flyout.ShowAt(anchor);
+    }
+
+    static MenuFlyout BuildCommandMenu(IReadOnlyList<ChromeCommand> commands, Action<string> run)
+    {
+        var flyout = new MenuFlyout { Placement = FlyoutPlacementMode.BottomEdgeAlignedLeft };
+        foreach (var command in commands)
+        {
+            if (command.SeparatorBefore)
+            {
+                flyout.Items.Add(new MenuFlyoutSeparator());
+            }
+
+            var item = new MenuFlyoutItem
+            {
+                Text = command.Label,
+                KeyboardAcceleratorTextOverride = command.Shortcut
+            };
+            var action = command.Action;
+            item.Click += (_, _) => run(action);
+            flyout.Items.Add(item);
+        }
+
+        return flyout;
+    }
+
+    void RunTabCommand(string id, string action)
+    {
+        switch (action)
+        {
+            case "new-tab":
+                NewTabFromChrome();
+                break;
+            case "close-tab":
+                CloseTab(id);
+                break;
+            case "close-others":
+                foreach (var tab in _tabs.Where(item => item.Id != id).ToList())
+                {
+                    CloseTab(tab.Id);
+                }
+
+                break;
+            case "duplicate":
+                var source = Find(id);
+                if (source != null)
+                {
+                    OpenInNewTab(source.Url);
+                }
+
+                break;
+            case "copy-url":
+                CopyText(Find(id)?.Url);
+                break;
+        }
+    }
+
+    void OpenInNewTab(string? url)
+    {
+        if (!BrowserLibrary.IsPage(url))
+        {
+            NewTabFromChrome();
+            return;
+        }
+
+        var tab = AddTab(new TabState { Title = url, Url = url }, true);
+        _ = NavigateAsync(tab, url!);
+    }
+
+    void ReopenClosedTab()
+    {
+        if (!ClosedTabMemory.TryTake(_closed, out var page))
+        {
+            Toast("Nothing to reopen.");
+            return;
+        }
+
+        var title = string.IsNullOrWhiteSpace(page.Title) ? "New Tab" : page.Title;
+        var tab = AddTab(new TabState { Title = title, Url = page.Url }, true);
+        if (BrowserLibrary.IsPage(page.Url))
+        {
+            _ = NavigateAsync(tab, page.Url);
+        }
+    }
+
+    void CopyText(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        package.SetText(text);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        Windows.ApplicationModel.DataTransfer.Clipboard.Flush();
+        Toast("Copied.");
     }
 
     void ShowExtensions()
@@ -746,6 +1004,7 @@ public sealed partial class ShellWindow : Window
 
     void ShowLibrary(string title, string note, IReadOnlyList<(string Label, string? Url)> rows, string empty, Action? extra, string? extraLabel)
     {
+        _downloadList = null;
         _settingsOpen = true;
         SetChromeOpacity(1);
         _settingsLayer.Children.Clear();
@@ -755,6 +1014,7 @@ public sealed partial class ShellWindow : Window
 
     void OpenSettings()
     {
+        _downloadList = null;
         _settingsOpen = true;
         SetChromeOpacity(1);
         _settingsLayer.Children.Clear();
@@ -805,6 +1065,7 @@ public sealed partial class ShellWindow : Window
     void CloseSettings()
     {
         _settingsOpen = false;
+        _downloadList = null;
         _settingsLayer.Visibility = Visibility.Collapsed;
         _settingsLayer.Children.Clear();
     }

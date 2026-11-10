@@ -122,7 +122,10 @@ public sealed partial class ShellWindow
             return;
         }
 
-        var closingPrimary = _tabs[index].Id == Primary.Id;
+        var closing = _tabs[index];
+        var replace = BrowserGestures.ShouldOpenReplacement(_tabs.Count);
+        var closingPrimary = closing.Id == Primary.Id;
+        ClosedTabMemory.Push(_closed, closing.Title, closing.Url);
         if (_splitMode && (id == _leftId || id == _rightId))
         {
             _splitMode = false;
@@ -130,9 +133,9 @@ public sealed partial class ShellWindow
             _rightId = null;
         }
 
-        Destroy(_tabs[index]);
+        Destroy(closing);
         _tabs.RemoveAt(index);
-        if (_tabs.Count == 0)
+        if (replace || _tabs.Count == 0)
         {
             AddTab(null, true);
         }
@@ -447,9 +450,12 @@ public sealed partial class ShellWindow
         core.Settings.IsPasswordAutosaveEnabled = false;
         core.Settings.IsGeneralAutofillEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = true;
+        core.Settings.AreDevToolsEnabled = false;
+        core.Settings.IsZoomControlEnabled = true;
         WireCore(tab, core);
         tab.Ready = true;
         ShowWeb(tab);
+        WatchWebKeys();
     }
 
     static async Task WaitForViewportAsync(FrameworkElement element)
@@ -528,15 +534,92 @@ public sealed partial class ShellWindow
         core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
         core.WebResourceRequested += (_, args) => TrimReferrer(args);
         core.DownloadStarting += (_, args) => TrackDownload(args);
+        core.ContextMenuRequested += (_, args) => ShowPageMenu(tab, args);
     }
 
     void TrackDownload(CoreWebView2DownloadStartingEventArgs args)
     {
-        var path = args.ResultFilePath;
-        var name = string.IsNullOrWhiteSpace(path) ? "Download" : System.IO.Path.GetFileName(path);
-        var note = new DownloadNote { Name = name, State = args.DownloadOperation.State.ToString() };
+        var operation = args.DownloadOperation;
+        var note = new DownloadNote();
+        void Pull(bool paint)
+        {
+            var path = string.IsNullOrWhiteSpace(operation.ResultFilePath) ? args.ResultFilePath : operation.ResultFilePath;
+            note.Path = path ?? "";
+            note.Name = string.IsNullOrWhiteSpace(note.Path) ? "Download" : System.IO.Path.GetFileName(note.Path);
+            note.Received = operation.BytesReceived;
+            note.Total = operation.TotalBytesToReceive > 0 ? operation.TotalBytesToReceive : 0;
+            note.State = operation.State.ToString();
+            note.Finished = operation.State == CoreWebView2DownloadState.Completed;
+            note.Active = operation.State == CoreWebView2DownloadState.InProgress;
+            if (!paint)
+            {
+                return;
+            }
+
+            var now = Environment.TickCount64;
+            if (note.Active && now - _downloadPaint < 200)
+            {
+                return;
+            }
+
+            _downloadPaint = now;
+            RefreshDownloads();
+        }
+
         _downloads.Insert(0, note);
-        args.DownloadOperation.StateChanged += (_, _) => note.State = args.DownloadOperation.State.ToString();
+        operation.StateChanged += (_, _) => Pull(true);
+        operation.BytesReceivedChanged += (_, _) => Pull(true);
+        Pull(true);
+    }
+
+    void ShowPageMenu(BrowserTab tab, CoreWebView2ContextMenuRequestedEventArgs args)
+    {
+        var target = args.ContextMenuTarget;
+        args.Handled = true;
+        var link = target.HasLinkUri ? target.LinkUri : "";
+        var commands = string.IsNullOrWhiteSpace(link)
+            ? ContextMenus.Page(tab.Web?.CoreWebView2.CanGoBack == true, tab.Web?.CoreWebView2.CanGoForward == true, target.HasSelection)
+            : ContextMenus.Link();
+        var flyout = BuildCommandMenu(commands, action => RunPageCommand(tab, action, link));
+        if (tab.Web != null)
+        {
+            flyout.ShowAt(tab.Web, new Point(args.Location.X, args.Location.Y));
+        }
+    }
+
+    void RunPageCommand(BrowserTab tab, string action, string link)
+    {
+        switch (action)
+        {
+            case "back":
+                Back();
+                break;
+            case "forward":
+                Forward();
+                break;
+            case "reload":
+                ReloadOrStop();
+                break;
+            case "copy":
+                _ = tab.Web?.CoreWebView2.ExecuteScriptAsync(PageFind.CopyScript());
+                break;
+            case "select-all":
+                _ = tab.Web?.CoreWebView2.ExecuteScriptAsync(PageFind.SelectAllScript());
+                break;
+            case "open-link":
+                if (BrowserLibrary.IsPage(link))
+                {
+                    _ = NavigateAsync(tab, link);
+                }
+
+                break;
+            case "open-link-tab":
+                OpenInNewTab(link);
+                break;
+            case "copy-link":
+                CopyText(link);
+                break;
+        }
     }
 
     void OnStarting(BrowserTab tab, CoreWebView2NavigationStartingEventArgs args)

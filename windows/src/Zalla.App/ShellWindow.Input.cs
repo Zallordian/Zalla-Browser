@@ -5,9 +5,9 @@ namespace Zalla;
 public sealed partial class ShellWindow
 {
     const int WmKeyDown = 0x0100;
+    const int WmSysKeyDown = 0x0104;
     const int WmHotkey = 0x0312;
     const int WmSysCommand = 0x0112;
-    const int VkF11 = 0x7A;
     const int ScMaximize = 0xF030;
     const uint ModAlt = 0x0001;
     const uint ModControl = 0x0002;
@@ -199,60 +199,89 @@ public sealed partial class ShellWindow
 
     void OnKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key == Windows.System.VirtualKey.F11)
-        {
-            ToggleFullScreen();
-            args.Handled = true;
-            return;
-        }
-
-        var control = IsKeyDown(Windows.System.VirtualKey.Control);
-        var shift = IsKeyDown(Windows.System.VirtualKey.Shift);
-        var alt = IsKeyDown(Windows.System.VirtualKey.Menu);
-        if (!control && !alt)
+        var action = BrowserGestures.Match(
+            IsKeyDown(Windows.System.VirtualKey.Control),
+            IsKeyDown(Windows.System.VirtualKey.Shift),
+            IsKeyDown(Windows.System.VirtualKey.Menu),
+            (int)args.Key,
+            out var tabNumber);
+        if (action == BrowserAction.None)
         {
             return;
         }
 
-        if (control && args.Key == Windows.System.VirtualKey.K)
-        {
-            _island.FocusCommand(true);
-            args.Handled = true;
-        }
-        else if (control && args.Key == Windows.System.VirtualKey.L)
-        {
-            _island.FocusCommand(false);
-            args.Handled = true;
-        }
-        else if (control && args.Key == Windows.System.VirtualKey.T)
-        {
-            NewTabFromChrome();
-            args.Handled = true;
-        }
-        else if (control && args.Key == Windows.System.VirtualKey.W)
-        {
-            var tab = PrimaryOrNull();
-            if (tab != null)
-            {
-                CloseTab(tab.Id);
-            }
+        RunGesture(action, tabNumber);
+        args.Handled = true;
+    }
 
-            args.Handled = true;
-        }
-        else if (control && args.Key == Windows.System.VirtualKey.Tab)
+    void RunGesture(BrowserAction action, int tabNumber)
+    {
+        switch (action)
         {
-            Cycle(shift ? -1 : 1);
-            args.Handled = true;
-        }
-        else if (alt && args.Key == Windows.System.VirtualKey.Left)
-        {
-            Back();
-            args.Handled = true;
-        }
-        else if (alt && args.Key == Windows.System.VirtualKey.Right)
-        {
-            Forward();
-            args.Handled = true;
+            case BrowserAction.NewTab:
+                NewTabFromChrome();
+                break;
+            case BrowserAction.CloseTab:
+                var tab = PrimaryOrNull();
+                if (tab != null)
+                {
+                    CloseTab(tab.Id);
+                }
+
+                break;
+            case BrowserAction.FocusAddress:
+                _island.FocusCommand(false);
+                break;
+            case BrowserAction.Command:
+                _island.FocusCommand(true);
+                break;
+            case BrowserAction.NextTab:
+                Cycle(1);
+                break;
+            case BrowserAction.PreviousTab:
+                Cycle(-1);
+                break;
+            case BrowserAction.ReopenTab:
+                ReopenClosedTab();
+                break;
+            case BrowserAction.SelectTab:
+                var index = BrowserGestures.TabIndex(_tabs.Count, tabNumber);
+                if (index is int chosen)
+                {
+                    Select(_tabs[chosen].Id);
+                }
+
+                break;
+            case BrowserAction.Reload:
+                ReloadOrStop();
+                break;
+            case BrowserAction.FullScreen:
+                ToggleFullScreen();
+                break;
+            case BrowserAction.Back:
+                Back();
+                break;
+            case BrowserAction.Forward:
+                Forward();
+                break;
+            case BrowserAction.Bookmark:
+                ToggleBookmark();
+                break;
+            case BrowserAction.History:
+                ShowHistory();
+                break;
+            case BrowserAction.Find:
+                ShowFind();
+                break;
+            case BrowserAction.ZoomIn:
+                ChangeZoom(1);
+                break;
+            case BrowserAction.ZoomOut:
+                ChangeZoom(-1);
+                break;
+            case BrowserAction.ZoomReset:
+                ChangeZoom(0);
+                break;
         }
     }
 
@@ -397,6 +426,12 @@ public sealed partial class ShellWindow
         if (_subclass != null)
         {
             RemoveWindowSubclass(_hwnd, _subclass, 1);
+            foreach (var child in _webKeys)
+            {
+                RemoveWindowSubclass(child, _subclass, 2);
+            }
+
+            _webKeys.Clear();
         }
 
         _hotkeysOn = false;
@@ -447,31 +482,16 @@ public sealed partial class ShellWindow
             return IntPtr.Zero;
         }
 
-        if (msg == WmKeyDown)
+        if (msg == WmKeyDown || msg == WmSysKeyDown)
         {
             var key = wParam.ToInt32();
             var ctrl = (GetKeyState(0x11) & 0x8000) != 0;
-            if (key == VkF11)
+            var shift = (GetKeyState(0x10) & 0x8000) != 0;
+            var alt = (GetKeyState(0x12) & 0x8000) != 0;
+            var action = BrowserGestures.Match(ctrl, shift, alt, key, out var tabNumber);
+            if (action != BrowserAction.None && hwnd != _hwnd)
             {
-                DispatcherQueue.TryEnqueue(ToggleFullScreen);
-                return IntPtr.Zero;
-            }
-
-            if (key == 0x74 || (ctrl && key == 0x52))
-            {
-                DispatcherQueue.TryEnqueue(ReloadOrStop);
-                return IntPtr.Zero;
-            }
-
-            if (ctrl && key == 0x44)
-            {
-                DispatcherQueue.TryEnqueue(ToggleBookmark);
-                return IntPtr.Zero;
-            }
-
-            if (ctrl && key == 0x48)
-            {
-                DispatcherQueue.TryEnqueue(ShowHistory);
+                DispatcherQueue.TryEnqueue(() => RunGesture(action, tabNumber));
                 return IntPtr.Zero;
             }
         }
@@ -485,8 +505,46 @@ public sealed partial class ShellWindow
         return DefSubclassProc(hwnd, msg, wParam, lParam, id, data);
     }
 
+    void WatchWebKeys()
+    {
+        if (_hwnd == 0 || _subclass == null)
+        {
+            return;
+        }
+
+        var found = new List<IntPtr>();
+        CollectChildren(_hwnd, found);
+        foreach (var child in found)
+        {
+            if (_webKeys.Add(child))
+            {
+                SetWindowSubclass(child, _subclass, 2, 0);
+            }
+        }
+    }
+
+    void CollectChildren(IntPtr parent, List<IntPtr> found)
+    {
+        var kids = new List<IntPtr>();
+        EnumChildWindows(parent, (child, _) =>
+        {
+            kids.Add(child);
+            return true;
+        }, IntPtr.Zero);
+        foreach (var child in kids)
+        {
+            found.Add(child);
+            CollectChildren(child, found);
+        }
+    }
+
     [DllImport("user32.dll")]
     static extern bool RegisterHotKey(IntPtr hwnd, int id, uint modifiers, uint key);
+
+    [DllImport("user32.dll")]
+    static extern bool EnumChildWindows(IntPtr hwnd, EnumProc proc, IntPtr data);
+
+    delegate bool EnumProc(IntPtr hwnd, IntPtr data);
 
     [DllImport("user32.dll")]
     static extern bool UnregisterHotKey(IntPtr hwnd, int id);
