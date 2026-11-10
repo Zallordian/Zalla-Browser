@@ -1,6 +1,6 @@
 namespace Zalla;
 
-sealed class FindBar : Border
+sealed class FindBar : Grid
 {
     readonly TextBox _input = new();
     readonly TextBlock _status = new() { FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = Paint.Brush(Paint.White), Opacity = 0.8, MinWidth = 72 };
@@ -11,13 +11,16 @@ sealed class FindBar : Border
         HorizontalAlignment = HorizontalAlignment.Right;
         VerticalAlignment = VerticalAlignment.Top;
         Margin = new Thickness(0, 12, 16, 0);
-        Padding = new Thickness(8, 6, 6, 6);
-        CornerRadius = new CornerRadius(10);
-        Background = Paint.Brush("101820", 245);
-        BorderBrush = Paint.Brush(Paint.White, 50);
-        BorderThickness = new Thickness(1);
-        RequestedTheme = ElementTheme.Dark;
         Canvas.SetZIndex(this, 30);
+        var card = new Border
+        {
+            Padding = new Thickness(8, 6, 6, 6),
+            CornerRadius = new CornerRadius(10),
+            Background = Paint.Brush("101820", 245),
+            BorderBrush = Paint.Brush(Paint.White, 50),
+            BorderThickness = new Thickness(1),
+            RequestedTheme = ElementTheme.Dark
+        };
 
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         _input.Width = 240;
@@ -55,7 +58,8 @@ sealed class FindBar : Border
         row.Children.Add(Small("Previous match", "Previous", () => Previous?.Invoke()));
         row.Children.Add(Small("Next match", "Next", () => Next?.Invoke()));
         row.Children.Add(Small("Close find", "Close", () => Dismiss?.Invoke()));
-        Child = row;
+        card.Child = row;
+        Children.Add(card);
     }
 
     public string Term => _input.Text ?? "";
