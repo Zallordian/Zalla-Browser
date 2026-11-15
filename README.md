@@ -186,7 +186,7 @@ Implemented in source:
 ## Build 15
 
 - The Flame is now Burn It All (free). It sits in Tabs, the Menu, and as an optional Quick Action button, no longer in the new tab edit menu, and its icon follows the accent color.
-- Listen to Page keeps playing in the background (audio background mode). Local network access is declared for LAN addresses.
+- Listen to page speaks while Zalla is open. It does not keep playing after you leave, and the app does not declare a background audio mode (corrected in Build 51 after App Review guideline 2.5.4). Local network access is declared for LAN addresses.
 - If Zalla Unlock lapses, locked accents and app icons fall back to the default right away. A purchase check that cannot be verified never removes a cached Unlock.
 - HTTPS-Only: local ranges now include 100.64.0.0/10, `::` and mapped IPv4. Timeouts show the normal error page. Upgrades are counted only when the secure page loads.
 - Cookie banner closing ignores generic dialogs. Link cleaning is capped per navigation. Bookmark import parses in the background and decodes numeric entities.

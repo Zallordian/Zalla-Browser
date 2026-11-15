@@ -2,6 +2,18 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 51: No Background Audio
+- Removed the unused background audio declaration. Listen to page still reads a page aloud while Zalla is open, and it stops when you leave. Apple rejected build 49 for declaring background audio without a feature that keeps playing.
+
+## Build 50: Phone Links Open
+- Tapping Call on a Google business now asks, then opens the Phone app. Google starts that call from a script, so Zalla used to drop it. A normal link, like the one on Brave Search, already worked
+- Phone, Messages, Mail, FaceTime, and Maps do the same, whether you tap the link, the page runs a script right after the tap, the link opens in a new tab, or the page calls window.open
+- App Store links open the App Store. YouTube, Google Maps, and other sites stay in Zalla
+- Any other app link asks first, for example "Open in Spotify?" or "Open in another app?", with Cancel and Open
+- A page cannot open an app by itself. After you answer, it cannot keep asking
+- Android intent links open their backup web page when they have one
+- Jump links on the same page no longer reload it. Download links save the file. A javascript link you tap runs, including inside a frame
+
 ## Build 49: PDFs Open in the Tab
 - Tapping a PDF link now opens the PDF right in the tab, like Safari. Before, Zalla quietly saved every PDF to Downloads and left the page looking like it was still loading
 - A PDF in a tab has Download and Edit PDF buttons at the top. Edit PDF is part of Zalla Unlock and shows a lock without it
