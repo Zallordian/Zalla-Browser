@@ -68,8 +68,14 @@ struct OnboardingView: View {
                         .tag(OnboardingStep.unlock.rawValue)
                     farewell.tag(OnboardingStep.farewell.rawValue)
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
+                // Build 53: the system dots sat on top of each screen's button. Zalla draws its own row of dots
+                // below the TabView instead, so every screen's button sits above them and never under them.
+                .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.spring(response: 0.45, dampingFraction: 0.86), value: step)
+
+                OnboardingPageDots(current: step, theme: theme)
+                    .padding(.top, OnboardingMetrics.dotsTopSpacing)
+                    .padding(.bottom, OnboardingMetrics.dotsBottomSpacing)
             }
         }
         .tint(theme.primary)
@@ -226,7 +232,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 28)
-            .padding(.bottom, 36)
+            .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
             .scaleEffect(pulse ? 1.01 : 1.0)
         }
     }
@@ -301,10 +307,11 @@ struct OnboardingView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 12)
             }
+            .onboardingScrollFade()
 
             nextButton("Continue") { goTo(OnboardingStep.search.rawValue) }
                 .padding(.horizontal, 24)
-                .padding(.bottom, 36)
+                .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
         }
         .padding(.top, 12)
         .opacity(step == 1 && !contentVisible ? 0 : 1)
@@ -312,6 +319,7 @@ struct OnboardingView: View {
     }
 
     private var bringYourStuff: some View {
+        VStack(spacing: 0) {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 stepHero(systemName: "tray.and.arrow.down.fill")
@@ -361,13 +369,18 @@ struct OnboardingView: View {
                 Text("Open tabs and history don't carry over. Only bookmarks come in from the file.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-
-                nextButton("Continue") { goTo(OnboardingStep.unlock.rawValue) }
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
+            .padding(.bottom, 16)
+        }
+        .onboardingScrollFade()
+
+            // Build 53: Continue stays pinned above the page dots instead of scrolling with the cards.
+            nextButton("Continue") { goTo(OnboardingStep.unlock.rawValue) }
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+                .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
         }
         .opacity(step == OnboardingStep.bringStuff.rawValue && !contentVisible ? 0 : 1)
         .offset(y: step == OnboardingStep.bringStuff.rawValue && !contentVisible ? 18 : 0)
@@ -433,7 +446,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 28)
-            .padding(.bottom, 36)
+            .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
             .scaleEffect(farewellBurst ? 1.0 : 0.94)
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: farewellBurst)
         }
