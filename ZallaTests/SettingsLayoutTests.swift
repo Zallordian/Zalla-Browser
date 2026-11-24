@@ -74,7 +74,7 @@ final class Build41CopyTests: XCTestCase {
             if let subtitle = row.subtitle { lines.append(subtitle) }
         }
         lines += SettingsGroup.allCases.compactMap(\.header)
-        for item in MenuTopRow.allCases {
+        for item in MenuTopRowItem.allCases {
             lines.append(item.title)
             lines.append(item.shortTitle)
         }
