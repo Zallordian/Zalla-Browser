@@ -67,6 +67,18 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         [.about]
     ]
 
+    /// Redesign phase 4: the short line under each page on the main screen, built from the first rows you will see
+    /// there so it can't name something the page doesn't have.
+    var contentsLine: String {
+        var titles: [String] = []
+        for row in shownMainRows where row.kind != .destructive {
+            guard let drawn = row.drawnRow, !titles.contains(drawn.title) else { continue }
+            titles.append(drawn.title)
+            if titles.count == 3 { break }
+        }
+        return titles.joined(separator: ", ")
+    }
+
     /// Rows on this page, in the order they are drawn.
     var rows: [SettingsRowID] { SettingsRowID.allCases.filter { $0.page == self } }
     var mainRows: [SettingsRowID] { rows.filter { !$0.inMoreOptions } }
@@ -115,6 +127,8 @@ extension SettingsRowID {
         switch self {
         case .defaultBrowser: return FeatureFlags.defaultBrowserEntitled
         case .addWidgets: return false
+        // Redesign phase 4: drawn inside the one Layout picker.
+        case .addressBar, .toolbarStyle: return false
         case .videoSaver: return FeatureFlags.videoSaverEnabled
         default: return true
         }
@@ -126,6 +140,7 @@ extension SettingsRowID {
         switch self {
         case .autoClear: return .privateTabLock
         case .addWidgets: return .widgets
+        case .addressBar, .toolbarStyle: return .barLayout
         default: return isShown ? self : nil
         }
     }
@@ -139,7 +154,11 @@ extension SettingsRowID {
     }
 
     /// The full path including the row itself, like "Settings, Privacy and Security, Privacy Shield".
-    var settingsPath: String { settingsLocation + ", " + title }
+    /// Rows drawn inside another row (like Toolbar Style inside Layout) point at the row you can actually see.
+    var settingsPath: String {
+        let shown = drawnRow ?? self
+        return shown.settingsLocation + ", " + shown.title
+    }
 
     /// Extra words people might type when searching Settings.
     var searchKeywords: [String] {

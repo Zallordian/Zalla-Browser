@@ -106,7 +106,7 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
         case .newTabPage: return "New Tab Page"
         case .pageZoom: return "Page Zoom"
         case .addressBar: return "Address Bar"
-        case .barLayout: return "Bar Layout"
+        case .barLayout: return "Layout"
         case .toolbarStyle: return "Toolbar Style"
         case .customizeToolbar: return "Customize Toolbar"
         case .customizeActions: return "Customize My Actions"
