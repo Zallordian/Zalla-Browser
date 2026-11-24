@@ -45,8 +45,9 @@ struct OnboardingView: View {
                         Button("Back") { goTo(step - 1) }
                     }
                     Spacer()
-                    if step > 0 {
-                        Button("Skip") { finish() }
+                    if step > 0 && step < OnboardingStep.farewell.rawValue {
+                        // Redesign phase 3: Skip lands on the last screen, so everyone still sees the privacy links.
+                        Button("Skip") { goTo(OnboardingStep.farewell.rawValue) }
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -54,11 +55,18 @@ struct OnboardingView: View {
                 .padding(.top, 12)
 
                 TabView(selection: $step) {
-                    welcome.tag(0)
-                    quickSetupLook.tag(1)
-                    quickSetupNavigation.tag(2)
-                    bringYourStuff.tag(3)
-                    farewell.tag(4)
+                    welcome.tag(OnboardingStep.welcome.rawValue)
+                    quickSetupLook.tag(OnboardingStep.look.rawValue)
+                    OnboardingSearchStep(theme: theme, selection: $searchEngine) { goTo(OnboardingStep.bringStuff.rawValue) }
+                        .opacity(step == OnboardingStep.search.rawValue && !contentVisible ? 0 : 1)
+                        .offset(y: step == OnboardingStep.search.rawValue && !contentVisible ? 18 : 0)
+                        .tag(OnboardingStep.search.rawValue)
+                    bringYourStuff.tag(OnboardingStep.bringStuff.rawValue)
+                    OnboardingUnlockStep(theme: theme) { goTo(OnboardingStep.farewell.rawValue) }
+                        .opacity(step == OnboardingStep.unlock.rawValue && !contentVisible ? 0 : 1)
+                        .offset(y: step == OnboardingStep.unlock.rawValue && !contentVisible ? 18 : 0)
+                        .tag(OnboardingStep.unlock.rawValue)
+                    farewell.tag(OnboardingStep.farewell.rawValue)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .always))
                 .animation(.spring(response: 0.45, dampingFraction: 0.86), value: step)
@@ -78,7 +86,7 @@ struct OnboardingView: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.82)) {
                 contentVisible = true
             }
-            if step == 4 {
+            if step == OnboardingStep.farewell.rawValue {
                 farewellBurst = false
                 withAnimation(.spring(response: 0.55, dampingFraction: 0.7).delay(0.05)) {
                     farewellBurst = true
@@ -209,7 +217,7 @@ struct OnboardingView: View {
 
             Spacer()
             Button {
-                goTo(1)
+                goTo(OnboardingStep.look.rawValue)
             } label: {
                 Text("Get started")
                     .font(.headline)
@@ -226,8 +234,8 @@ struct OnboardingView: View {
     private var quickSetupLook: some View {
         VStack(alignment: .leading, spacing: 16) {
             header(
-                title: "Quick Setup",
-                subtitle: "Make Zalla yours. Everything here can be changed later in Settings."
+                title: "Make it yours",
+                subtitle: "Pick your colors and where your controls sit. You can change all of this later in Settings."
             )
             .padding(.horizontal, 24)
 
@@ -281,18 +289,11 @@ struct OnboardingView: View {
                     .background(cardBackground)
 
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("Search engine").font(.headline)
-                            Spacer()
-                            Picker("Search engine", selection: $searchEngine) {
-                                ForEach(SearchEngine.choices(customTemplate: nil), id: \.rawValue) { Text($0.displayName).tag($0.rawValue) }
-                            }
-                            .pickerStyle(.menu)
-                            .labelsHidden()
-                        }
-                        Text("Searches open inside Zalla. Your chosen engine receives what you search for. You can change it later by pressing and holding the engine label on the search bar.")
+                        Text("Layout").font(.headline)
+                        Text("Where the address bar and buttons go. The preview above changes as you tap.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                        LayoutPresetPicker(theme: theme, isDark: previewIsDark, showsPreview: false)
                     }
                     .padding(20)
                     .background(cardBackground)
@@ -301,7 +302,7 @@ struct OnboardingView: View {
                 .padding(.bottom, 12)
             }
 
-            nextButton("Continue") { goTo(2) }
+            nextButton("Continue") { goTo(OnboardingStep.search.rawValue) }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 36)
         }
@@ -310,111 +311,19 @@ struct OnboardingView: View {
         .offset(y: step == 1 && !contentVisible ? 18 : 0)
     }
 
-    private var quickSetupNavigation: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            header(
-                title: "Navigation",
-                subtitle: "Pick how your controls sit on screen."
-            )
-            .padding(.horizontal, 24)
-
-            livePreview
-                .padding(.horizontal, 24)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Toolbar").font(.headline)
-                        ForEach(ToolbarStyle.allCases) { style in
-                            toolbarStyleOption(style)
-                        }
-                    }
-                    .padding(20)
-                    .background(cardBackground)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Address bar").font(.headline)
-                        Picker("Address bar", selection: placementBinding) {
-                            ForEach(AddressBarPlacement.allCases) { placement in
-                                Text(placement.rawValue).tag(placement.rawValue)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    .padding(20)
-                    .background(cardBackground)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 12)
-            }
-
-            nextButton("Continue") { goTo(3) }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 36)
-        }
-        .padding(.top, 12)
-        .opacity(step == 2 && !contentVisible ? 0 : 1)
-        .offset(y: step == 2 && !contentVisible ? 18 : 0)
-    }
-
-    private func toolbarStyleOption(_ style: ToolbarStyle) -> some View {
-        let selected = (ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic) == style
-        return Button {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                toolbarStyleRaw = style.rawValue
-            }
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: style.symbolName)
-                    .font(.title3)
-                    .foregroundStyle(selected ? .white : theme.primary)
-                    .frame(width: 42, height: 42)
-                    .background(
-                        selected ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(theme.primary.opacity(0.12)),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(style.rawValue)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(style.summary)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(selected ? theme.primary : Color.secondary.opacity(0.5))
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(selected ? theme.primary.opacity(0.08) : Color.clear)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(selected ? theme.primary.opacity(0.35) : Color.primary.opacity(0.08), lineWidth: 1)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
     private var bringYourStuff: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 stepHero(systemName: "tray.and.arrow.down.fill")
                 header(
                     title: "Bring your stuff",
-                    subtitle: "Passwords stay with Apple. Bookmarks come in from a file. Both are optional."
+                    subtitle: "Move your bookmarks over and keep using the passwords you already have. Both are optional."
                 )
 
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Passwords", systemImage: "key.fill")
                         .font(.headline)
-                    Text("Zalla works with Apple Passwords and iCloud Keychain AutoFill, and has no password vault of its own. Zalla does not appear in the Passwords list in Settings. To use your saved passwords here, turn on AutoFill Passwords in Settings under General, AutoFill & Passwords, then tap a login field in Zalla.")
+                    Text("Zalla doesn't keep a password vault of its own, so there's nothing to move. It fills logins through iOS AutoFill, from Apple Passwords or a password manager like 1Password, Bitwarden, or Dashlane. Turn it on in the Settings app under General, AutoFill & Passwords, then tap a login field in Zalla.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {
@@ -433,7 +342,7 @@ struct OnboardingView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label("Bookmarks", systemImage: "bookmark.fill")
                         .font(.headline)
-                    Text("Import an HTML bookmark file exported from Safari, Chrome, or Firefox. You can also do this later in Settings.")
+                    Text("Import a bookmarks file from another browser. On iPhone, Safari can make one in the Settings app under Apps, Safari, Export. It saves a ZIP, so tap it in Files to unzip it, then pick Bookmarks.html here. Chrome and Firefox on a computer can export one too. You can also do this later in Settings.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button {
@@ -449,15 +358,19 @@ struct OnboardingView: View {
                 .padding(20)
                 .background(cardBackground)
 
-                nextButton("Continue") { goTo(4) }
+                Text("Open tabs and history don't carry over. Only bookmarks come in from the file.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                nextButton("Continue") { goTo(OnboardingStep.unlock.rawValue) }
                     .padding(.top, 8)
                     .padding(.bottom, 24)
             }
             .padding(.horizontal, 24)
             .padding(.top, 12)
         }
-        .opacity(step == 3 && !contentVisible ? 0 : 1)
-        .offset(y: step == 3 && !contentVisible ? 18 : 0)
+        .opacity(step == OnboardingStep.bringStuff.rawValue && !contentVisible ? 0 : 1)
+        .offset(y: step == OnboardingStep.bringStuff.rawValue && !contentVisible ? 18 : 0)
     }
 
     private var farewell: some View {
@@ -524,8 +437,8 @@ struct OnboardingView: View {
             .scaleEffect(farewellBurst ? 1.0 : 0.94)
             .animation(.spring(response: 0.5, dampingFraction: 0.7), value: farewellBurst)
         }
-        .opacity(step == 4 && !contentVisible ? 0 : 1)
-        .offset(y: step == 4 && !contentVisible ? 18 : 0)
+        .opacity(step == OnboardingStep.farewell.rawValue && !contentVisible ? 0 : 1)
+        .offset(y: step == OnboardingStep.farewell.rawValue && !contentVisible ? 18 : 0)
     }
 
     // MARK: - Preview chrome
@@ -545,17 +458,6 @@ struct OnboardingView: View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
             .fill(Color(uiColor: .secondarySystemGroupedBackground))
             .shadow(color: theme.primary.opacity(0.06), radius: 12, y: 4)
-    }
-
-    private var placementBinding: Binding<String> {
-        Binding(
-            get: { addressBarPlacementRaw },
-            set: { newValue in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    addressBarPlacementRaw = newValue
-                }
-            }
-        )
     }
 
     private var appearanceBinding: Binding<String> {
