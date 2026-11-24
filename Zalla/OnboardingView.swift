@@ -87,7 +87,7 @@ struct OnboardingView: View {
         }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.html],
+            allowedContentTypes: BookmarkHTML.importTypes,
             allowsMultipleSelection: false
         ) { result in
             handleImport(result)
@@ -665,7 +665,7 @@ struct OnboardingView: View {
                     importMessage = added == 0
                         ? "No new bookmarks were found in that file."
                         : "Imported \(added) bookmark\(added == 1 ? "" : "s")."
-                    goTo(4)
+                    // Build 52: stay on this screen so the passwords card and Continue are still there.
                 }
             } catch {
                 importMessage = error.localizedDescription

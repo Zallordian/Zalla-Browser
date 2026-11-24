@@ -20,6 +20,17 @@ enum BarLayout: String, CaseIterable, Identifiable {
         return layout
     }
 
+    /// Build 52: under Toolbar Style in Settings while the Safari style bar is showing.
+    static let toolbarStyleHiddenNote = "Safari style bar is on. Picking Classic or Compact switches Bar Layout to Classic."
+
+    /// Build 52: the Bar Layout to keep after a Toolbar Style is picked. Classic and Compact only show when Bar Layout is
+    /// Classic (or the bar is at the top), so picking one of them while Safari style is on switches to Classic.
+    /// Quick Action has its own bar and leaves Bar Layout alone.
+    static func layoutAfterPicking(style: ToolbarStyle, current: BarLayout, placement: AddressBarPlacement) -> BarLayout {
+        guard current == .safari, placement == .bottom, style != .quickAction else { return current }
+        return .classic
+    }
+
     /// Safari style draws the bar only at the bottom, and never replaces the Quick Action bar, which has its own shape.
     static func usesSafariBar(layout: BarLayout, style: ToolbarStyle, placement: AddressBarPlacement) -> Bool {
         layout == .safari && placement == .bottom && style != .quickAction

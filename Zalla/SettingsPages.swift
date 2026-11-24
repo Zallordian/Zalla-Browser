@@ -71,13 +71,16 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var rows: [SettingsRowID] { SettingsRowID.allCases.filter { $0.page == self } }
     var mainRows: [SettingsRowID] { rows.filter { !$0.inMoreOptions } }
     var moreRows: [SettingsRowID] { rows.filter(\.inMoreOptions) }
+    /// Build 52: the rows Settings actually draws on this page.
+    var shownMainRows: [SettingsRowID] { mainRows.filter(\.isShown) }
+    var shownMoreRows: [SettingsRowID] { moreRows.filter(\.isShown) }
 
     var footer: String? {
         switch self {
         case .toolbarAndTabs:
             return "Immersive Layout lets pages run edge to edge with controls floating on glass. Turn it off for solid bars. Collapse Toolbar shrinks the bar to the site name as you scroll down; tap it or scroll up to bring it back. Sleep Unused Tabs unloads tabs you have not opened for a while, and they reload when you open them."
         case .privacy:
-            return "Close Cookie Banners picks reject or necessary only, and never presses accept. Clear Browsing Data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App puts every setting back to its default and keeps bookmarks."
+            return "Close Cookie Banners picks reject or necessary only, and never presses accept. Clear Browsing Data closes all tabs and removes history, cookies, website caches, and saved page zoom levels. Bookmarks and downloads are kept. Reset the App puts every setting back to its default and also deletes your tabs, history, downloads, and website data. Bookmarks are kept."
         case .websites:
             return "Website Location decides whether sites may ask for your real location. Your location goes only to a site you allow, never to Zalla."
         case .about:
@@ -105,6 +108,38 @@ extension SettingsRowID {
         case .zallaUnlock, .supportZalla, .privacyPolicy, .support, .acknowledgements, .about: return .about
         }
     }
+
+    /// Build 52: whether Settings draws this row. Set as Default Browser waits for Apple's entitlement, Add Widgets
+    /// opened the same screen as Widgets so only Widgets is drawn, and Video Saver is hidden for version 1.
+    var isShown: Bool {
+        switch self {
+        case .defaultBrowser: return FeatureFlags.defaultBrowserEntitled
+        case .addWidgets: return false
+        case .videoSaver: return FeatureFlags.videoSaverEnabled
+        default: return true
+        }
+    }
+
+    /// The row that is actually drawn for this one, or nil when it is hidden. Auto-clear draws together with
+    /// Face ID for private tabs, and Add Widgets is the Widgets row.
+    var drawnRow: SettingsRowID? {
+        switch self {
+        case .autoClear: return .privateTabLock
+        case .addWidgets: return .widgets
+        default: return isShown ? self : nil
+        }
+    }
+
+    /// Build 52: where this row lives, for directions in How To and tips, like "Settings, Toolbar and Tabs, More options".
+    /// Built from the page and row titles so the directions can't fall out of date when Settings moves things.
+    var settingsLocation: String {
+        var parts = ["Settings", page.title]
+        if inMoreOptions { parts.append(SettingsRowID.moreOptionsTitle) }
+        return parts.joined(separator: ", ")
+    }
+
+    /// The full path including the row itself, like "Settings, Privacy and Security, Privacy Shield".
+    var settingsPath: String { settingsLocation + ", " + title }
 
     /// Extra words people might type when searching Settings.
     var searchKeywords: [String] {
