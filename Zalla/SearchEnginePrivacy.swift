@@ -40,7 +40,9 @@ enum SearchEnginePrivacy {
 
     struct Rating: Equatable {
         let level: Level
-        /// One honest line, shown under the engine name.
+        /// Build 53: one short line, shown on every card. Same facts as `reason`, just shorter.
+        let summary: String
+        /// The fuller line, shown on the selected card and in Settings.
         let reason: String
         let policyURL: URL
     }
@@ -51,42 +53,49 @@ enum SearchEnginePrivacy {
         case .brave:
             return Rating(
                 level: .collectsLittle,
+                summary: "No profile, and your IP address isn't kept with searches.",
                 reason: "Keeps search words without your IP address or device, and doesn't build a profile of you.",
                 policyURL: URL(string: "https://search.brave.com/help/privacy-policy")!
             )
         case .duckDuckGo:
             return Rating(
                 level: .collectsLittle,
+                summary: "Doesn't keep your IP address. Ads follow the search, not you.",
                 reason: "Doesn't save your IP address with your searches. Ads match what you searched, not who you are.",
                 policyURL: URL(string: "https://duckduckgo.com/privacy")!
             )
         case .startpage:
             return Rating(
                 level: .collectsLittle,
+                summary: "Google results without your IP address. Part of System1, a marketing company.",
                 reason: "Gets Google results without passing on your IP address, and doesn't log searches. Part of System1, a marketing company.",
                 policyURL: URL(string: "https://www.startpage.com/en/privacy-policy/")!
             )
         case .kagi:
             return Rating(
                 level: .collectsLittle,
+                summary: "No ads, and searches aren't tied to your account.",
                 reason: "No ads, and searches aren't linked to your account. You need a paid Kagi account to use it.",
                 policyURL: URL(string: "https://kagi.com/privacy")!
             )
         case .ecosia:
             return Rating(
                 level: .collectsSome,
+                summary: "Passes your search and IP address to Bing or Google.",
                 reason: "Sends your search and IP address to Bing or Google for results. Ecosia removes its own copy of your IP within a week.",
                 policyURL: URL(string: "https://www.ecosia.org/privacy")!
             )
         case .bing:
             return Rating(
                 level: .collectsALot,
+                summary: "Keeps searches to personalize results and ads.",
                 reason: "Microsoft keeps searches with identifiers and uses them to personalize results and ads.",
                 policyURL: URL(string: "https://privacy.microsoft.com/privacystatement")!
             )
         case .google:
             return Rating(
                 level: .collectsALot,
+                summary: "Can link searches to your Google Account for ads.",
                 reason: "Keeps your searches and can link them to your Google Account to personalize results and ads.",
                 policyURL: URL(string: "https://policies.google.com/privacy")!
             )
@@ -114,8 +123,9 @@ enum SearchEnginePrivacy {
 
     enum Copy {
         static let title = "Choose how you search"
-        static let zallaPromise = "Zalla doesn't collect your data. There's no account and no analytics, and your history and bookmarks stay on this iPhone. Zalla also blocks trackers, upgrades sites to HTTPS, and cleans tracking out of links."
-        static let enginesNote = "Search engines are separate companies. Every search you send goes to the engine you pick, and each one handles that differently. Here's a quick look so you can choose."
-        static let footer = "Ratings are our plain reading of each company's public privacy policy as of \(SearchEnginePrivacy.ratedOn). They're a guide, not a guarantee. Zalla only sends a search when you tap Go, never while you're still typing."
+        static let enginesNote = "Your searches go to the engine you pick, and each one handles them differently."
+        static let zallaPromiseTitle = "Zalla collects nothing"
+        static let zallaPromise = "No account and no analytics. A search only leaves your iPhone when you tap Go."
+        static let footer = "Based on each company's public privacy policy as of \(SearchEnginePrivacy.ratedOn). A guide, not a guarantee."
     }
 }

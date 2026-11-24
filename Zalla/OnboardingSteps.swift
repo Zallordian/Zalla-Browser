@@ -9,6 +9,62 @@ enum OnboardingStep: Int, CaseIterable {
     case bringStuff
     case unlock
     case farewell
+
+    /// Read out for the page dots, like "Page 3 of 6".
+    var pageLabel: String { "Page \(rawValue + 1) of \(OnboardingStep.allCases.count)" }
+}
+
+/// Build 53: shared spacing for the bottom of every setup screen. The screen's main button sits
+/// `buttonBottomPadding` above the dots row, and the dots get their own row under it.
+enum OnboardingMetrics {
+    static let buttonBottomPadding: CGFloat = 14
+    static let dotsTopSpacing: CGFloat = 4
+    static let dotsBottomSpacing: CGFloat = 10
+    static let dotSize: CGFloat = 7
+    static let activeDotWidth: CGFloat = 20
+    /// How far the list fades out at its top and bottom edges instead of being cut off.
+    static let scrollFade: CGFloat = 22
+}
+
+/// Build 53: the page dots, on a row of their own under each screen's button.
+struct OnboardingPageDots: View {
+    let current: Int
+    let theme: ZallaTheme
+
+    var body: some View {
+        HStack(spacing: 7) {
+            ForEach(OnboardingStep.allCases, id: \.rawValue) { step in
+                let active = step.rawValue == current
+                Capsule()
+                    .fill(active ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(Color.primary.opacity(0.22)))
+                    .frame(width: active ? OnboardingMetrics.activeDotWidth : OnboardingMetrics.dotSize,
+                           height: OnboardingMetrics.dotSize)
+            }
+        }
+        .frame(height: OnboardingMetrics.dotSize + 6)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: current)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(OnboardingStep(rawValue: current)?.pageLabel ?? "")
+    }
+}
+
+/// Build 53: scrolling lists fade out under the header and above the button instead of cutting text off.
+struct OnboardingScrollFade: ViewModifier {
+    func body(content: Content) -> some View {
+        content.mask(
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                    .frame(height: OnboardingMetrics.scrollFade)
+                Rectangle().fill(.black)
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: OnboardingMetrics.scrollFade)
+            }
+        )
+    }
+}
+
+extension View {
+    func onboardingScrollFade() -> some View { modifier(OnboardingScrollFade()) }
 }
 
 /// The rounded card every setup screen uses.
@@ -41,24 +97,23 @@ extension SearchEnginePrivacy.Level {
     }
 }
 
-/// The red, yellow, or green bar. Fuller and greener means the engine collects less.
+/// The red, yellow, or green bar, as three short segments. More filled and greener means the engine collects less.
+/// Fixed widths so the bar and its label line up on every card.
 struct PrivacyMeter: View {
     let level: SearchEnginePrivacy.Level
 
     var body: some View {
         HStack(spacing: 8) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.primary.opacity(0.08))
+            HStack(spacing: 3) {
+                ForEach(SearchEnginePrivacy.Level.allCases, id: \.rawValue) { segment in
                     Capsule()
-                        .fill(level.color)
-                        .frame(width: proxy.size.width * level.fill)
+                        .fill(segment.rawValue <= level.rawValue ? level.color : Color.primary.opacity(0.12))
+                        .frame(width: 16, height: 6)
                 }
             }
-            .frame(width: 64, height: 6)
             Text(level.label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(level == .collectsSome ? Color.primary.opacity(0.7) : level.color)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Privacy: \(level.label)")
@@ -77,54 +132,74 @@ struct OnboardingSearchStep: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(SearchEnginePrivacy.Copy.title)
-                        .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                    Text(SearchEnginePrivacy.Copy.enginesNote)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "hand.raised.fill")
-                        .font(.title3)
-                        .foregroundStyle(theme.primary)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Zalla's part").font(.headline)
-                        Text(SearchEnginePrivacy.Copy.zallaPromise)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(SearchEnginePrivacy.Copy.title)
+                            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                        Text(SearchEnginePrivacy.Copy.enginesNote)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
-                }
-                .onboardingCard(theme)
 
-                VStack(spacing: 10) {
-                    ForEach(engines, id: \.rawValue) { engine in
-                        row(engine)
+                    promise
+
+                    VStack(spacing: 8) {
+                        ForEach(engines, id: \.rawValue) { engine in
+                            row(engine)
+                        }
                     }
-                }
 
-                Text(SearchEnginePrivacy.Copy.footer)
-                    .font(.footnote)
+                    Text(SearchEnginePrivacy.Copy.footer)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 2)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+            }
+            .onboardingScrollFade()
+
+            Button(action: onContinue) {
+                Text("Continue")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+            .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
+        }
+    }
+
+    private var promise: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 34, height: 34)
+                .background(theme.gradient, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(SearchEnginePrivacy.Copy.zallaPromiseTitle)
+                    .font(.subheadline.weight(.semibold))
+                Text(SearchEnginePrivacy.Copy.zallaPromise)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Button(action: onContinue) {
-                    Text("Continue")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.top, 4)
-                .padding(.bottom, 24)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
+            Spacer(minLength: 0)
         }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(theme.primary.opacity(0.10))
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private func row(_ engine: SearchEngine) -> some View {
@@ -134,51 +209,65 @@ struct OnboardingSearchStep: View {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) { selection = engine.rawValue }
         } label: {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
+                // A letter badge instead of a logo: works offline and uses no company artwork.
+                Text(String(engine.rawValue.prefix(1)))
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(selected ? Color.white : theme.primary)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        Circle().fill(selected ? AnyShapeStyle(theme.gradient) : AnyShapeStyle(theme.primary.opacity(0.12)))
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
-                        Text(engine.displayName)
+                        Text(engine.rawValue)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
-                        if engine == SearchEngine.defaultEngine {
-                            Text("Default")
-                                .font(.caption2.weight(.semibold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(theme.primary.opacity(0.14), in: Capsule())
-                                .foregroundStyle(theme.primary)
-                        }
+                        if engine == SearchEngine.defaultEngine { chip("Default") }
+                        if engine == .kagi { chip("Paid") }
                     }
                     if let rating {
                         PrivacyMeter(level: rating.level)
-                        Text(rating.reason)
+                        Text(selected ? rating.reason : rating.summary)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         if selected {
-                            Link("Read \(engine.rawValue)'s privacy policy", destination: rating.policyURL)
+                            Link("Read the privacy policy", destination: rating.policyURL)
                                 .font(.caption.weight(.semibold))
+                                .padding(.top, 1)
                         }
                     }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selected ? theme.primary : Color.secondary.opacity(0.5))
+                    .foregroundStyle(selected ? theme.primary : Color.secondary.opacity(0.4))
             }
-            .padding(14)
+            .padding(12)
             .background(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color(uiColor: .secondarySystemGroupedBackground))
+                    .fill(selected ? theme.primary.opacity(0.08) : Color(uiColor: .secondarySystemGroupedBackground))
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(selected ? theme.primary.opacity(0.5) : Color.primary.opacity(0.06), lineWidth: selected ? 1.5 : 1)
+                    .strokeBorder(selected ? theme.primary.opacity(0.6) : Color.primary.opacity(0.05), lineWidth: selected ? 1.5 : 1)
             }
             .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(theme.primary.opacity(0.14), in: Capsule())
+            .foregroundStyle(theme.primary)
     }
 }
 
@@ -223,11 +312,12 @@ struct OnboardingUnlockStep: View {
                 .padding(.top, 12)
                 .padding(.bottom, 12)
             }
+            .onboardingScrollFade()
 
             actions
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
-                .padding(.bottom, 32)
+                .padding(.bottom, OnboardingMetrics.buttonBottomPadding)
         }
         .task { await unlock.loadProduct() }
         .onChange(of: unlock.isUnlocked) { _, unlocked in

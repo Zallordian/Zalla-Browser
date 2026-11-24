@@ -54,12 +54,14 @@ final class OnboardingRedesignTests: XCTestCase {
 
     func testCopyIsPlain() {
         var copy = [
-            SearchEnginePrivacy.Copy.title, SearchEnginePrivacy.Copy.zallaPromise, SearchEnginePrivacy.Copy.enginesNote,
+            SearchEnginePrivacy.Copy.title, SearchEnginePrivacy.Copy.zallaPromiseTitle, SearchEnginePrivacy.Copy.zallaPromise,
+            SearchEnginePrivacy.Copy.enginesNote,
             SearchEnginePrivacy.Copy.footer, SearchEnginePrivacy.customNote,
             ZallaUnlockBenefits.Copy.title, ZallaUnlockBenefits.Copy.subtitle, ZallaUnlockBenefits.Copy.smallPrint,
             ZallaUnlockBenefits.Copy.notNow, ZallaUnlockBenefits.Copy.restore, ZallaUnlockBenefits.Copy.unlocked
         ]
         copy += SearchEngine.allCases.compactMap { SearchEnginePrivacy.rating(for: $0)?.reason }
+        copy += SearchEngine.allCases.compactMap { SearchEnginePrivacy.rating(for: $0)?.summary }
         copy += (ZallaUnlockBenefits.unlockItems(manifest: nil) + ZallaUnlockBenefits.freeItems(manifest: nil)).flatMap { [$0.title, $0.detail] }
         for line in copy {
             XCTAssertFalse(line.contains("\u{2014}"), "No em dashes: \(line)")
@@ -68,5 +70,31 @@ final class OnboardingRedesignTests: XCTestCase {
         }
         XCTAssertEqual(ZallaUnlockBenefits.Copy.notNow, "Not right now")
         XCTAssertEqual(ZallaUnlockBenefits.Copy.restore, "Restore Purchase")
+    }
+
+    // MARK: Build 53
+
+    func testPageDotsCoverEveryScreen() {
+        XCTAssertEqual(OnboardingStep.search.pageLabel, "Page 3 of 6")
+        XCTAssertEqual(OnboardingStep.farewell.pageLabel, "Page 6 of 6")
+        XCTAssertGreaterThan(OnboardingMetrics.buttonBottomPadding, 0, "The button keeps clear space above the dots")
+        XCTAssertGreaterThan(OnboardingMetrics.dotsBottomSpacing, 0)
+    }
+
+    func testEveryCardHasAShortSummary() {
+        for engine in SearchEngine.allCases where engine != .custom {
+            guard let rating = SearchEnginePrivacy.rating(for: engine) else { return XCTFail("\(engine)") }
+            XCTAssertFalse(rating.summary.isEmpty)
+            XCTAssertLessThanOrEqual(rating.summary.count, 80, "\(engine) summary should fit on a card in a line or two")
+            XCTAssertLessThan(rating.summary.count, rating.reason.count, "\(engine) summary should be shorter than the full line")
+        }
+        // The System1 ownership note stays visible on Startpage's card, not just when it's picked.
+        XCTAssertTrue(SearchEnginePrivacy.rating(for: .startpage)?.summary.contains("System1") ?? false)
+        XCTAssertTrue(SearchEnginePrivacy.rating(for: .startpage)?.reason.contains("System1") ?? false)
+    }
+
+    func testFooterStaysShortAndDated() {
+        XCTAssertTrue(SearchEnginePrivacy.Copy.footer.contains(SearchEnginePrivacy.ratedOn))
+        XCTAssertLessThanOrEqual(SearchEnginePrivacy.Copy.footer.count, 120)
     }
 }
