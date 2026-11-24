@@ -10,6 +10,18 @@ struct ChromeStylePreview: View {
     let theme: ZallaTheme
     /// Toolbar buttons to draw. Defaults to the built-in layout, as onboarding shows it.
     var toolbarItems: ToolbarLayout = .default
+    /// Redesign phase 2: the Bar Layout to draw. Nil reads the stored setting, so every existing preview shows the
+    /// Safari style bar when that is what the browser really draws.
+    var barLayout: BarLayout? = nil
+    @AppStorage(BarLayout.storageKey) private var storedBarLayoutRaw = BarLayout.defaultLayout.rawValue
+
+    private var showsSafariBar: Bool {
+        BarLayout.usesSafariBar(
+            layout: barLayout ?? BarLayout.stored(storedBarLayoutRaw),
+            style: style,
+            placement: placement
+        )
+    }
 
     private var layout: ChromePreviewLayout { .make(style: style, placement: placement) }
     private var barBG: Color { isDark ? Color(white: 0.20) : Color.white }
@@ -30,8 +42,14 @@ struct ChromeStylePreview: View {
                 .background(scrim(isTop: true, strong: layout.addressAtTop))
                 Spacer(minLength: 0)
                 if !layout.addressAtTop {
-                    chromeRow(isTop: false)
-                        .background(scrim(isTop: false))
+                    Group {
+                        if showsSafariBar {
+                            safariRow
+                        } else {
+                            chromeRow(isTop: false)
+                        }
+                    }
+                    .background(scrim(isTop: false))
                 } else if layout.showsNavRow && layout.navRowAtBottom {
                     navRow
                         .padding(.vertical, 8)
@@ -51,8 +69,11 @@ struct ChromeStylePreview: View {
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: placement)
         .animation(.easeInOut(duration: 0.28), value: isDark)
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: toolbarItems)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: showsSafariBar)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Preview: \(style.rawValue) toolbar, address bar at the \(placement.rawValue.lowercased())")
+        .accessibilityLabel(showsSafariBar
+            ? "Preview: Safari style bar at the bottom"
+            : "Preview: \(style.rawValue) toolbar, address bar at the \(placement.rawValue.lowercased())")
     }
 
     // MARK: - Pieces
@@ -203,6 +224,61 @@ struct ChromeStylePreview: View {
             ForEach(toolbarItems.compactTrailing) { kind in
                 miniCircle(previewSymbol(kind, classic: false))
             }
+        }
+    }
+
+    /// The Safari style bar: Back and Forward in one capsule, the page pill, then Tabs and More, like the real bar.
+    private var safariRow: some View {
+        HStack(spacing: 6) {
+            ForEach(SafariBarMetrics.segments(toolbarItems.compactLeading)) { segment in
+                safariSegment(segment)
+            }
+            HStack(spacing: 5) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 7))
+                    .foregroundStyle(muted)
+                Text("zalla.gg")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(strong)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 26)
+            .background(barBG, in: Capsule())
+            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+            ForEach(SafariBarMetrics.segments(toolbarItems.compactTrailing)) { segment in
+                safariSegment(segment)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+        .frame(maxWidth: .infinity)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    @ViewBuilder
+    private func safariSegment(_ segment: SafariBarSegment) -> some View {
+        switch segment {
+        case .nav(let kinds):
+            HStack(spacing: 8) {
+                ForEach(kinds) { kind in
+                    Image(systemName: previewSymbol(kind, classic: false))
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(muted)
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .background(barBG, in: Capsule())
+            .shadow(color: .black.opacity(0.10), radius: 3, y: 1)
+        case .single(let kind):
+            Image(systemName: previewSymbol(kind, classic: false))
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(muted)
+                .frame(width: 26, height: 26)
+                .background(barBG, in: Circle())
+                .shadow(color: .black.opacity(0.10), radius: 3, y: 1)
         }
     }
 
