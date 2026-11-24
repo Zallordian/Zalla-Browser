@@ -152,7 +152,11 @@ final class SafariBarInsetTests: XCTestCase {
         ]
         for width in [320.0, 375.0, 393.0, 430.0] as [CGFloat] {
             let inset = SafariBarMetrics.sideInset(screenWidth: width)
-            for list in lists {
+            for raw in lists {
+                // The Safari bar draws the saved Compact layout, which ToolbarLayout always trims to
+                // ToolbarEditTarget.compact.limit buttons. Run each list through that same rule, so a list longer
+                // than the app allows (like the six item one above) is checked the way the app would draw it.
+                let list = ToolbarLayout.sanitized(raw, for: .compact)
                 for back in [false, true] {
                     for forward in [false, true] {
                         let visible = SafariBarMetrics.visibleItems(list, canGoBack: back, canGoForward: forward)
@@ -166,6 +170,16 @@ final class SafariBarInsetTests: XCTestCase {
                 }
             }
         }
+    }
+
+    /// The widest row the app can draw (the Compact limit, every button its own circle) still leaves room for the
+    /// pill on the narrowest screen, so the inset never has to give way.
+    func testWidestAllowedRowStillFitsThePill() {
+        let widest = SafariBarMetrics.segments(Array(repeating: ToolbarItemKind.menu, count: ToolbarEditTarget.compact.limit))
+        let pill = SafariBarMetrics.pillWidth(screenWidth: 320, segments: widest)
+        XCTAssertGreaterThan(pill, 0)
+        XCTAssertLessThanOrEqual(ToolbarLayout.sanitized([.share, .back, .address, .burn, .downloads, .menu], for: .compact)
+            .filter { $0 != .address }.count, ToolbarEditTarget.compact.limit)
     }
 
     func testPillTakesTheFreedSpace() {
