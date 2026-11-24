@@ -96,5 +96,33 @@ struct SearchEngineSettingsRows: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        SearchEnginePrivacyRow(engine: SearchEngine(rawValue: engineRaw) ?? SearchEngine.defaultEngine)
+    }
+}
+
+/// Redesign phase 4: the same privacy rating setup shows, under the engine picker in Settings.
+struct SearchEnginePrivacyRow: View {
+    let engine: SearchEngine
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let rating = SearchEnginePrivacy.rating(for: engine) {
+                PrivacyMeter(level: rating.level)
+                Text(rating.reason)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Based on its public privacy policy as of \(SearchEnginePrivacy.ratedOn).")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Link("Read \(engine.rawValue)'s privacy policy", destination: rating.policyURL)
+                    .font(.caption.weight(.semibold))
+            } else {
+                Text(SearchEnginePrivacy.customNote)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }

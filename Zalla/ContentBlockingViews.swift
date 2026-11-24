@@ -412,28 +412,20 @@ struct ZallaUnlockSheet: View {
                 Section {
                     UnlockHeader()
                 }
+                // Redesign phase 4: the same list setup shows, from ZallaUnlockBenefits.
                 Section("Includes") {
-                    ForEach(BlocklistCategory.allCases.filter(\.requiresUnlock)) { category in
-                        Label(category.title, systemImage: category.systemImage)
-                    }
-                    Label("Hide Element on any site", systemImage: "eye.slash.circle")
-                    Label("Custom block and allow rules", systemImage: "list.bullet.rectangle")
-                    Label("Face ID for private tabs", systemImage: "faceid")
-                    Label("Tab groups", systemImage: "rectangle.stack")
-                    // Grouped so the list stays within the ten rows a ViewBuilder block allows.
-                    Group {
-                        Label("Listen to page", systemImage: "speaker.wave.2")
-                        if FeatureFlags.videoSaverEnabled {
-                            Label("Video Saver for plain video files", systemImage: "arrow.down.to.line")
+                    ForEach(ZallaUnlockBenefits.unlockItems()) { item in
+                        Label {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                Text(item.detail)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        } icon: {
+                            Image(systemName: item.symbolName)
                         }
                     }
-                    Group {
-                        Label("Per-site CSS", systemImage: "paintbrush")
-                        Label("Edit PDF: fill forms, add text, sign, and highlight", systemImage: "signature")
-                    }
-                    Label("Scheduled auto-clear", systemImage: "clock.arrow.circlepath")
-                    Label("Background packs for new tabs", systemImage: "photo.on.rectangle.angled")
-                    Label("Space, Jungle, Volcano, Deep Ocean, Retro Arcade, Neon City, Arctic, and Cherry Blossom theme packs, with matching icons and full-screen transitions", systemImage: "sparkles")
                 }
                 Section {
                     UnlockPurchaseRow(unlock: unlock)

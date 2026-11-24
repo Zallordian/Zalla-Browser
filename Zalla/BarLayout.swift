@@ -41,7 +41,7 @@ enum BarLayout: String, CaseIterable, Identifiable {
         usesSafariBar(layout: layout, style: style, placement: placement) ? .compact : .forStyle(style)
     }
 
-    static let settingsFooter = "Safari style is a slim bar that floats over the page, with Back, Forward, the page title, Tabs, and More. Classic keeps the Toolbar Style you pick below. Customize Toolbar changes the Safari style buttons too."
+    static let settingsFooter = "Layout sets where the address bar and buttons sit. Safari Style is a slim bar that floats over the page, with Back, Forward, the page title, Tabs, and More. Customize Toolbar picks the buttons, including the ones on the Safari Style bar."
 }
 
 /// Sizes for the Safari style bar, kept in one place so the layout never measures itself while scrolling.

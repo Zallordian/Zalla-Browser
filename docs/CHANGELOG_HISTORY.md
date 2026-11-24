@@ -2,6 +2,15 @@
 
 The in-app What's new shows only the public 1.0 entry. This is the full TestFlight history it replaced, kept for reference.
 
+## Build 52: New Settings and Setup
+- Settings has a new look that matches your theme, with a header card, four quick toggles, short summaries under each page, and a red Danger zone for Clear Browsing Data and Reset the App
+- Reset the App, Clear Browsing Data, Import and Export Bookmarks, and Zalla Unlock open again from their own pages
+- Address Bar, Bar Layout, and Toolbar Style are now one Layout picker with a live preview, in Settings and in setup
+- Setup has six screens: Welcome, Make it yours, Choose how you search, Bring your stuff, Get more out of Zalla, and Enjoy your stay
+- Choosing a search engine shows a red, yellow, or green privacy bar for each one, based on its privacy policy as of November 2026
+- The Zalla Unlock screen shows the App Store price, Restore Purchase, and Not right now
+- Set as Default Browser is hidden until Apple approves it, Reset's warning mentions downloads, and How To directions match the new pages
+
 ## Build 51: No Background Audio
 - Removed the unused background audio declaration. Listen to page still reads a page aloud while Zalla is open, and it stops when you leave. Apple rejected build 49 for declaring background audio without a feature that keeps playing.
 

@@ -3557,8 +3557,8 @@ private struct SettingsView: View {
         )
     }
     private var versionString: String {
-        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.1"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "51"
+        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "52"
         return "\(marketing) (\(build))"
     }
 
@@ -3579,6 +3579,7 @@ private struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .zallaSettingsBackground(theme)
         .searchable(text: $settingsQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search Settings")
         .autocorrectionDisabled()
         .navigationTitle("Settings")
@@ -3663,6 +3664,26 @@ private struct SettingsView: View {
 
     @ViewBuilder
     private var mainScreen: some View {
+        // Redesign phase 4: a themed header and four quick toggles, then the category pages.
+        Section {
+            SettingsHeaderCard(theme: theme, version: versionString, unlocked: unlock.isUnlocked) {
+                act(from: nil) { showThemeUpsell = true }
+            }
+            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 8, trailing: 0))
+            .listRowBackground(Color.clear)
+        }
+        Section {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                QuickToggleTile(title: SettingsRowID.httpsOnly.title, symbol: SettingsRowID.httpsOnly.symbol, isOn: $httpsOnlyMode, theme: theme)
+                QuickToggleTile(title: SettingsRowID.cookieBanners.title, symbol: SettingsRowID.cookieBanners.symbol, isOn: $cookieBanners, theme: theme)
+                QuickToggleTile(title: SettingsRowID.privacyCover.title, symbol: SettingsRowID.privacyCover.symbol, isOn: $privacyCover, theme: theme)
+                QuickToggleTile(title: SettingsRowID.collapseToolbar.title, symbol: SettingsRowID.collapseToolbar.symbol, isOn: $collapseToolbarOnScroll, theme: theme)
+            }
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        } header: {
+            Text("Quick toggles")
+        }
         ForEach(Array(SettingsPage.mainScreenGroups.enumerated()), id: \.offset) { _, pages in
             Section {
                 ForEach(pages) { page in
@@ -3679,24 +3700,19 @@ private struct SettingsView: View {
         }
     }
 
+    /// Redesign phase 4: every page icon uses the theme accent, with a short line saying what is inside.
     private func pageLabel(_ page: SettingsPage) -> some View {
         HStack(spacing: 12) {
-            SettingsIconTile(symbol: page.symbol, tint: tileColor(page))
-            Text(page.title)
+            SettingsIconTile(symbol: page.symbol, tint: theme.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(page.title)
+                Text(page.contentsLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
         }
-    }
-
-    private func tileColor(_ page: SettingsPage) -> Color {
-        switch page.tileColorName {
-        case "gray": return .gray
-        case "indigo": return .indigo
-        case "orange": return .orange
-        case "green": return .green
-        case "teal": return .teal
-        case "cyan": return .cyan
-        case "pink": return .pink
-        default: return .blue
-        }
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder
@@ -3749,8 +3765,15 @@ private struct SettingsView: View {
             }
             let destructive = page.shownMainRows.filter { $0.kind == .destructive }
             if !destructive.isEmpty {
+                // Redesign phase 4: Clear and Reset sit together in their own red card.
                 Section {
-                    ForEach(destructive, id: \.self) { row in rowView(row, from: page) }
+                    ForEach(destructive, id: \.self) { row in
+                        rowView(row, from: page)
+                            .listRowBackground(Color.red.opacity(colorScheme == .dark ? 0.16 : 0.08))
+                    }
+                } header: {
+                    Label("Danger zone", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
                 }
             }
             if page == .about {
@@ -3759,6 +3782,7 @@ private struct SettingsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .zallaSettingsBackground(theme)
         .navigationTitle(page.title)
         .navigationBarTitleDisplayMode(.inline)
         .tint(theme.primary)
@@ -3853,37 +3877,17 @@ private struct SettingsView: View {
     @ViewBuilder
     private func toolbarAndTabsRow(_ row: SettingsRowID) -> some View {
         switch row {
-        case .addressBar:
-            AddressBarPicker(
-                selection: $addressBarPlacementRaw,
-                style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
-                isDark: previewIsDark,
-                theme: theme
-            )
         case .barLayout:
-            Picker(selection: $barLayoutRaw) {
-                ForEach(BarLayout.allCases) { layout in
-                    Text(layout.title).tag(layout.rawValue)
-                }
-            } label: { label(.barLayout) }
-        case .toolbarStyle:
-            // Build 52: the Safari style bar takes the place of Classic and Compact at the bottom, so the picker
-            // says so, and choosing one of those switches Bar Layout to Classic so the choice shows up right away.
-            Picker(selection: $toolbarStyleRaw) {
-                ForEach(ToolbarStyle.allCases) { style in
-                    Text(style.rawValue).tag(style.rawValue)
-                }
-            } label: {
-                label(.toolbarStyle, subtitle: safariBarHidesToolbarStyle ? BarLayout.toolbarStyleHiddenNote : nil)
+            // Redesign phase 4: one Layout picker, shared with setup, in place of Address Bar, Bar Layout, and
+            // Toolbar Style. It writes the same three settings, so nothing a person chose before is lost.
+            VStack(alignment: .leading, spacing: 12) {
+                label(.barLayout)
+                LayoutPresetPicker(theme: theme, isDark: previewIsDark)
             }
-            .onChange(of: toolbarStyleRaw) { _, newValue in
-                let style = ToolbarStyle(rawValue: newValue) ?? .classic
-                barLayoutRaw = BarLayout.layoutAfterPicking(
-                    style: style,
-                    current: BarLayout.stored(barLayoutRaw),
-                    placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
-                ).rawValue
-            }
+            .padding(.vertical, 6)
+        case .addressBar, .toolbarStyle:
+            // Drawn inside the Layout picker above.
+            EmptyView()
         case .customizeToolbar:
             NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
         case .customizeActions:
@@ -4192,15 +4196,6 @@ private struct SettingsView: View {
             .overlay {
                 ThemeTransitionOverlay(plan: quickThemePlan, pulse: quickThemePulse)
             }
-    }
-
-    /// True when the Safari style bar is drawn instead of the Classic or Compact toolbar.
-    private var safariBarHidesToolbarStyle: Bool {
-        BarLayout.usesSafariBar(
-            layout: BarLayout.stored(barLayoutRaw),
-            style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
-            placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
-        )
     }
 
     private var previewIsDark: Bool {
