@@ -70,6 +70,8 @@ final class FaviconTests: XCTestCase {
         XCTAssertNil(store.image(for: "wps.com"))
     }
 
+    // FaviconStore is main actor isolated, so its static decode is too.
+    @MainActor
     func testDecodeRejectsNonImages() {
         XCTAssertNil(FaviconStore.decode(Data("<svg></svg>".utf8)))
         let png = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32)).image { ctx in

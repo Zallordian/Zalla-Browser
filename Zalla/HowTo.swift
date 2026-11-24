@@ -80,7 +80,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Tap the center button to fan out Back, Forward, Reload, Tabs, New Tab, and Share.",
                 "Tap the search bar on the left, or press and hold the center button, to search or type an address.",
                 "Menu sits beside Tabs.",
-                "Switch styles any time in Settings, Appearance, Toolbar."
+                "Switch styles any time in \(SettingsRowID.toolbarStyle.settingsPath)."
             ]
         case .historyPeek:
             return [
@@ -94,7 +94,7 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Swipe in from the right edge to go forward.",
                 "Swipe back from the first page you opened and you land on your new tab page. Swipe forward to return.",
                 "A small arrow follows your finger. Let go past it to turn the page, or let go early to stay put.",
-                "If it gets in the way, turn it off in Settings, Browsing."
+                "If it gets in the way, turn off \(SettingsRowID.edgeSwipes.title) in \(SettingsRowID.edgeSwipes.settingsLocation)."
             ]
         case .pullToRefresh:
             return [
@@ -102,14 +102,14 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "A little spinner shows while the page reloads and stops when it finishes.",
                 "Only a pull from the very top counts, so scrolling around a page never reloads it.",
                 "With the keyboard up, pulling down just puts the keyboard away.",
-                "To switch it off, open Settings, Browsing."
+                "To switch it off, turn off \(SettingsRowID.pullToRefresh.title) in \(SettingsRowID.pullToRefresh.settingsLocation)."
             ]
         case .newTabPage:
             return [
                 "Tap the pencil in the corner to change the background or edit shortcuts.",
                 "Tap the plus tile to add a shortcut from a popular list, your bookmarks, or a web address.",
                 "In Shortcuts, drag the handles to reorder and swipe to delete.",
-                "Logo style in Settings, Appearance, Home personalization picks the red, white, or black Zalla logo. Auto chooses the one that stands out on your background."
+                "Logo style in \(SettingsRowID.newTabPage.settingsPath) picks the red, white, or black Zalla logo. Auto chooses the one that stands out on your background."
             ]
         case .addToDashboard:
             return [
@@ -122,13 +122,13 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Find Burn It All in the Menu, in Tabs, or add it to your Quick Action buttons in Settings.",
                 BurnCopy.howToWipeStep,
                 BurnCopy.howToEffectStep,
-                "Prefer it quiet? Turn off Burn It All fire effect in Settings, Privacy. With Reduce Motion on, the screen just fades.",
+                "Prefer it quiet? Turn off \(SettingsRowID.burnEffect.title) in \(SettingsRowID.burnEffect.settingsLocation). With Reduce Motion on, the screen just fades.",
                 BurnCopy.howToAfterStep
             ]
         case .themeTransitions:
             return [
                 "Jungle sweeps layers of leaves across the screen. Space launches a rocket with a long flame and a trail of smoke. Volcano floods the screen with lava and sparks. Deep Ocean rolls a wave across with bubbles and light, then pulls it back. Retro Arcade dissolves the screen into pixels behind CRT scanlines. Neon City sweeps a flickering neon wipe with glow streaks. Arctic spreads frost with snow sparkle. Cherry Blossom swirls petals across. They play when you refresh and when you apply a theme.",
-                "Open Premium or Appearance, Explore theme packs. Turn Theme transitions off, or pick Slow, Normal, or Fast.",
+                "Open \(SettingsRowID.themePacks.settingsPath). Turn Theme transitions off, or pick Slow, Normal, or Fast.",
                 "With Reduce Motion on, you get a quick fade instead.",
                 "Theme packs are part of Zalla Unlock."
             ]
@@ -137,11 +137,11 @@ enum HowToTopic: String, CaseIterable, Identifiable {
                 "Zalla tries the secure version of a site first.",
                 "If a site has no secure version, you get a warning page first.",
                 "Choose Take me back, or Continue anyway for that site only.",
-                "Turn it off in Settings, Privacy."
+                "Turn it off in \(SettingsRowID.httpsOnly.settingsLocation)."
             ]
         case .privacyShield:
             return [
-                "Open Settings, Privacy, Privacy Shield.",
+                "Open \(SettingsRowID.privacyShield.settingsPath).",
                 "Pick the protections you want. Each one says what it changes.",
                 "Privacy Shield works on this device. It is not a VPN."
             ]
@@ -158,10 +158,10 @@ enum HowToTopic: String, CaseIterable, Identifiable {
             ]
         case .websiteLocation:
             return [
-                "Open Settings, Privacy, Website location. Ask is the default. Never blocks every request.",
+                "Open \(SettingsRowID.websiteLocation.settingsPath). Ask is the default. Never blocks every request.",
                 "When a site asks, choose Allow or Don't Allow. Zalla remembers your answer for that site.",
                 "Your location goes only to the site you allow, never to Zalla. Private tabs ask every time and remember nothing.",
-                "To change a saved answer, open Settings, Privacy, Location and swipe the site away."
+                "To change a saved answer, open \(SettingsRowID.location.settingsPath) and swipe the site away."
             ]
         }
     }

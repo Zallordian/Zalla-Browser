@@ -54,7 +54,7 @@ enum ChromeModeTips {
         "Your address bar is at the top. In Classic mode, Back, Forward, and tabs stay along the bottom."
 
     static let quickActionMessage =
-        "\u{2022} Tap the center button to fan out Back, Forward, Reload, Tabs, New Tab, and Share.\n\u{2022} Tap the search bar, or press and hold the button, to search or type an address.\n\u{2022} Menu sits beside Tabs.\n\nFull guide: Settings, How to."
+        "\u{2022} Tap the center button to fan out Back, Forward, Reload, Tabs, New Tab, and Share.\n\u{2022} Tap the search bar, or press and hold the button, to search or type an address.\n\u{2022} Menu sits beside Tabs.\n\nFull guide: \(SettingsRowID.howTo.settingsPath)."
 
     static let holdRevealMessage =
         "Press and hold Back or Forward to peek recent pages that way. Slide to a page, then let go to open it."
