@@ -215,13 +215,13 @@ enum SettingsRowID: String, CaseIterable, Identifiable {
     var subtitle: String? {
         switch self {
         case .defaultBrowser: return "Opens Zalla in the Settings app"
-        case .addWidgets: return "Search, favorites, and privacy stats"
+        case .addWidgets, .widgets: return "Search, favorites, and privacy stats"
         case .importBookmarks: return "From Safari or Chrome"
         case .privacyShield: return "Link cleaning, referrer trimming, fingerprinting"
         case .cookieBanners: return "Never presses accept"
         case .privateTabLock: return "Unlock with Face ID or your passcode"
         case .privacyCover: return "Shows a plain Zalla screen in the background"
-        case .resetApp: return "Bookmarks are kept"
+        case .resetApp: return "Deletes downloads, keeps bookmarks"
         case .pageZoom: return "Saved per site"
         case .pageSnapshots: return "Kept in memory, never for private tabs"
         case .browsingHaptics: return "Tab switch, pull to refresh, and Back"

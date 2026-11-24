@@ -3186,7 +3186,7 @@ private struct LibraryView: View {
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .fileImporter(
             isPresented: $showImporter,
-            allowedContentTypes: [.html, .text],
+            allowedContentTypes: BookmarkHTML.importTypes,
             allowsMultipleSelection: false
         ) { result in
             handleImport(result)
@@ -3529,6 +3529,8 @@ private struct SettingsView: View {
     @State private var suggestIconForTheme: ZallaThemeID?
     @State private var showThemeUpsell = false
     @State private var showDetailUpsell = false
+    /// The category page a tapped action came from, or nil for the main screen and search results.
+    @State private var actionOrigin: SettingsPage?
     @AppStorage(QuickTheme.storageKey) private var quickThemeFullLook = QuickTheme.defaultEnabled
     @AppStorage(NewTabBackground.storageKey) private var newTabBackgroundRaw = NewTabBackground.standard.storageValue
     @AppStorage(ThemePacks.transitionsKey) private var themeTransitionsOn = true
@@ -3563,6 +3565,12 @@ private struct SettingsView: View {
     @State private var settingsQuery = ""
 
     var body: some View {
+        withActions(mainList, from: nil)
+            .tint(theme.primary)
+            .onAppear { loadCustomControls() }
+    }
+
+    private var mainList: some View {
         List {
             if settingsQuery.trimmingCharacters(in: .whitespaces).isEmpty {
                 mainScreen
@@ -3580,43 +3588,75 @@ private struct SettingsView: View {
                 SettingsDoneButton(tint: theme.primary) { dismiss() }
             }
         }
-        .alert("Clear browsing data and close all tabs?", isPresented: $confirmClear) {
-            Button("Clear browsing data", role: .destructive) {
-                Task { await browser.clearBrowsingData(); dismiss() }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .alert("Reset the App? Bookmarks are kept.", isPresented: $confirmReset) {
-            Button("Reset the App", role: .destructive) {
-                Task {
-                    await browser.resetApp(keepingBookmarks: true)
-                    hasCompletedOnboarding = false
-                    dismiss()
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [.html, .text],
-            allowsMultipleSelection: false
-        ) { result in
-            handleImport(result)
-        }
-        .sheet(isPresented: $showExporter) {
-            if let exportURL {
-                ActivityShareSheet(items: [exportURL])
-            }
-        }
-        .alert("Bookmarks", isPresented: Binding(
+    }
+
+    // MARK: Actions that open an alert, sheet, or file picker
+
+    /// Build 52: rows on a category page are pushed on top of the main screen, so an alert or sheet attached to the
+    /// main screen can't show from there. Every screen that draws these rows carries the same alerts and sheets, and
+    /// each one only shows them for taps that came from that screen.
+    private func actionBinding(_ flag: Binding<Bool>, from origin: SettingsPage?) -> Binding<Bool> {
+        Binding(
+            get: { flag.wrappedValue && actionOrigin == origin },
+            set: { flag.wrappedValue = $0 }
+        )
+    }
+
+    private var bookmarkMessageShown: Binding<Bool> {
+        Binding(
             get: { bookmarkMessage != nil },
             set: { if !$0 { bookmarkMessage = nil } }
-        )) {
-            Button("OK") { bookmarkMessage = nil }
-        } message: { Text(bookmarkMessage ?? "") }
-        .sheet(isPresented: $showThemeUpsell) { ZallaUnlockSheet() }
-        .tint(theme.primary)
-        .onAppear { loadCustomControls() }
+        )
+    }
+
+    private func confirmResetApp() {
+        Task {
+            await browser.resetApp(keepingBookmarks: true)
+            hasCompletedOnboarding = false
+            dismiss()
+        }
+    }
+
+    private func confirmClearData() {
+        Task { await browser.clearBrowsingData(); dismiss() }
+    }
+
+    /// The alerts, sheets, and file picker behind Clear Browsing Data, Reset the App, Import and Export Bookmarks,
+    /// and Zalla Unlock. Attached to the main screen and to every category page.
+    private func withActions<Content: View>(_ content: Content, from origin: SettingsPage?) -> some View {
+        content
+            .alert("Clear browsing data and close all tabs?", isPresented: actionBinding($confirmClear, from: origin)) {
+                Button("Clear browsing data", role: .destructive) { confirmClearData() }
+                Button("Cancel", role: .cancel) {}
+            }
+            .alert("Reset the App?", isPresented: actionBinding($confirmReset, from: origin)) {
+                Button("Reset the App", role: .destructive) { confirmResetApp() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text(SettingsCopy.resetMessage)
+            }
+            .fileImporter(
+                isPresented: actionBinding($showImporter, from: origin),
+                allowedContentTypes: BookmarkHTML.importTypes,
+                allowsMultipleSelection: false
+            ) { result in
+                handleImport(result)
+            }
+            .sheet(isPresented: actionBinding($showExporter, from: origin)) {
+                if let exportURL {
+                    ActivityShareSheet(items: [exportURL])
+                }
+            }
+            .alert("Bookmarks", isPresented: actionBinding(bookmarkMessageShown, from: origin)) {
+                Button("OK") { bookmarkMessage = nil }
+            } message: { Text(bookmarkMessage ?? "") }
+            .sheet(isPresented: actionBinding($showThemeUpsell, from: origin)) { ZallaUnlockSheet() }
+    }
+
+    /// Marks which screen a tap came from, then sets the flag that opens the alert or sheet.
+    private func act(from origin: SettingsPage?, _ open: () -> Void) {
+        actionOrigin = origin
+        open()
     }
 
     // MARK: Build 46 main screen and search
@@ -3661,7 +3701,7 @@ private struct SettingsView: View {
 
     @ViewBuilder
     private var searchScreen: some View {
-        let results = SettingsRowID.searchResults(settingsQuery)
+        let results = SettingsRowID.searchResults(settingsQuery).filter { !searchRows($0.rows).isEmpty }
         if results.isEmpty {
             ContentUnavailableView.search(text: settingsQuery)
                 .listRowBackground(Color.clear)
@@ -3676,36 +3716,41 @@ private struct SettingsView: View {
         }
     }
 
-    /// Face ID and Auto-clear draw together, so a search for either shows the pair once.
+    /// Face ID and Auto-clear draw together, and Add Widgets is the Widgets row, so a search shows each drawn row once.
+    /// Hidden rows never show.
     private func searchRows(_ rows: [SettingsRowID]) -> [SettingsRowID] {
         var seen: [SettingsRowID] = []
         for row in rows {
-            let drawn = row == .autoClear ? SettingsRowID.privateTabLock : row
+            guard let drawn = row.drawnRow else { continue }
             if !seen.contains(drawn) { seen.append(drawn) }
         }
         return seen
     }
 
     private func pageDetail(_ page: SettingsPage) -> some View {
+        withActions(pageList(page), from: page)
+    }
+
+    private func pageList(_ page: SettingsPage) -> some View {
         List {
             Section {
-                ForEach(page.mainRows.filter { $0.kind != .destructive }, id: \.self) { row in
-                    rowView(row)
+                ForEach(page.shownMainRows.filter { $0.kind != .destructive }, id: \.self) { row in
+                    rowView(row, from: page)
                 }
-                if !page.moreRows.isEmpty {
+                if !page.shownMoreRows.isEmpty {
                     MoreOptionsGroup {
-                        ForEach(page.moreRows, id: \.self) { row in
-                            rowView(row)
+                        ForEach(page.shownMoreRows, id: \.self) { row in
+                            rowView(row, from: page)
                         }
                     }
                 }
             } footer: {
                 if let text = footer(for: page) { Text(text) }
             }
-            let destructive = page.mainRows.filter { $0.kind == .destructive }
+            let destructive = page.shownMainRows.filter { $0.kind == .destructive }
             if !destructive.isEmpty {
                 Section {
-                    ForEach(destructive, id: \.self) { row in rowView(row) }
+                    ForEach(destructive, id: \.self) { row in rowView(row, from: page) }
                 }
             }
             if page == .about {
@@ -3721,7 +3766,10 @@ private struct SettingsView: View {
 
     private func footer(for page: SettingsPage) -> String? {
         switch page {
-        case .general: return DefaultBrowser.settingsFooter + " " + DefaultBrowser.quickActionsFooter
+        case .general:
+            return FeatureFlags.defaultBrowserEntitled
+                ? DefaultBrowser.settingsFooter + " " + DefaultBrowser.quickActionsFooter
+                : DefaultBrowser.quickActionsFooter
         case .toolbarAndTabs: return BarLayout.settingsFooter + " " + (page.footer ?? "")
         case .privacy: return (page.footer ?? "") + " " + BurnCopy.settingsHelp
         case .about: return page.footer
@@ -3743,22 +3791,22 @@ private struct SettingsView: View {
 
     /// Build 46: one live row, drawn the same on its page and in search results. Split by page to keep type checking quick.
     @ViewBuilder
-    private func rowView(_ row: SettingsRowID) -> some View {
+    private func rowView(_ row: SettingsRowID, from origin: SettingsPage? = nil) -> some View {
         switch row.page {
-        case .general: generalRow(row)
+        case .general: generalRow(row, from: origin)
         case .appearance: appearanceRow(row)
         case .toolbarAndTabs: toolbarAndTabsRow(row)
         case .homeAndNewTab: homeAndNewTabRow(row)
         case .search: searchRow(row)
-        case .privacy: privacyRow(row)
+        case .privacy: privacyRow(row, from: origin)
         case .websites: websitesRow(row)
         case .downloadsAndTools: downloadsAndToolsRow(row)
-        case .about: aboutRow(row)
+        case .about: aboutRow(row, from: origin)
         }
     }
 
     @ViewBuilder
-    private func generalRow(_ row: SettingsRowID) -> some View {
+    private func generalRow(_ row: SettingsRowID, from origin: SettingsPage?) -> some View {
         switch row {
         case .defaultBrowser:
             Button {
@@ -3771,12 +3819,12 @@ private struct SettingsView: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens Zalla in the Settings app")
         case .importBookmarks:
-            Button { showImporter = true } label: { label(.importBookmarks).contentShape(Rectangle()) }
+            Button { act(from: origin) { showImporter = true } } label: { label(.importBookmarks).contentShape(Rectangle()) }
                 .buttonStyle(.plain)
         case .iconQuickActions:
             Toggle(isOn: $quickActionsOn) { label(.iconQuickActions) }
         case .exportBookmarks:
-            Button { exportBookmarks() } label: { label(.exportBookmarks).contentShape(Rectangle()) }
+            Button { act(from: origin) { exportBookmarks() } } label: { label(.exportBookmarks).contentShape(Rectangle()) }
                 .buttonStyle(.plain)
                 .disabled(browser.bookmarks.isEmpty)
         default:
@@ -3819,11 +3867,23 @@ private struct SettingsView: View {
                 }
             } label: { label(.barLayout) }
         case .toolbarStyle:
+            // Build 52: the Safari style bar takes the place of Classic and Compact at the bottom, so the picker
+            // says so, and choosing one of those switches Bar Layout to Classic so the choice shows up right away.
             Picker(selection: $toolbarStyleRaw) {
                 ForEach(ToolbarStyle.allCases) { style in
                     Text(style.rawValue).tag(style.rawValue)
                 }
-            } label: { label(.toolbarStyle) }
+            } label: {
+                label(.toolbarStyle, subtitle: safariBarHidesToolbarStyle ? BarLayout.toolbarStyleHiddenNote : nil)
+            }
+            .onChange(of: toolbarStyleRaw) { _, newValue in
+                let style = ToolbarStyle(rawValue: newValue) ?? .classic
+                barLayoutRaw = BarLayout.layoutAfterPicking(
+                    style: style,
+                    current: BarLayout.stored(barLayoutRaw),
+                    placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
+                ).rawValue
+            }
         case .customizeToolbar:
             NavigationLink { ToolbarEditorView(theme: theme) } label: { label(.customizeToolbar) }
         case .customizeActions:
@@ -3895,7 +3955,7 @@ private struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func privacyRow(_ row: SettingsRowID) -> some View {
+    private func privacyRow(_ row: SettingsRowID, from origin: SettingsPage?) -> some View {
         switch row {
         case .contentBlocking:
             NavigationLink { ContentBlockingView() } label: { label(.contentBlocking) }
@@ -3919,10 +3979,10 @@ private struct SettingsView: View {
         case .burnEffect:
             Toggle(isOn: $burnAnimation) { label(.burnEffect) }
         case .clearData:
-            Button(role: .destructive) { confirmClear = true } label: { label(.clearData) }
+            Button(role: .destructive) { act(from: origin) { confirmClear = true } } label: { label(.clearData) }
                 .disabled(browser.clearingData)
         case .resetApp:
-            Button(role: .destructive) { confirmReset = true } label: { label(.resetApp) }
+            Button(role: .destructive) { act(from: origin) { confirmReset = true } } label: { label(.resetApp) }
                 .disabled(browser.clearingData)
         default:
             EmptyView()
@@ -3974,11 +4034,11 @@ private struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func aboutRow(_ row: SettingsRowID) -> some View {
+    private func aboutRow(_ row: SettingsRowID, from origin: SettingsPage?) -> some View {
         switch row {
         case .zallaUnlock:
             Button {
-                showThemeUpsell = true
+                act(from: origin) { showThemeUpsell = true }
             } label: {
                 label(.zallaUnlock, value: unlock.isUnlocked ? "Unlocked" : "Optional").contentShape(Rectangle())
             }
@@ -4132,6 +4192,15 @@ private struct SettingsView: View {
             .overlay {
                 ThemeTransitionOverlay(plan: quickThemePlan, pulse: quickThemePulse)
             }
+    }
+
+    /// True when the Safari style bar is drawn instead of the Classic or Compact toolbar.
+    private var safariBarHidesToolbarStyle: Bool {
+        BarLayout.usesSafariBar(
+            layout: BarLayout.stored(barLayoutRaw),
+            style: ToolbarStyle(rawValue: toolbarStyleRaw) ?? .classic,
+            placement: AddressBarPlacement(rawValue: addressBarPlacementRaw) ?? .bottom
+        )
     }
 
     private var previewIsDark: Bool {
