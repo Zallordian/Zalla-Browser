@@ -295,11 +295,15 @@ private struct TabContent: View {
             beginCompactAddressEditing()
         }
     }
-    /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted. The
-    /// scroll view then adds no automatic top inset of its own, so the chrome height alone keeps the page clear of
-    /// the banner and top bar.
+    /// Safe-area edges the page layer extends into. The top stays out while the status bar strip is painted, and on
+    /// systems before iOS 26 where WebKit cannot be told the clock covers the page. Otherwise the page runs under the
+    /// transparent status bar and `PageInsets` reports that area as covered, so a site's fixed header still lands
+    /// below the clock.
     private var webSurfaceIgnoredEdges: Edge.Set {
-        statusBarPlan.startsBelowStatusBar ? [.bottom, .horizontal] : .all
+        PageInsets.frameStartsBelowStatusBar(
+            stripPainted: statusBarPlan.startsBelowStatusBar,
+            obscuredInsetsSupported: ObscuredInsets.isSupported
+        ) ? [.bottom, .horizontal] : .all
     }
     /// A control dimension: a little smaller in the immersive layout, unchanged for the solid bars.
     private func barSize(_ value: CGFloat) -> CGFloat {
@@ -332,7 +336,8 @@ private struct TabContent: View {
                 )
                 // Container only: the keyboard still resizes the page like before. While the status bar strip is
                 // painted the page frame starts below the clock (top safe area respected), so a site's fixed
-                // header is not hidden under the strip. Otherwise edge to edge, as in Build 23.
+                // header is not hidden under the strip. Otherwise edge to edge, and `PageInsets` keeps fixed
+                // headers below the clock and the bars (Build 54).
                 .overlay(alignment: .top) {
                     if snapshotsOn, let snapshot = tab.transitionSnapshot {
                         TransitionSnapshotView(image: snapshot)
@@ -474,6 +479,7 @@ private struct TabContent: View {
             GeometryReader { geo in
                 Color.clear.preference(key: HomeIndicatorInsetKey.self, value: geo.safeAreaInsets.bottom)
             }
+            .allowsHitTesting(false)
         }
         .onPreferenceChange(HomeIndicatorInsetKey.self) { value in
             if let inset = ImmersiveLayout.homeIndicatorInset(fromSafeAreaBottom: value) {
@@ -2171,6 +2177,8 @@ private struct ChromeHeightReader<Key: PreferenceKey>: View where Key.Value == C
         GeometryReader { geo in
             Color.clear.preference(key: key, value: geo.size.height)
         }
+        // Measures only. Never takes a tap meant for the page.
+        .allowsHitTesting(false)
     }
 }
 
@@ -2361,25 +2369,15 @@ private struct WebSurface: UIViewRepresentable {
         coordinator.follow(isCollapsed)
     }
 
-    /// Lets pages scroll fully clear of the translucent chrome. The scroll view keeps its automatic
-    /// adjustment, which adds whichever notch and home indicator insets the web view frame overlaps (none at the
-    /// top while the status bar strip is painted, since the frame then starts below it), so only the bar heights
-    /// are added here. On iOS 26 and later WebKit is also told what is covered, so a site's fixed header lays out
-    /// below the status bar and the bars instead of under them.
+    /// Lets pages scroll fully clear of the translucent chrome, and keeps a site's fixed header below the status bar
+    /// and the bars. The work is in `PageInsets`; the tab's own web view also redoes it when its safe area changes.
     private static func apply(_ insets: UIEdgeInsets, to webView: WKWebView) {
-        let scrollView = webView.scrollView
-        // While the pull to refresh spinner is out, UIKit owns the top inset.
-        if scrollView.refreshControl?.isRefreshing == true { return }
-        if scrollView.contentInset != insets {
-            let wasAtTop = scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top + 1
-            scrollView.contentInset = insets
-            scrollView.verticalScrollIndicatorInsets = insets
-            if wasAtTop {
-                // Keep the top of the page just below the top bar instead of hidden under it.
-                scrollView.contentOffset = CGPoint(x: scrollView.contentOffset.x, y: -scrollView.adjustedContentInset.top)
-            }
+        if let zallaWebView = webView as? ZallaWebView {
+            zallaWebView.chromeInsets = insets
+            PageInsets.apply(chrome: insets, to: zallaWebView)
+        } else {
+            PageInsets.apply(chrome: insets, to: webView)
         }
-        ObscuredInsets.apply(scrollView.adjustedContentInset, to: webView)
     }
 }
 

@@ -1071,7 +1071,7 @@ final class BrowserTab: NSObject, ObservableObject, Identifiable, WKNavigationDe
             configuration.userContentController = controller
             newController = controller
         }
-        webView = WKWebView(frame: .zero, configuration: configuration)
+        webView = ZallaWebView(frame: .zero, configuration: configuration)
         super.init()
         if let newController {
             scriptHandlerProxy.delegate = self
